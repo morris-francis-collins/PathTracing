@@ -2,23 +2,31 @@
 //  ContentView.swift
 //  PathTracing
 //
-//  Created by Moritz Kohlenz on 4/25/25.
-//
 
 import SwiftUI
+import MetalKit
 
-struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+struct ContentView: NSViewRepresentable {
+    @EnvironmentObject var gameScene: GameScene
+    let device: MTLDevice = MTLCreateSystemDefaultDevice()!
+    
+    func makeCoordinator() -> Renderer {
+        Renderer(device: device, scene: gameScene)
     }
-}
-
-#Preview {
-    ContentView()
+    
+    func makeNSView(context: Context) -> MTKView {
+        let mtkView = MTKView()
+        mtkView.delegate = context.coordinator
+        mtkView.preferredFramesPerSecond = 60
+        mtkView.device = device
+        mtkView.framebufferOnly = false
+        mtkView.drawableSize = mtkView.frame.size
+        mtkView.isPaused = false
+        mtkView.depthStencilPixelFormat = .depth32Float
+        return mtkView
+    }
+    
+    func updateNSView(_ nsView: MTKView, context: Context) {
+        
+    }
 }

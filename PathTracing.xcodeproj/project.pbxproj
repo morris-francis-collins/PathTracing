@@ -10,9 +10,22 @@
 		1DB937E62DBC835A00B93D69 /* PathTracing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathTracing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1D59DB742DBF5D4300E54BA1 /* Exceptions for "PathTracing" folder in "PathTracing" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Unused/scene.bin,
+			);
+			target = 1DB937E52DBC835A00B93D69 /* PathTracing */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1DB937E82DBC835A00B93D69 /* PathTracing */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1D59DB742DBF5D4300E54BA1 /* Exceptions for "PathTracing" folder in "PathTracing" target */,
+			);
 			path = PathTracing;
 			sourceTree = "<group>";
 		};
@@ -248,7 +261,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PathTracing/PathTracing.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -264,6 +277,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = moritz.PathTracing;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = PathTracing/definitions.h;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -273,7 +287,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PathTracing/PathTracing.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -289,6 +303,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = moritz.PathTracing;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = PathTracing/definitions.h;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

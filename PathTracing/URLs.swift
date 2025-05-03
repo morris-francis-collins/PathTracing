@@ -1,0 +1,33 @@
+//
+//  URLs.swift
+//  PathTracing
+//
+//  Created on 4/30/25.
+//
+
+import Foundation
+
+// MARK: Textures
+
+let transparentURL = Bundle.main.url(forResource: "transparent", withExtension: "jpg")!
+let checkerBoardURL = Bundle.main.url(forResource: "checkerboard", withExtension: "jpg")!
+
+// MARK: Models
+
+let cubeURL = Bundle.main.url(forResource: "cube", withExtension: "obj")!
+let ballURL = Bundle.main.url(forResource: "ball", withExtension: "obj")!
+let pyramidURL = Bundle.main.url(forResource: "pyramid", withExtension: "obj")!
+let tableURL = Bundle.main.url(forResource: "table", withExtension: "obj")!
+let roundGlassTableURL = Bundle.main.url(forResource: "Round_glass_table", withExtension: "usdz")!
+let teaTableURL = Bundle.main.url(forResource: "Tea Table01", withExtension: "usdz")!
+let windowURL = Bundle.main.url(forResource: "glass_window", withExtension: "usdz")!
+let mirrorURL = Bundle.main.url(forResource: "Stand_mirror", withExtension: "usdz")!
+let couchURL = Bundle.main.url(forResource: "basic_couch", withExtension: "usdz")!
+let hangingLightURL = Bundle.main.url(forResource: "hanging_light", withExtension: "usdz")!
+let LShapedCouchURL = Bundle.main.url(forResource: "l_shaped_couch", withExtension: "usdz")!
+
+// hanging light works
+// triangle hanging light too small
+// triangle light broken
+
+// hanging light nearly equal triangle light
