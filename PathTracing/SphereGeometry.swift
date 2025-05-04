@@ -56,10 +56,6 @@ class SphereGeometry: Geometry {
         spheres.append(sphere)
     }
     
-    override func clear() {
-        spheres.removeAll()
-    }
-    
     override func uploadToBuffers() {
         let options = getManagedBufferStorageMode()
         

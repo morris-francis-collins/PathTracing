@@ -10,15 +10,11 @@ import MetalKit
 import ModelIO
 
 class ModelIOGeometry: Geometry {
-    let resolver: MDLAssetResolver?
-    
-    var lightGeometry: LightGeometry
-    
-    init(device: MTLDevice, modelURL: URL, textureURL: URL? = transparentURL, defaultColor: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0), inwardsNormals: Bool = false) {
-        self.resolver = MDLPathAssetResolver(path: modelURL.deletingLastPathComponent().path)
-        lightGeometry = LightGeometry(device: device)
-        super.init(device: device)
         
+    init(device: MTLDevice, modelURL: URL, textureURL: URL? = transparentURL, defaultColor: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0), inwardsNormals: Bool = false) {
+        super.init(device: device)
+        lightGeometry = LightGeometry(device: device)
+
         self.inwardsNormals = inwardsNormals
         
         let bufferAllocator = MTKMeshBufferAllocator(device: device)
@@ -125,18 +121,52 @@ class ModelIOGeometry: Geometry {
                 print("Failed to get material")
             }
         
-            let emission = submesh.material!.property(with: MDLMaterialSemantic.emission)
-            let emissionTexture = emission?.textureSamplerValue?.texture
-
+            let emissionProperty = submesh.material?.property(with: MDLMaterialSemantic.emission)
+            let emissionTexture = emissionProperty?.textureSamplerValue?.texture
             let emissionData = emissionTexture?.texelDataWithTopLeftOrigin()
-            
 
             for i in stride(from: 0, to: indexCount, by: 3) {
-                triangleMaterials.append(submeshMaterial)
                 
                 let i0 = getIndexValue(from: indexData, at: i, type: indexType)
                 let i1 = getIndexValue(from: indexData, at: i+1, type: indexType)
                 let i2 = getIndexValue(from: indexData, at: i+2, type: indexType)
+                
+                var emissive = false
+                
+                if let texCoordAttribute = texCoordAttribute {
+                    let offset = texCoordAttribute.offset
+                    
+                    let t0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
+                                         .assumingMemoryBound(to: SIMD2<Float>.self)
+                    let t1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
+                                         .assumingMemoryBound(to: SIMD2<Float>.self)
+                    let t2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
+                                         .assumingMemoryBound(to: SIMD2<Float>.self)
+
+                    triangleTexCoords.append(t0Ptr.pointee)
+                    triangleTexCoords.append(t1Ptr.pointee)
+                    triangleTexCoords.append(t2Ptr.pointee)
+                                        
+                    if let emissionTexture = emissionTexture, let emissionData = emissionData {
+                        let width = Int(emissionTexture.dimensions.x)
+                        let height = Int(emissionTexture.dimensions.y)
+                        
+                        let emissionColor0 = sampleEmissionTexture(data: emissionData, w: width, h: height, at: t0Ptr.pointee)
+                        let emissionColor1 = sampleEmissionTexture(data: emissionData, w: width, h: height, at: t1Ptr.pointee)
+                        let emissionColor2 = sampleEmissionTexture(data: emissionData, w: width, h: height, at: t2Ptr.pointee)
+                        
+                        if length(emissionColor0) > 0.01 || length(emissionColor1) > 0.01 || length(emissionColor2) > 0.01 {
+                            emissive = true
+                            lightGeometry?.lightColors.append(contentsOf: [emissionColor0, emissionColor1, emissionColor2])
+                        }
+                    }
+                }
+                
+                if emissive {
+                    lightGeometry?.materials.append(submeshMaterial)
+                } else {
+                    triangleMaterials.append(submeshMaterial)
+                }
                 
                 if let positionAttribute = positionAttribute {
                     let offset = positionAttribute.offset
@@ -148,9 +178,15 @@ class ModelIOGeometry: Geometry {
                     let v2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
                                          .assumingMemoryBound(to: SIMD3<Float>.self)
                     
-                    triangleVertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
-                    triangleVertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
-                    triangleVertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
+                    if emissive {
+                        lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
+                        lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
+                        lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
+                    } else {
+                        triangleVertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
+                        triangleVertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
+                        triangleVertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
+                    }
                 }
                 
                 if let normalAttribute = normalAttribute {
@@ -173,34 +209,17 @@ class ModelIOGeometry: Geometry {
                         n2 = -n2
                     }
                     
-                    triangleNormals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
-                    triangleNormals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
-                    triangleNormals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
-                }
-                
-                if let texCoordAttribute = texCoordAttribute {
-                    let offset = texCoordAttribute.offset
-                    
-                    let t0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
-                                         .assumingMemoryBound(to: SIMD2<Float>.self)
-                    let t1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
-                                         .assumingMemoryBound(to: SIMD2<Float>.self)
-                    let t2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
-                                         .assumingMemoryBound(to: SIMD2<Float>.self)
-
-                    triangleTexCoords.append(t0Ptr.pointee)
-                    triangleTexCoords.append(t1Ptr.pointee)
-                    triangleTexCoords.append(t2Ptr.pointee)
-                    if emissionTexture != nil && emissionData != nil {
-                        let width = Int(emissionTexture!.dimensions.x)
-                        let height = Int(emissionTexture!.dimensions.y)
-                        let emissionColor = sampleEmissionTexture(data: emissionData!, w: width, h: height, at: t0Ptr.pointee)
-                        if length(emissionColor) > 0.1 {
-                            print(emissionColor)
-                        }
+                    if emissive {
+                        lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
+                        lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
+                        lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
+                    } else {
+                        triangleNormals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
+                        triangleNormals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
+                        triangleNormals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
                     }
                 }
-                
+                                
                 if let colorAttribute = colorAttribute {
                     let offset = colorAttribute.offset
                     
@@ -211,9 +230,15 @@ class ModelIOGeometry: Geometry {
                     let c2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
                                          .assumingMemoryBound(to: SIMD3<Float>.self)
 
-                    triangleColors.append(c0Ptr.pointee)
-                    triangleColors.append(c1Ptr.pointee)
-                    triangleColors.append(c2Ptr.pointee)
+                    if emissive {
+                        lightGeometry?.colors.append(c0Ptr.pointee)
+                        lightGeometry?.colors.append(c1Ptr.pointee)
+                        lightGeometry?.colors.append(c2Ptr.pointee)
+                    } else {
+                        triangleColors.append(c0Ptr.pointee)
+                        triangleColors.append(c1Ptr.pointee)
+                        triangleColors.append(c2Ptr.pointee)
+                    }
                 } else {
                     var color = defaultColor
                     
@@ -225,9 +250,15 @@ class ModelIOGeometry: Geometry {
                         }
                     }
                     
-                    triangleColors.append(color)
-                    triangleColors.append(color)
-                    triangleColors.append(color)
+                    if emissive {
+                        lightGeometry?.colors.append(color)
+                        lightGeometry?.colors.append(color)
+                        lightGeometry?.colors.append(color)
+                    } else {
+                        triangleColors.append(color)
+                        triangleColors.append(color)
+                        triangleColors.append(color)
+                    }
                 }
             }
         }
@@ -293,7 +324,7 @@ class ModelIOGeometry: Geometry {
         let v = uv.y.truncatingRemainder(dividingBy: 1.0)
 
         let px = min(max(Int(u * Float(w)), 0), w - 1)
-        let py = min(max(Int((1 - v) * Float(h)), 0), h - 1) // possibly change 1 - v
+        let py = min(max(Int((1 - v) * Float(h)), 0), h - 1) // need 1 - v
 
         let bytesPerPixel = 4
         let rowBytes = bytesPerPixel * w
@@ -323,6 +354,10 @@ class ModelIOGeometry: Geometry {
         if let tx = textureCoordinatesBuffer { resourceArray.append(tx) }
         
         return resourceArray
+    }
+    
+    override func getLightGeometry() -> LightGeometry? {
+        return lightGeometry
     }
 }
 

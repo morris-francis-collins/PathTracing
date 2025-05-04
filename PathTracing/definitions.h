@@ -31,7 +31,7 @@
 
 #define MAX_AREA_LIGHTS 4
 
-#define CAMERA_FOV_ANGLE 45
+#define CAMERA_FOV_ANGLE 60
 
 #define MAX_TEXTURES 32
 
@@ -46,6 +46,9 @@ struct LightTriangle {
     vector_float3 v0;
     vector_float3 v1;
     vector_float3 v2;
+    vector_float3 emission0;
+    vector_float3 emission1;
+    vector_float3 emission2;
     float area;
     float cdf;
 };

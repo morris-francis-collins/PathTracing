@@ -9,6 +9,12 @@ import MetalKit
 
 class LightGeometry: Geometry {
     var lightColors: [SIMD3<Float>] = []
+    var lightAmplifier: Float
+    
+    init(device: MTLDevice, lightAmplifier: Float = 1.0) {
+        self.lightAmplifier = lightAmplifier
+        super.init(device: device)
+    }
         
     override func geometryDescriptor() -> MTLAccelerationStructureGeometryDescriptor? {
         let descriptor = MTLAccelerationStructureTriangleGeometryDescriptor()
@@ -20,7 +26,7 @@ class LightGeometry: Geometry {
         
     override func resources() -> [MTLResource] {
         var resourceArray: [MTLResource] = []
-        
+
         if let nb = vertexNormalBuffer { resourceArray.append(nb) }
         if let cb = vertexColorBuffer { resourceArray.append(cb) }
         if let mb = materialBuffer { resourceArray.append(mb) }

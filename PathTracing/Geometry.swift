@@ -23,6 +23,7 @@ class Geometry {
     var texCoords: [SIMD2<Float>] = []
     var materials: [Material] = []
     
+    var lightGeometry: LightGeometry?
     var inwardsNormals: Bool = false
         
     init(device: MTLDevice) {
@@ -86,9 +87,6 @@ class Geometry {
         #endif
     }
 
-    func clear() {
-    }
-
     func geometryDescriptor() -> MTLAccelerationStructureGeometryDescriptor? {
         return nil
     }
@@ -100,18 +98,19 @@ class Geometry {
     func intersectionFunctionName() -> String? {
         return nil
     }
+    
+    func getLightGeometry() -> LightGeometry? {
+        return nil
+    }
 }
 
 class ObjGeometry: Geometry {
     var material: Material?
     var texture: MTLTexture?
     
-    var lightGeometry: LightGeometry
-
-    init(device: MTLDevice, objURL: URL, textureURL: URL = transparentURL, color: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0),
-         material: Material = PLASTIC, inwardsNormals: Bool = false) {
-        lightGeometry = LightGeometry(device: device)
+    init(device: MTLDevice, objURL: URL, textureURL: URL = transparentURL, color: SIMD3<Float> = .one, emissionColor: SIMD3<Float> = .zero, material: Material = PLASTIC, inwardsNormals: Bool = false) {
         super.init(device: device)
+        lightGeometry = LightGeometry(device: device)
 
         self.inwardsNormals = inwardsNormals
         self.material = material
@@ -132,10 +131,7 @@ class ObjGeometry: Geometry {
             if trimmed.hasPrefix("v ") {
                 // vertex positions
                 let parts = trimmed.split(separator: " ")
-                if parts.count >= 4,
-                   let x = Float(parts[1]),
-                   let y = Float(parts[2]),
-                   let z = Float(parts[3]) {
+                if parts.count >= 4, let x = Float(parts[1]), let y = Float(parts[2]), let z = Float(parts[3]) {
                     positions.append(SIMD3<Float>(x, y, z))
                 }
             } else if trimmed.hasPrefix("vt ") {
@@ -193,6 +189,8 @@ class ObjGeometry: Geometry {
         } catch {
             fatalError("Couldn't load texture: \(error)")
         }
+        
+        
 
         
         for face in faces {
@@ -200,11 +198,21 @@ class ObjGeometry: Geometry {
                 let pos = positions[vertex.v]
                 let norm = normalsArray[vertex.n]
                 let uv = textureCoordinates[vertex.vt]
-                vertices.append(pos)
-                normals.append(inwardsNormals ? -norm : norm)
-                colors.append(color)
-                texCoords.append(uv)
-                materials.append(self.material!)
+                
+                if let lightGeo = lightGeometry, length(emissionColor) > 0.1 {
+                    lightGeo.vertices.append(pos)
+                    lightGeo.normals.append(inwardsNormals ? -norm : norm)
+                    lightGeo.colors.append(color)
+                    lightGeo.texCoords.append(uv)
+                    lightGeo.materials.append(self.material!)
+                    lightGeo.lightColors.append(emissionColor)
+                } else {
+                    vertices.append(pos)
+                    normals.append(inwardsNormals ? -norm : norm)
+                    colors.append(color)
+                    texCoords.append(uv)
+                    materials.append(self.material!)
+                }
             }
         }
 
@@ -229,11 +237,9 @@ class ObjGeometry: Geometry {
 
         return resourceArray
     }
-    
-    override func clear() {
-        vertices.removeAll()
-        normals.removeAll()
-        colors.removeAll()
+        
+    override func getLightGeometry() -> LightGeometry? {
+        return lightGeometry
     }
 }
 
@@ -269,10 +275,14 @@ class GeometryInstance {
         ))
     }
     
-    func getLightTriangles() -> ([LightTriangle], Float) {
+    func getLightTriangles() -> ([LightTriangle], Float, SIMD3<Float>) {
         var lightTriangles: [LightTriangle] = []
         var totalArea: Float = 0.0
+        var averageEmission = SIMD3<Float>(0.0, 0.0, 0.0)
+        
         let vertices = geometry.vertices
+        guard let lightColors = (geometry as? LightGeometry)?.lightColors,
+              let lightAmplifier = (geometry as? LightGeometry)?.lightAmplifier else { fatalError("Could not get light geometry") }
         
         for i in stride(from: 0, to: vertices.count, by: 3) {
             if i + 2 < vertices.count {
@@ -290,7 +300,16 @@ class GeometryInstance {
                 let area = 0.5 * simd_length(cross(edge1, edge2))
                 totalArea += area
                 
-                let triangle = LightTriangle(v0: v0, v1: v1, v2: v2, area: area, cdf: 0.0)
+                let emission0 = lightColors[i] * lightAmplifier
+                let emission1 = lightColors[i + 1] * lightAmplifier
+                let emission2 = lightColors[i + 2] * lightAmplifier
+                
+                averageEmission += emission0 + emission1 + emission2
+                
+                let triangle = LightTriangle(v0: v0, v1: v1, v2: v2,
+                                             emission0: emission0, emission1: emission1, emission2: emission2,
+                                             area: area, cdf: 0.0)
+                
                 lightTriangles.append(triangle)
             }
         }
@@ -301,6 +320,6 @@ class GeometryInstance {
             lightTriangles[i].cdf = cumulativeArea / totalArea
         }
         
-        return (lightTriangles, totalArea)
+        return (lightTriangles, totalArea, averageEmission / Float(lightColors.count))
     }
 }

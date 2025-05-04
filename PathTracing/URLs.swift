@@ -25,6 +25,9 @@ let mirrorURL = Bundle.main.url(forResource: "Stand_mirror", withExtension: "usd
 let couchURL = Bundle.main.url(forResource: "basic_couch", withExtension: "usdz")!
 let hangingLightURL = Bundle.main.url(forResource: "hanging_light", withExtension: "usdz")!
 let LShapedCouchURL = Bundle.main.url(forResource: "l_shaped_couch", withExtension: "usdz")!
+let wallLightURL = Bundle.main.url(forResource: "wall_light", withExtension: "usdz")!
+let floorLampURL = Bundle.main.url(forResource: "floor_lamp", withExtension: "usdz")!
+
 
 // hanging light works
 // triangle hanging light too small

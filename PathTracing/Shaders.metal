@@ -273,7 +273,7 @@ LightSample sampleTriangle(thread AreaLight areaLight,
     sample.distance = max(length(toLight), 1e-4f);
     sample.direction = toLight / sample.distance;
 
-    sample.emission = areaLight.color;
+    sample.emission = u * triangle.emission0 + v * triangle.emission1 + w * triangle.emission2;
     sample.PDF = selectionPDF / triangle.area;
     return sample;
 }
@@ -630,7 +630,7 @@ int traceCameraPath(float2 pixel,
                                  true);
         
         if (mask & GEOMETRY_MASK_LIGHT) {
-            directLightingContribution += throughput * sample.areaLight.color;
+            directLightingContribution += throughput * sample.emission;
             break;
         }
         
@@ -679,8 +679,7 @@ int traceLightPath(float2 pixel,
     float lightRandom = scrambledHalton(offset, 49, uniforms.frameIndex);
     uint lightIndex = min(uint(lightRandom * uniforms.lightCount), uniforms.lightCount - 1);
     
-    LightSample sample = sampleTriangle(areaLights[lightIndex], lightTriangles, 1.0f / float(uniforms.lightCount), float3(0.0f), r.yzw
-    );
+    LightSample sample = sampleTriangle(areaLights[lightIndex], lightTriangles, 1.0f / float(uniforms.lightCount), float3(0.0f), r.yzw);
     
     sample.areaLight = areaLights[lightIndex];
     AreaLight selectedLight = sample.areaLight;
@@ -694,8 +693,8 @@ int traceLightPath(float2 pixel,
     
     lightVertices[0].position = sample.position + sample.normal * 1e-4f;
     lightVertices[0].normal = sample.normal;
-    lightVertices[0].throughput = selectedLight.color;
-    lightVertices[0].material_color = selectedLight.color;
+    lightVertices[0].throughput = sample.emission;
+    lightVertices[0].material_color = sample.emission;
     lightVertices[0].forwardPDF = sample.PDF * directionPDF;
     lightVertices[0].reversePDF = 0.0f;
     lightVertices[0].type = LIGHT_VERTEX;
@@ -805,7 +804,7 @@ uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
     float3 normalizedRight = normalize(uniforms.camera.right);
     float3 normalizedUp = normalize(uniforms.camera.up);
 
-    float fieldOfView = 45.0f * (M_PI_F / 180.0f);
+    float fieldOfView = CAMERA_FOV_ANGLE * (M_PI_F / 180.0f);
     float imagePlaneHeight = tan(fieldOfView / 2.0f);
     float imagePlaneWidth = imagePlaneHeight * float(uniforms.width) / float(uniforms.height);
 
@@ -1149,7 +1148,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     
     dstTex.write(float4(totalLighting, 1.0f), tid);
     splatTex.write(float4(totalSplat, 1.0f), tid);
-    finalImage.write(float4(1.0f * totalLighting + 1.0f * 50.0f * totalSplat, 1.0f), tid);
+    finalImage.write(float4(1.0f * totalLighting + 1.0f * 20.0f * totalSplat, 1.0f), tid);
 }
 
 kernel void clearAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],
