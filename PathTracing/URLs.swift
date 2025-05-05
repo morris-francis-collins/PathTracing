@@ -28,3 +28,4 @@ let LShapedCouchURL = Bundle.main.url(forResource: "l_shaped_couch", withExtensi
 let wallLightURL = Bundle.main.url(forResource: "wall_light", withExtension: "usdz")!
 let floorLampURL = Bundle.main.url(forResource: "floor_lamp", withExtension: "usdz")!
 let ringURL = Bundle.main.url(forResource: "ring", withExtension: "obj")!
+let torusURL = Bundle.main.url(forResource: "torus", withExtension: "obj")!

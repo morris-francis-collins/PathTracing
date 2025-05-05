@@ -62,7 +62,21 @@ extension Renderer {
         let aKey: UInt16 = 0
         let sKey: UInt16 = 1
         let dKey: UInt16 = 2
+        let qKey: UInt16 = 12
+        let eKey: UInt16 = 14
         let lKey: UInt16 = 37
+        
+        let zeroKey: UInt16 = 29
+        let oneKey: UInt16 = 18
+        let twoKey: UInt16 = 19
+        let threeKey: UInt16 = 20
+        let fourKey: UInt16 = 21
+        let fiveKey: UInt16 = 23
+        let sixKey: UInt16 = 22
+        let sevenKey: UInt16 = 26
+        let eightKey: UInt16 = 28
+        let nineKey: UInt16 = 25
+        
         let upArrow: UInt16 = 126
         let downArrow: UInt16 = 125
         let leftArrow: UInt16 = 123
@@ -70,7 +84,7 @@ extension Renderer {
         let space: UInt16 = 49
 
         if keysPressed.isEmpty { return }
-        
+
         let spacePressed = keysPressed.contains(space)
         var cameraChanged = false
         
@@ -93,6 +107,15 @@ extension Renderer {
             scene.moveCamera(amount: -scene.cameraSpeed, axis: rightAxis)
             cameraChanged = true
         }
+        if keysPressed.contains(eKey) {
+            scene.moveCamera(amount: scene.cameraSpeed, axis: worldUp)
+            cameraChanged = true
+        }
+        if keysPressed.contains(qKey) {
+            scene.moveCamera(amount: -scene.cameraSpeed, axis: worldUp)
+            cameraChanged = true
+        }
+        
         
         if keysPressed.contains(upArrow) {
             scene.rotateUpDown(angle: scene.rotationSpeed)
@@ -109,6 +132,22 @@ extension Renderer {
         if keysPressed.contains(rightArrow) {
             scene.rotateLeftRight(angle: -scene.rotationSpeed)
             cameraChanged = true
+        }
+        
+        let numberKeys = [zeroKey, oneKey, twoKey, threeKey, fourKey, fiveKey, sixKey, sevenKey, eightKey, nineKey]
+        
+        for (index, keyCode) in numberKeys.enumerated() {
+            if keysPressed.contains(keyCode) {
+                if index < scene.cameraLocations.count {
+                    let (newPosition, newTarget) = scene.cameraLocations[index]
+                    
+                    scene.cameraPosition = newPosition
+                    scene.cameraTarget = newTarget
+                    
+                    keysPressed.remove(keyCode)
+                    cameraChanged = true
+                }
+            }
         }
         
         if keysPressed.contains(lKey) {
