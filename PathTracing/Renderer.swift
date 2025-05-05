@@ -47,6 +47,8 @@ class Renderer: NSObject, MTKViewDelegate {
     var frameIndex: UInt = 0
     
     var scene: GameScene
+    var keysPressed = Set<UInt16>()
+    
     var resourcesStride: Int = 0
     var useIntersectionFunctions: Bool = false
     
@@ -363,11 +365,11 @@ class Renderer: NSObject, MTKViewDelegate {
         let position = scene.cameraPosition
         let target = scene.cameraTarget
         let up = scene.cameraUp
-        
+
         let forward = simd_normalize(target - position)
         let right = simd_normalize(simd_cross(forward, up))
         let correctedUp = simd_normalize(simd_cross(right, forward))
-        
+
         uniforms.camera.position = position
         uniforms.camera.forward = forward
         uniforms.camera.right = right
@@ -407,6 +409,7 @@ class Renderer: NSObject, MTKViewDelegate {
             self.semaphore.signal()
         }
         
+        processCameraInput()
         updateUniforms()
         
         let width = Int(drawableSize.width)

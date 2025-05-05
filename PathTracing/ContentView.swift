@@ -15,7 +15,7 @@ struct ContentView: NSViewRepresentable {
     }
     
     func makeNSView(context: Context) -> MTKView {
-        let mtkView = MTKView()
+        let mtkView = KeyHandlingMTKView()
         mtkView.delegate = context.coordinator
         mtkView.preferredFramesPerSecond = 60
         mtkView.device = device
@@ -23,6 +23,7 @@ struct ContentView: NSViewRepresentable {
         mtkView.drawableSize = mtkView.frame.size
         mtkView.isPaused = false
         mtkView.depthStencilPixelFormat = .depth32Float
+        mtkView.renderer = context.coordinator
         return mtkView
     }
     

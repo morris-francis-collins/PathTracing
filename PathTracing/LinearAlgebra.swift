@@ -96,6 +96,19 @@ class LinearAlgebra {
         )
     }
     
+    static func rotateAroundAxis(_ angle: Float, around axis: simd_float3) -> float3x3 {
+        let c = cos(angle)
+        let s = sin(angle)
+        let t = 1 - c
+        let x = axis.x, y = axis.y, z = axis.z
+        
+        return float3x3(
+            [t*x*x + c, t*x*y - s*z, t*x*z + s*y],
+            [t*x*y + s*z, t*y*y + c, t*y*z - s*x],
+            [t*x*z - s*y, t*y*z + s*x, t*z*z + c]
+        )
+    }
+    
     static func transformPosition(position: SIMD3<Float>, with transform: float4x4) -> SIMD3<Float> {
         let homogeneous = SIMD4<Float>(position, 1)
         let transformed = transform * homogeneous
@@ -104,9 +117,9 @@ class LinearAlgebra {
     
     static func transformNormal(normal: SIMD3<Float>, with transform: float4x4) -> SIMD3<Float> {
         let t3x3 = float3x3(
-            SIMD3<Float>(transform.columns.0.x, transform.columns.0.y, transform.columns.0.z),
-            SIMD3<Float>(transform.columns.1.x, transform.columns.1.y, transform.columns.1.z),
-            SIMD3<Float>(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z)
+            [transform.columns.0.x, transform.columns.0.y, transform.columns.0.z],
+            [transform.columns.1.x, transform.columns.1.y, transform.columns.1.z],
+            [transform.columns.2.x, transform.columns.2.y, transform.columns.2.z]
         )
         
         let normalMatrix = simd_transpose(simd_inverse(t3x3))

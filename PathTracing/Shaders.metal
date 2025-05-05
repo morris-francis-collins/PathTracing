@@ -963,7 +963,7 @@ float3 connectPaths(
                 if (lightVertices[v].is_delta || lightVertices[v].material.metallic > 0.5f ||
                     lightVertices[v].material.opacity < 0.9f) {
                     hitSpecular++;
-                } else if (hitSpecular >= 2) { // 1 to show mirror, 2 for glass
+                } else if (hitSpecular >= 1) { // 1 to show mirror, 2 for glass
                     isCausticPath = true;
                     break;
                 }

@@ -27,10 +27,4 @@ let hangingLightURL = Bundle.main.url(forResource: "hanging_light", withExtensio
 let LShapedCouchURL = Bundle.main.url(forResource: "l_shaped_couch", withExtension: "usdz")!
 let wallLightURL = Bundle.main.url(forResource: "wall_light", withExtension: "usdz")!
 let floorLampURL = Bundle.main.url(forResource: "floor_lamp", withExtension: "usdz")!
-
-
-// hanging light works
-// triangle hanging light too small
-// triangle light broken
-
-// hanging light nearly equal triangle light
+let ringURL = Bundle.main.url(forResource: "ring", withExtension: "obj")!
