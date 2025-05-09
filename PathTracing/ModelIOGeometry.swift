@@ -10,6 +10,7 @@ import MetalKit
 import ModelIO
 
 class ModelIOGeometry: Geometry {
+    var resolver: MDLAssetResolver?
         
     init(device: MTLDevice, modelURL: URL, textureURL: URL? = transparentURL, defaultColor: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0), inwardsNormals: Bool = false) {
         super.init(device: device)
@@ -23,10 +24,10 @@ class ModelIOGeometry: Geometry {
                              bufferAllocator: bufferAllocator
                             )
         
-        asset.loadTextures()
-        asset.resolver = MDLPathAssetResolver(path: modelURL.deletingLastPathComponent().path)
-        print(modelURL.pathComponents.last)
-//        print(modelURL.path,asset.childObjects(of: MDLLight.self).count, asset.childObjects(of: MDLAreaLight.self).count, asset.childObjects(of: MDLMesh.self).count)
+//        asset.loadTextures()
+        resolver = asset.resolver!
+
+//        print(modelURL.pathComponents.last)
         for i in 0..<asset.count {
             let object = asset.object(at: i)
             let transform = object.transform?.matrix ?? LinearAlgebra.identity()
@@ -57,7 +58,7 @@ class ModelIOGeometry: Geometry {
         if mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeTextureCoordinate) == nil {
             mesh.addUnwrappedTextureCoordinates(forAttributeNamed: MDLVertexAttributeTextureCoordinate)
         }
-        
+                
         guard let vertexBuffer = mesh.vertexBuffers.first else { fatalError("Failed getting vertex buffer") }
         let vertexData = vertexBuffer.map().bytes
         
@@ -72,41 +73,68 @@ class ModelIOGeometry: Geometry {
         var triangleTexCoords: [SIMD2<Float>] = []
         var triangleColors: [SIMD3<Float>] = []
         var triangleMaterials: [Material] = []
-        
+                
         for submesh in mesh.submeshes! {
             guard let submesh = submesh as? MDLSubmesh else { fatalError("Could not cast to submesh") }
             let indexBuffer = submesh.indexBuffer
             let indexData = indexBuffer.map().bytes
             let indexCount = submesh.indexCount
             let indexType = submesh.indexType
-
+            
             var submeshMaterial = Material()
+            var currentColor = defaultColor
+                        
             if let mdlMaterial = submesh.material {
-                submeshMaterial = extractMaterialData(from: mdlMaterial)
+                mdlMaterial.loadTextures(using: resolver!)
+                
+                if let baseColorProperty = mdlMaterial.property(with: MDLMaterialSemantic.baseColor) {
+                    if baseColorProperty.type == .float3 {
+                        currentColor = baseColorProperty.float3Value
+                    }
+                }
+
+                if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
+                    if opacityProperty.type == .float {
+                        submeshMaterial.opacity = opacityProperty.floatValue / 10.0
+                    }
+                } else {
+                    submeshMaterial.opacity = 1.0
+                }
+
+                
+                if let refractionProperty = mdlMaterial.property(with: MDLMaterialSemantic.materialIndexOfRefraction) {
+                    if refractionProperty.type == .float {
+                        submeshMaterial.refraction = refractionProperty.floatValue
+                    }
+                } else {
+                    submeshMaterial.refraction = 1.5
+                }
+
+                if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
+                    if roughnessProperty.type == .float {
+                        submeshMaterial.roughness = roughnessProperty.floatValue
+                    }
+                } else {
+                    submeshMaterial.roughness = 0.0
+                }
+                
+                
+                if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
+                    if metallicProperty.type == .float {
+                        submeshMaterial.metallic = metallicProperty.floatValue
+                    }
+                } else {
+                    submeshMaterial.metallic = 0.0
+                }
+                
                 let baseColor = mdlMaterial.property(with: MDLMaterialSemantic.baseColor)
                 let mdlTexture = baseColor?.textureSamplerValue?.texture
                 let textureLoader = MTKTextureLoader(device: device)
-//                print("color", baseColor?.color, baseColor?.float3Value)
-//                let emission = mdlMaterial.property(with: MDLMaterialSemantic.emission)
-//                let emissionTexture = emission?.textureSamplerValue?.texture
-//                print("emission", emission?.color, emission?.float3Value, emission?.luminance, emission?.textureSamplerValue?.texture?.description, emission?.textureSamplerValue?.texture?.name)
-            
-                
-//                if let emissionProperty = mdlMaterial.property(with: .emission) {
-//
-//                    if let textureValue = emissionProperty.textureSamplerValue?.texture {
-//                        print("texture")
-//                    }
-//                    if let colorValue = emissionProperty.color {
-//                        print("color: \(colorValue)")
-//                    }
-//                }
-                
                 
                 do {
                     if let cgImage = mdlTexture?.imageFromTexture() {
                         let mtlTexture = try textureLoader.newTexture(cgImage: cgImage.takeRetainedValue())
-                        let identifier = "\(submesh.hashValue)+\(mdlTexture.hashValue)"
+                        let identifier = "\(submesh.hashValue)\(mdlTexture.hashValue)"
                         let index = TextureRegistry.shared.addTexture(mtlTexture, identifier: identifier)
                         submeshMaterial.texture_index = UInt32(index)
                     } else {
@@ -120,11 +148,14 @@ class ModelIOGeometry: Geometry {
             } else {
                 print("Failed to get material")
             }
-        
-            let emissionProperty = submesh.material?.property(with: MDLMaterialSemantic.emission)
-            let emissionTexture = emissionProperty?.textureSamplerValue?.texture
-            let emissionData = emissionTexture?.texelDataWithTopLeftOrigin()
+            
+            let mdlMaterial = submesh.material!
 
+            let opacityMaterialData = extractTextureData(from: mdlMaterial, semantic: .opacity)
+            let roughnessMaterialData = extractTextureData(from: mdlMaterial, semantic: .roughness)
+            let metallicMaterialData = extractTextureData(from: mdlMaterial, semantic: .metallic)
+            let emissionMaterialData = extractTextureData(from: mdlMaterial, semantic: .emission)
+            
             for i in stride(from: 0, to: indexCount, by: 3) {
                 
                 let i0 = getIndexValue(from: indexData, at: i, type: indexType)
@@ -132,132 +163,169 @@ class ModelIOGeometry: Geometry {
                 let i2 = getIndexValue(from: indexData, at: i+2, type: indexType)
                 
                 var emissive = false
+                var currentMaterial = submeshMaterial
                 
                 if let texCoordAttribute = texCoordAttribute {
                     let offset = texCoordAttribute.offset
                     
                     let t0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
-                                         .assumingMemoryBound(to: SIMD2<Float>.self)
+                        .assumingMemoryBound(to: SIMD2<Float>.self)
                     let t1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
-                                         .assumingMemoryBound(to: SIMD2<Float>.self)
+                        .assumingMemoryBound(to: SIMD2<Float>.self)
                     let t2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
-                                         .assumingMemoryBound(to: SIMD2<Float>.self)
+                        .assumingMemoryBound(to: SIMD2<Float>.self)
+                    
+                    let t0 = t0Ptr.pointee
+                    let t1 = t1Ptr.pointee
+                    let t2 = t2Ptr.pointee
+                    
+                    triangleTexCoords.append(t0)
+                    triangleTexCoords.append(t1)
+                    triangleTexCoords.append(t2)
+                    
+                    if let mdlMaterial = submesh.material {
+                        if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
+                            if let opacityMaterialData, opacityProperty.type == .texture {
+                                currentMaterial.opacity = averageMaterialValue(from: opacityMaterialData, t0: t0, t1: t1, t2: t2).x
+                            }
+                        }
+                                                
+                        if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
+                            if let roughnessMaterialData, roughnessProperty.type == .texture {
+                                currentMaterial.roughness = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
+                            }
+                        }
+                        
+                        if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
+                            if let metallicMaterialData, metallicProperty.type == .texture {
+                                currentMaterial.metallic = averageMaterialValue(from: metallicMaterialData, t0: t0, t1: t1, t2: t2).x
+                            }
+                        }
+                        
+                        if let emissionProperty = mdlMaterial.property(with: MDLMaterialSemantic.emission) {
+                            if let emissionMaterialData, emissionProperty.type == .texture {
+                                let emissionColor0 = sampleTexture(materialData: emissionMaterialData, at: t0)
+                                let emissionColor1 = sampleTexture(materialData: emissionMaterialData, at: t1)
+                                let emissionColor2 = sampleTexture(materialData: emissionMaterialData, at: t2)
 
-                    triangleTexCoords.append(t0Ptr.pointee)
-                    triangleTexCoords.append(t1Ptr.pointee)
-                    triangleTexCoords.append(t2Ptr.pointee)
+                                if min(length(emissionColor0), length(emissionColor1), length(emissionColor2)) > 0.1 {
+                                    emissive = true
+                                    lightGeometry?.lightColors.append(contentsOf: [emissionColor0, emissionColor1, emissionColor2])
+                                }
+                            }
+                            else if emissionProperty.type == .float3 {
+                                let emissionColor = emissionProperty.float3Value
+                                if length(emissionColor) > 0.1 {
+                                    emissive = true
+                                    lightGeometry?.lightColors.append(contentsOf: [emissionColor, emissionColor, emissionColor])
+                                }
+                            }
+                        }
+                    }
+
+                    if emissive {
+                        lightGeometry?.materials.append(currentMaterial)
+                    } else {
+                        triangleMaterials.append(currentMaterial)
+                    }
                                         
-                    if let emissionTexture = emissionTexture, let emissionData = emissionData {
-                        let width = Int(emissionTexture.dimensions.x)
-                        let height = Int(emissionTexture.dimensions.y)
+                    if let positionAttribute = positionAttribute {
+                        let offset = positionAttribute.offset
                         
-                        let emissionColor0 = sampleEmissionTexture(data: emissionData, w: width, h: height, at: t0Ptr.pointee)
-                        let emissionColor1 = sampleEmissionTexture(data: emissionData, w: width, h: height, at: t1Ptr.pointee)
-                        let emissionColor2 = sampleEmissionTexture(data: emissionData, w: width, h: height, at: t2Ptr.pointee)
+                        let v0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        let v1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        let v2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
                         
-                        if length(emissionColor0) > 0.01 || length(emissionColor1) > 0.01 || length(emissionColor2) > 0.01 {
-                            emissive = true
-                            lightGeometry?.lightColors.append(contentsOf: [emissionColor0, emissionColor1, emissionColor2])
-                        }
-                    }
-                }
-                
-                if emissive {
-                    lightGeometry?.materials.append(submeshMaterial)
-                } else {
-                    triangleMaterials.append(submeshMaterial)
-                }
-                
-                if let positionAttribute = positionAttribute {
-                    let offset = positionAttribute.offset
-                    
-                    let v0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    let v1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    let v2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    
-                    if emissive {
-                        lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
-                        lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
-                        lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
-                    } else {
-                        triangleVertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
-                        triangleVertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
-                        triangleVertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
-                    }
-                }
-                
-                if let normalAttribute = normalAttribute {
-                    let offset = normalAttribute.offset
-                    
-                    let n0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    let n1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    let n2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    
-                    var n0 = n0Ptr.pointee
-                    var n1 = n1Ptr.pointee
-                    var n2 = n2Ptr.pointee
-                    
-                    if inwardsNormals {
-                        n0 = -n0
-                        n1 = -n1
-                        n2 = -n2
-                    }
-                    
-                    if emissive {
-                        lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
-                        lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
-                        lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
-                    } else {
-                        triangleNormals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
-                        triangleNormals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
-                        triangleNormals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
-                    }
-                }
-                                
-                if let colorAttribute = colorAttribute {
-                    let offset = colorAttribute.offset
-                    
-                    let c0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    let c1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-                    let c2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
-                                         .assumingMemoryBound(to: SIMD3<Float>.self)
-
-                    if emissive {
-                        lightGeometry?.colors.append(c0Ptr.pointee)
-                        lightGeometry?.colors.append(c1Ptr.pointee)
-                        lightGeometry?.colors.append(c2Ptr.pointee)
-                    } else {
-                        triangleColors.append(c0Ptr.pointee)
-                        triangleColors.append(c1Ptr.pointee)
-                        triangleColors.append(c2Ptr.pointee)
-                    }
-                } else {
-                    var color = defaultColor
-                    
-                    if let mdlMaterial = submesh.material, let baseColorProperty = mdlMaterial.property(with: MDLMaterialSemantic.baseColor) {
-                        color = baseColorProperty.float3Value
-
-                        if simd_length(color) < 1e-5 {
-                            color = SIMD3<Float>(repeating: 1.0)
+                        if emissive {
+                            lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
+                            lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
+                            lightGeometry?.vertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
+                        } else {
+                            triangleVertices.append(LinearAlgebra.transformPosition(position: v0Ptr.pointee, with: transform))
+                            triangleVertices.append(LinearAlgebra.transformPosition(position: v1Ptr.pointee, with: transform))
+                            triangleVertices.append(LinearAlgebra.transformPosition(position: v2Ptr.pointee, with: transform))
                         }
                     }
                     
-                    if emissive {
-                        lightGeometry?.colors.append(color)
-                        lightGeometry?.colors.append(color)
-                        lightGeometry?.colors.append(color)
+                    if let normalAttribute = normalAttribute {
+                        let offset = normalAttribute.offset
+                        
+                        let n0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        let n1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        let n2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        
+                        var n0 = n0Ptr.pointee
+                        var n1 = n1Ptr.pointee
+                        var n2 = n2Ptr.pointee
+                        
+                        if inwardsNormals {
+                            n0 = -n0
+                            n1 = -n1
+                            n2 = -n2
+                        }
+                        
+                        if emissive {
+                            lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
+                            lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
+                            lightGeometry?.normals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
+                        } else {
+                            triangleNormals.append(LinearAlgebra.transformNormal(normal: n0, with: transform))
+                            triangleNormals.append(LinearAlgebra.transformNormal(normal: n1, with: transform))
+                            triangleNormals.append(LinearAlgebra.transformNormal(normal: n2, with: transform))
+                        }
+                    }
+                    
+                    if let colorAttribute = colorAttribute {
+                        let offset = colorAttribute.offset
+                        
+                        let c0Ptr = vertexData.advanced(by: vertexStride * Int(i0) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        let c1Ptr = vertexData.advanced(by: vertexStride * Int(i1) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        let c2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                        
+                        let c0 = c0Ptr.pointee
+                        let c1 = c1Ptr.pointee
+                        let c2 = c2Ptr.pointee
+                        
+                        if emissive {
+                            lightGeometry?.colors.append(length(c0) < 1e-5 ? c0 : c0)
+                            lightGeometry?.colors.append(length(c1) < 1e-5 ? c1 : c1)
+                            lightGeometry?.colors.append(length(c2) < 1e-5 ? c2 : c2)
+                        } else {
+                            triangleColors.append(length(c0) < 1e-5 ? c0 : c0)
+                            triangleColors.append(length(c1) < 1e-5 ? c1 : c1)
+                            triangleColors.append(length(c2) < 1e-5 ? c2 : c2)
+                        }
                     } else {
-                        triangleColors.append(color)
-                        triangleColors.append(color)
-                        triangleColors.append(color)
+                        var color = currentColor
+                        
+                        if let mdlMaterial = submesh.material, let baseColorProperty = mdlMaterial.property(with: MDLMaterialSemantic.baseColor) {
+                            if baseColorProperty.type == .float3 {
+                                color = baseColorProperty.float3Value
+                            }
+
+                            if simd_length(color) < 1e-5 {
+                                color = SIMD3<Float>(repeating: 1.0)
+                            }
+                        }
+
+                        if emissive {
+                            lightGeometry?.colors.append(color)
+                            lightGeometry?.colors.append(color)
+                            lightGeometry?.colors.append(color)
+                        } else {
+                            triangleColors.append(color)
+                            triangleColors.append(color)
+                            triangleColors.append(color)
+                        }
                     }
                 }
             }
@@ -282,53 +350,42 @@ class ModelIOGeometry: Geometry {
             return 0
         }
     }
-    
-    private func extractMaterialData(from mdlMaterial: MDLMaterial) -> Material {
-        var material = Material()
         
-        if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
-            material.opacity = opacityProperty.floatValue
-        } else {
-            material.opacity = 1.0
+    func extractTextureData(from material: MDLMaterial?, semantic: MDLMaterialSemantic) -> MaterialData? {
+        if let material = material, let texture = material.property(with: semantic)?.textureSamplerValue?.texture, let data = texture.texelDataWithTopLeftOrigin() {
+            return MaterialData(data: data,
+                                width: Int(texture.dimensions.x),
+                                height: Int(texture.dimensions.y))
         }
-        
-        if let refractionProperty = mdlMaterial.property(with: MDLMaterialSemantic.materialIndexOfRefraction) {
-            material.refraction = refractionProperty.floatValue
-        } else {
-            material.refraction = 1.5
-        }
-        
-        if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
-            material.roughness = roughnessProperty.floatValue
-        } else {
-            material.roughness = 1.0
-        }
-
-        if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
-            material.metallic = metallicProperty.floatValue
-        } else {
-            material.metallic = 0.0
-        }
-
-        if let emissionProperty = mdlMaterial.property(with: MDLMaterialSemantic.emission) {
-            material.emission = emissionProperty.float3Value
-        } else {
-            material.emission = .zero
-        }
-
-        return material
+        return nil
     }
     
-    func sampleEmissionTexture(data: Data, w: Int, h: Int, at uv: SIMD2<Float>) -> SIMD3<Float> {
+    func averageMaterialValue(from materialData: MaterialData, t0: SIMD2<Float>, t1: SIMD2<Float>, t2: SIMD2<Float>, readAlpha: Bool = false) -> SIMD3<Float> {
+        let val0 = sampleTexture(materialData: materialData, at: t0, readAlpha: readAlpha)
+        let val1 = sampleTexture(materialData: materialData, at: t1, readAlpha: readAlpha)
+        let val2 = sampleTexture(materialData: materialData, at: t2, readAlpha: readAlpha)
+        
+        return (val0 + val1 + val2) / 3.0
+    }
+                                                               
+    func sampleTexture(materialData: MaterialData, at uv: SIMD2<Float>, readAlpha: Bool = false) -> SIMD3<Float> {
+        let data = materialData.data
+        let w = materialData.width
+        let h = materialData.height
+        
         let u = uv.x.truncatingRemainder(dividingBy: 1.0)
         let v = uv.y.truncatingRemainder(dividingBy: 1.0)
 
-        let px = min(max(Int(u * Float(w)), 0), w - 1)
-        let py = min(max(Int((1 - v) * Float(h)), 0), h - 1) // need 1 - v
-
+        let px = min(max(Int((u) * Float(w)), 0), w - 1)
+        let py = min(max(Int((1 - v) * Float(h)), 0), h - 1) // 1 - v is needed
         let bytesPerPixel = 4
         let rowBytes = bytesPerPixel * w
         let offset = py * rowBytes + px * bytesPerPixel
+        
+        if readAlpha {
+            let a = Float(data[offset + 3]) / 255
+            return SIMD3<Float>(a, a, a)
+        }
 
         let r = Float(data[offset + 0]) / 255
         let g = Float(data[offset + 1]) / 255
@@ -362,30 +419,33 @@ class ModelIOGeometry: Geometry {
 }
 
 func getVertexDescriptor() -> MDLVertexDescriptor {
-    let vertexDescriptor = MTLVertexDescriptor()
+    let vertexDescriptor = MDLVertexDescriptor()
     var offset = 0
     
-    vertexDescriptor.attributes[0].format = .float3
-    vertexDescriptor.attributes[0].offset = offset
-    vertexDescriptor.attributes[0].bufferIndex = 0
+    vertexDescriptor.attributes[0] = MDLVertexAttribute(name: MDLVertexAttributePosition,
+                                                        format: .float3,
+                                                        offset: offset,
+                                                        bufferIndex: 0)
     offset += MemoryLayout<SIMD3<Float>>.stride
     
-    vertexDescriptor.attributes[1].format = .float3
-    vertexDescriptor.attributes[1].offset = offset
-    vertexDescriptor.attributes[1].bufferIndex = 0
+    vertexDescriptor.attributes[1] = MDLVertexAttribute(name: MDLVertexAttributeNormal,
+                                                        format: .float3,
+                                                        offset: offset,
+                                                        bufferIndex: 0)
     offset += MemoryLayout<SIMD3<Float>>.stride
     
-    vertexDescriptor.attributes[2].format = .float2
-    vertexDescriptor.attributes[2].offset = offset
-    vertexDescriptor.attributes[2].bufferIndex = 0
+    vertexDescriptor.attributes[2] = MDLVertexAttribute(name: MDLVertexAttributeTextureCoordinate,
+                                                        format: .float2,
+                                                        offset: offset,
+                                                        bufferIndex: 0)
     offset += MemoryLayout<SIMD2<Float>>.stride
-    
-    vertexDescriptor.layouts[0].stride = offset
-    vertexDescriptor.layouts[0].stepFunction = .perVertex
-    
-    let mdlVertexDescriptor = MTKModelIOVertexDescriptorFromMetal(vertexDescriptor)
-    (mdlVertexDescriptor.attributes[0] as! MDLVertexAttribute).name = MDLVertexAttributePosition
-    (mdlVertexDescriptor.attributes[1] as! MDLVertexAttribute).name = MDLVertexAttributeNormal
-    (mdlVertexDescriptor.attributes[2] as! MDLVertexAttribute).name = MDLVertexAttributeTextureCoordinate
-    return mdlVertexDescriptor
+
+    vertexDescriptor.layouts[0] = MDLVertexBufferLayout(stride: offset)
+    return vertexDescriptor
+}
+
+struct MaterialData {
+    let data: Data
+    let width: Int
+    let height: Int
 }

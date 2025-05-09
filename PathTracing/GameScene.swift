@@ -33,7 +33,7 @@ class GameScene: ObservableObject {
     var cameraUp: SIMD3<Float> = SIMD3<Float>(0, 1, 0)
     
     var cameraSpeed: Float = 0.25
-    var rotationSpeed: Float = 0.05
+    var rotationSpeed: Float = 0.1
     
     var cameraLocations: [(SIMD3<Float>, SIMD3<Float>)] = []
     
@@ -76,7 +76,7 @@ class GameScene: ObservableObject {
         #endif
     }
     
-    func buildSimpleBox() { // x coordinates are flipped; left is positive, right is negative
+    func buildColorfulBox() { // x coordinates are flipped; left is positive, right is negative
         let wallGeometry = ObjGeometry(device: device, objURL: cubeURL, textureURL: checkerBoardURL)
         wallGeometry.uploadToBuffers()
         addGeometry(wallGeometry)
@@ -231,30 +231,105 @@ class GameScene: ObservableObject {
         
         let leftSideMirrorInstance = GeometryInstance(geometry: mirrorCubeGeometry,
                                                   translation: SIMD3<Float>(0.9, 2, 0),
-                                                  scale: SIMD3<Float>(0.001, 1, 1),
+                                                  scale: SIMD3<Float>(epsilon, 1, 1),
                                                   mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE)
         
         let rightSideMirrorInstance1 = GeometryInstance(geometry: mirrorCubeGeometry,
                                                         translation: SIMD3<Float>(1.1, 2, -2.25),
-                                                        scale: SIMD3<Float>(0.001, 4, 1.5),
+                                                        rotation: SIMD3<Float>(0, .pi, 0),
+                                                        scale: SIMD3<Float>(epsilon, 4, 1.5),
                                                   mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE)
 
         let rightSideMirrorInstance2 = GeometryInstance(geometry: mirrorCubeGeometry,
                                                         translation: SIMD3<Float>(1.1, 2, -0.25),
-                                                        scale: SIMD3<Float>(0.001, 4, 1.5),
+                                                        rotation: SIMD3<Float>(0, .pi, 0),
+                                                        scale: SIMD3<Float>(epsilon, 4, 1.5),
                                                   mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE)
+        
+        let rightLightSeparatorInstance = GeometryInstance(geometry: wallGeometry,
+                                                           translation: SIMD3<Float>(2.5, 2.5, -2.5),
+                                                           scale: SIMD3<Float>(3, 3, epsilon),
+                                                  mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE)
+
 
         addInstance(leftSideMirrorInstance)
         addInstance(rightSideMirrorInstance1)
         addInstance(rightSideMirrorInstance2)
+//        addInstance(rightLightSeparatorInstance)
+    }
+    
+    func buildBox() {
+        let width: Float = 6.0
+        let height: Float = 4.0
+        let depth: Float = 6.0
+        let epsilon: Float = 1e-3
+        
+        let wallGeometry = ObjGeometry(device: device, objURL: cubeURL)
+        wallGeometry.uploadToBuffers()
+        addGeometry(wallGeometry)
+                
+        let floorInstance = GeometryInstance(
+            geometry: wallGeometry,
+            translation: SIMD3<Float>(0.0, 0.0, 0.0),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(width, epsilon, depth),
+            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+        )
+        
+        let leftWallInstance = GeometryInstance(
+            geometry: wallGeometry,
+            translation: SIMD3<Float>(-width / 2, height / 2, 0.0),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(epsilon, height, depth),
+            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+        )
+        
+        let rightWallInstance = GeometryInstance(
+            geometry: wallGeometry,
+            translation: SIMD3<Float>(width / 2, height / 2, 0.0),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(epsilon, height, depth),
+            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+        )
+        
+        let backWallInstance = GeometryInstance(
+            geometry: wallGeometry,
+            translation: SIMD3<Float>(0.0, height / 2, -depth / 2),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(width, height, epsilon),
+            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+        )
+                
+        let ceilingInstance = GeometryInstance(
+            geometry: wallGeometry,
+            translation: SIMD3<Float>(0.0, height, 0.0),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(width, epsilon, depth),
+            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+        )
+        
+        let frontWallInstance = GeometryInstance(
+            geometry: wallGeometry,
+            translation: SIMD3<Float>(0.0, height / 2, depth / 2),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(width, height, epsilon),
+            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+        )
+
+        addInstance(floorInstance)
+        addInstance(leftWallInstance)
+        addInstance(rightWallInstance)
+        addInstance(backWallInstance)
+        addInstance(ceilingInstance)
+        addInstance(frontWallInstance)
     }
         
     func createScene() { // x coordinates are flipped; left is positive, right is negative
-        cameraPosition = SIMD3<Float>(0.0, 2.0, -6.0)
+        cameraPosition = SIMD3<Float>(0.0, 2.0, -5.0)
         cameraTarget = SIMD3<Float>(0.0, 1.75, 0.0)
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
 
-        buildSimpleBox()
+        buildColorfulBox()
 
 
         let whiteCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), material: GLASS)
@@ -328,28 +403,16 @@ class GameScene: ObservableObject {
 //        addInstance(leftBallInstance)
 //        addInstance(pyramidInstance)
         addInstance(tableInstance)
+        
+        let lightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), emissionColor: 3.0 * .one, material: GLASS)
 
-        let leftLightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: .zero)
-        leftLightGeometry.uploadToBuffers()
-        addGeometry(leftLightGeometry)
+        addInstance(with: lightGeometry,
+                    translation: SIMD3<Float>(0.0, 3.39, -1.0),
+                    scale: SIMD3<Float>(3.9, 0.00001, 0.8))
         
-        let leftLightInstance = GeometryInstance(geometry: whiteCubeGeometry,
-                                                 translation: SIMD3<Float>(0.0, 3.39, -1.0),
-                                                 scale: SIMD3<Float>(3.9, 0.00001, 0.8),
-                                                 mask: GEOMETRY_MASK_LIGHT | GEOMETRY_MASK_OPAQUE)
-        
-        addLight(lightInstance: leftLightInstance, lightForward: SIMD3<Float>(0.0, -1.0, 0.0))
-        
-        let rightLightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: .zero)
-        rightLightGeometry.uploadToBuffers()
-        addGeometry(rightLightGeometry)
-        
-        let rightLightInstance = GeometryInstance(geometry: whiteCubeGeometry,
-                                                 translation: SIMD3<Float>(0.0, 3.39, 1.0),
-                                                  scale: SIMD3<Float>(3.9, 0.00001, 0.8),
-                                                 mask: GEOMETRY_MASK_LIGHT | GEOMETRY_MASK_OPAQUE)
-        
-        addLight(lightInstance: rightLightInstance, lightForward: SIMD3<Float>(0.0, -1.0, 0.0))
+        addInstance(with: lightGeometry,
+                    translation: SIMD3<Float>(0.0, 3.39, 1.0),
+                    scale: SIMD3<Float>(3.9, 0.00001, 0.8))
     }
     
     func createLivelyScene() {
@@ -486,8 +549,6 @@ class GameScene: ObservableObject {
     }
             
     func createDifficultScene() {
-//        cameraPosition = SIMD3<Float>(-1.9, 3.5, 0.5)
-//        cameraTarget = SIMD3<Float>(-2.0, 1, 0.0)
         cameraPosition = SIMD3<Float>(0, 2.5, 6)
         cameraTarget = SIMD3<Float>(0, 2, 0.0)
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
@@ -495,7 +556,8 @@ class GameScene: ObservableObject {
         cameraLocations = [(cameraPosition, cameraTarget),
                             (SIMD3<Float>(2.9280746, 2.5814812, 3.0649862), SIMD3<Float>(-0.489712, 1.8794974, -1.8417473)),
                             (SIMD3<Float>(3.860585, 2.7261002, -0.094045304), SIMD3<Float>(-0.15811086, -0.75679064, -2.9171062)),
-                            (SIMD3<Float>(3.860585, 1.2261002, 0.9059547), SIMD3<Float>(-0.120718956, -1.2116656, -2.896234))
+                            (SIMD3<Float>(3.860585, 1.2261002, 0.9059547), SIMD3<Float>(-0.120718956, -1.2116656, -2.896234)),
+                            (SIMD3<Float>(-1.139415, 2.2261002, -0.094045304), SIMD3<Float>(4.7482796, 1.22613, -0.85901386))
                           ]
         
         buildSegmentedBox(extra: true)
@@ -527,8 +589,6 @@ class GameScene: ObservableObject {
         let torusGeometry = ObjGeometry(device: device, objURL: torusURL, color: SIMD3<Float>(1, 1, 1), material: PLASTIC)
         torusGeometry.uploadToBuffers()
         addGeometry(torusGeometry)
-
-
         
         let ringInstance = GeometryInstance(geometry: ringGeometry,
                                             translation: SIMD3<Float>(-2, 0.25, 0),
@@ -588,7 +648,81 @@ class GameScene: ObservableObject {
 
         addInstance(with: lightBallGeometry, translation: SIMD3<Float>(0.0, 2.5, -3), scale: SIMD3<Float>(0.5, 0.5, 0.5))
         addInstance(with: lightBallGeometry, translation: SIMD3<Float>(2.0, 2.5, -3), scale: SIMD3<Float>(0.5, 0.5, 0.5))
+    }
+    
+    func createFocusScene() {
+        cameraPosition = SIMD3<Float>(0.0, 2.0, 2.5)
+        cameraTarget = SIMD3<Float>(0.0, 1.75, 0.0)
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        buildBox()
+        
+        cameraLocations = [(cameraPosition, cameraTarget),
+                           (SIMD3<Float>(-1.4804919, 1.75, -1.4395511), SIMD3<Float>(0.55699587, 1.1292119, -0.1069715)),
+                           (SIMD3<Float>(-0.06333873, 1.7002482, 1.6584291), SIMD3<Float>(0.4302318, 1.3256127, -0.77642965)),
+                           (SIMD3<Float>(-0.66476583, 1.564688, -1.1811823), SIMD3<Float>(0.69295394, 0.94389987, 0.83963954)),
+                           (SIMD3<Float>(-0.40038502, 1.5263345, -1.2669994), SIMD3<Float>(0.07269779, 1.1516991, 1.1719233)),
+                           (SIMD3<Float>(0.0, 1.7512412, 0.012407258), SIMD3<Float>(-1.9680835, 1.7520738, -1.5493672)),
+                           (SIMD3<Float>(-0.5884206, 1.7529173, -1.1681728), SIMD3<Float>(0.22924161, 0.44039154, 0.8120316))
+                          ]
+        
+//        let porscheGeometry = ModelIOGeometry(device: device, modelURL: porscheURL, inwardsNormals: false)
+//        addInstance(with: porscheGeometry,
+//                    translation: SIMD3<Float>(0.0, 1.5, 0.0),
+//                    rotation: SIMD3<Float>(0.0, .pi/6, 0.0),
+//                    scale: SIMD3<Float>(0.005, 0.005, 0.005)
+//                    )
+        
+        let arrowGeometry = ModelIOGeometry(device: device, modelURL: arrowURL)
+        addInstance(with: arrowGeometry,
+                    translation: SIMD3<Float>(0.0, 2.5, 0.0),
+                    rotation: SIMD3<Float>(0.0, -.pi/6, 0.0),
+                    scale: SIMD3<Float>(0.05, 0.05, 0.05)
+                    )
+                
+//        let bugattiGeometry = ModelIOGeometry(device: device, modelURL: bugattiURL)
+//        addInstance(with: bugattiGeometry,
+//                    translation: SIMD3<Float>(0.0, 1.0, 0.0),
+//                    rotation: SIMD3<Float>(0.0, -.pi/6, 0.0),
+//                    scale: SIMD3<Float>(0.005, 0.005, 0.005)
+//                    )
+        
+        let futuristicCarGeometry = ModelIOGeometry(device: device, modelURL: futuristicCarURL)
+        addInstance(with: futuristicCarGeometry,
+                    translation: SIMD3<Float>(0.0, 0.0, -1.5),
+                    rotation: SIMD3<Float>(0.0, .pi/5, 0.0),
+                    scale: SIMD3<Float>(0.005, 0.005, 0.005)
+                    )
 
+
+        let lightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: .one, emissionColor: 3 * .one)
+                
+        addInstance(with: lightGeometry,
+                    translation: SIMD3<Float>(0.0, 3.99, -1.0),
+                    scale: SIMD3<Float>(3.9, 0.00001, 0.8)
+                    )
+        
+        addInstance(with: lightGeometry,
+                    translation: SIMD3<Float>(0.0, 3.99, 1.0),
+                    scale: SIMD3<Float>(3.9, 0.00001, 0.8)
+                    )
+    }
+    
+    func createLivingRoomScene() {
+        cameraPosition = SIMD3<Float>(59.49535, 35.642956, 33.0719)
+        cameraTarget = SIMD3<Float>(58.55864, 35.40372, 32.816353)
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+
+        let livingRoomGeometry = ModelIOGeometry(device: device, modelURL: whiteLivingRoomURL)
+        
+        addInstance(with: livingRoomGeometry,
+                    translation: SIMD3<Float>(0.0, 0, 0.0),
+                    scale: SIMD3<Float>(0.2, 0.2, 0.2),
+                    lightAmplifier: 2.0
+                    )
+                
+        let lightBallGeometry = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(repeating: 50.0))
+        addInstance(with: lightBallGeometry, translation: SIMD3<Float>(-32.878624, 29.477142, -37.870895), scale: SIMD3<Float>(2, 2, 2))
     }
 
     func addInstance(with geometry: Geometry, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one,
@@ -617,7 +751,7 @@ class GameScene: ObservableObject {
                                                translation: translation,
                                                rotation: rotation,
                                                scale: scale,
-                                               mask: GEOMETRY_MASK_LIGHT | GEOMETRY_MASK_OPAQUE)
+                                               mask: GEOMETRY_MASK_LIGHT)
             
             addLight(lightInstance: lightInstance, lightForward: SIMD3<Float>(0.0, -1.0, 0.0)) // TODO: do something with forward later
             instances.append(lightInstance)

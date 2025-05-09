@@ -29,11 +29,11 @@
 #define CAMERA_VERTEX 1
 #define LIGHT_VERTEX 2
 
-#define MAX_AREA_LIGHTS 4
+#define MAX_AREA_LIGHTS 16
 
 #define CAMERA_FOV_ANGLE 60
 
-#define MAX_TEXTURES 32
+#define MAX_TEXTURES 120
 
 struct Camera {
     vector_float3 position;
@@ -84,7 +84,6 @@ struct Material {
     float refraction;
     float roughness;
     float metallic;
-    vector_float3 emission;
     unsigned int texture_index;
 };
 

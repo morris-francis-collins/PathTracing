@@ -330,6 +330,52 @@ LightSample sampleAreaLight(device AreaLight *areaLights,
     return sample;
 }
 
+float calculateMISWeight(thread PathVertex *cameraVertices,
+                         thread PathVertex *lightVertices,
+                         int c,
+                         int l,
+                         float cameraToLightPDF,
+                         float lightToCameraPDF
+                         )
+{
+    float realProb = 1.0f;
+
+    for (int i = 0; i < c; i++) {
+        realProb *= cameraVertices[i].forwardPDF;
+    }
+
+    for (int i = 0; i < l; i++) {
+        realProb *= lightVertices[i].forwardPDF;
+    }
+
+    float allProb = realProb;
+
+    for (int s = 0; s < c + l + 2; s++) {
+        if (s == c) continue;
+        
+        int cEnd = s;
+        int lEnd = c + l + 2 - s;
+
+        float currProb = 1.0f;
+
+        for (int i = 0; i < cEnd; i++) {
+            if (i <= c) currProb *= cameraVertices[i].forwardPDF;
+            else if (i == c + 1) currProb *= cameraToLightPDF;
+            else currProb *= lightVertices[c - i + l + 1].reversePDF;
+        }
+
+        for (int i = 0; i < lEnd; i++) {
+            if (i <= l) currProb *= lightVertices[i].forwardPDF;
+            else if (i == l + 1) currProb *= lightToCameraPDF;
+            else currProb *= cameraVertices[l - i + c + 1].reversePDF;
+        }
+
+        allProb += currProb;
+    }
+
+    return (realProb * realProb) / (allProb * allProb); // power heuristic
+}
+
 float3 evaluateBSDF(PathVertex vx, float3 outgoingDirection) {
     Material material = vx.material;
     float3 incomingDirection = vx.incoming_direction;
@@ -433,7 +479,7 @@ BounceInfo calculateBounce(ray incidentRay,
                       scrambledHalton(offset, 5 + bounce * 13 + 1, frameIndex));
     float random = scrambledHalton(offset, 5 + bounce * 13 + 2, frameIndex);
     
-    float dielectricF0 = pow((1.0f - material.refraction) / (1.0f + material.refraction), 2.0f);
+    float dielectricF0 = pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f);
     float reflectance = mix(dielectricF0, 0.95f, material.metallic);
     float3 reflected = reflect(incidentRay.direction, normal);
     
@@ -590,13 +636,16 @@ int traceCameraPath(float2 pixel,
             
             float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
             uv.y = 1 - uv.y;
+//            uv.x = 1 - uv.x;
+
             currVertex.material_color = interpolateVertexAttribute(triangleResources.vertexColors, primitiveIndex, barycentric_coords);
             
             constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
 
             texture2d<float> texture = textureArray[material.texture_index];
-            float3 textureColor = texture.sample(textureSampler, uv).xyz;
-            
+            float4 textureValue = texture.sample(textureSampler, uv);
+            float3 textureColor = textureValue.w > 0.0f ? textureValue.xyz : textureValue.xyz;
+
 //            float3 textureColor = triangleResources.texture.sample(textureSampler, uv * 5.0f).xyz;
             currVertex.material_color *= textureColor;
 
@@ -631,6 +680,7 @@ int traceCameraPath(float2 pixel,
         
         if (mask & GEOMETRY_MASK_LIGHT) {
             directLightingContribution += throughput * sample.emission;
+//            directLightingContribution += float3(0.0f, 100000.0f, 0.0f);
             break;
         }
         
@@ -711,7 +761,7 @@ int traceLightPath(float2 pixel,
      
     for (int bounce = 0; bounce < maxPathLength - 1; bounce++) {
         IntersectionResult intersection = intersect(ray,
-                                                    RAY_MASK_PRIMARY,
+                                                    bounce == 0 ? RAY_MASK_PRIMARY : RAY_MASK_PRIMARY,
                                                     resources,
                                                     instances,
                                                     accelerationStructure,
@@ -758,14 +808,16 @@ int traceLightPath(float2 pixel,
 
             float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
             uv.y = 1 - uv.y;
+//            uv.x = 1 - uv.x;
 
             currVertex.material_color = interpolateVertexAttribute(triangleResources.vertexColors, primitiveIndex, barycentric_coords);
 
             constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
             
             texture2d<float> texture = textureArray[material.texture_index];
-            float3 textureColor = texture.sample(textureSampler, uv).xyz;
-            
+            float4 textureValue = texture.sample(textureSampler, uv);
+            float3 textureColor = textureValue.w > 0.0f ? textureValue.xyz : textureValue.xyz;
+
 //            float3 textureColor = triangleResources.texture.sample(textureSampler, uv * 5.0f).xyz;
             currVertex.material_color *= textureColor;
             throughput *= currVertex.material_color;
@@ -938,6 +990,7 @@ float3 connectPaths(
             float3 brdfCamera = evaluateBSDF(cameraVertex, connectionDirection);
             float3 brdfLight = evaluateBSDF(lightVertex, -connectionDirection);
             float geometricTerm = (cosCamera * cosLight) / (connectionDistance * connectionDistance);
+            float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, cosCamera / M_PI_F, cosLight / M_PI_F);
             
             float pdfConversionFactor = 1.0f;
             if (lightVertex.type == LIGHT_VERTEX && lightVertex.forwardPDF > 0) {
@@ -947,7 +1000,7 @@ float3 connectPaths(
             contribution *= cameraVertex.throughput * brdfCamera *
                            geometricTerm * brdfLight * lightVertex.throughput *
                            pdfConversionFactor;
-            totalContribution += contribution;
+            totalContribution += contribution * MISWeight;
         }
         
         
