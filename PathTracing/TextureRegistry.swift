@@ -34,6 +34,7 @@ class TextureRegistry {
         if let index = textureMap[identifier] {
             return index
         }
+
         return 0
     }
     

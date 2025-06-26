@@ -11,9 +11,17 @@ import ModelIO
 
 class ModelIOGeometry: Geometry {
     var resolver: MDLAssetResolver?
+    let defaultMaterial: Material?
+    let textureURL: URL?
+    let emissionColor: SIMD3<Float>
+    
+    init(device: MTLDevice, modelURL: URL, textureURL: URL? = nil, defaultColor: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0), defaultMaterial: Material? = nil, emissionColor: SIMD3<Float> = .zero, inwardsNormals: Bool = false) {
+        self.defaultMaterial = defaultMaterial
+        self.textureURL = textureURL
+        self.emissionColor = emissionColor
         
-    init(device: MTLDevice, modelURL: URL, textureURL: URL? = transparentURL, defaultColor: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0), inwardsNormals: Bool = false) {
         super.init(device: device)
+        
         lightGeometry = LightGeometry(device: device)
 
         self.inwardsNormals = inwardsNormals
@@ -24,7 +32,7 @@ class ModelIOGeometry: Geometry {
                              bufferAllocator: bufferAllocator
                             )
         
-//        asset.loadTextures()
+        asset.loadTextures()
         resolver = asset.resolver!
 
 //        print(modelURL.pathComponents.last)
@@ -58,7 +66,9 @@ class ModelIOGeometry: Geometry {
         if mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeTextureCoordinate) == nil {
             mesh.addUnwrappedTextureCoordinates(forAttributeNamed: MDLVertexAttributeTextureCoordinate)
         }
-                
+        
+        mesh.addTangentBasis(forTextureCoordinateAttributeNamed: MDLVertexAttributeTextureCoordinate, normalAttributeNamed: MDLVertexAttributeNormal, tangentAttributeNamed: MDLVertexAttributeTangent)
+
         guard let vertexBuffer = mesh.vertexBuffers.first else { fatalError("Failed getting vertex buffer") }
         let vertexData = vertexBuffer.map().bytes
         
@@ -67,12 +77,17 @@ class ModelIOGeometry: Geometry {
         let normalAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeNormal)
         let texCoordAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeTextureCoordinate)
         let colorAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeColor)
+        let tangentAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeTangent)
+        let bitangentAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeBitangent)
+
         
         var triangleVertices: [SIMD3<Float>] = []
         var triangleNormals: [SIMD3<Float>] = []
         var triangleTexCoords: [SIMD2<Float>] = []
         var triangleColors: [SIMD3<Float>] = []
         var triangleMaterials: [Material] = []
+        var triangleTangents: [SIMD3<Float>] = []
+        var triangleBitangents: [SIMD3<Float>] = []
                 
         for submesh in mesh.submeshes! {
             guard let submesh = submesh as? MDLSubmesh else { fatalError("Could not cast to submesh") }
@@ -82,8 +97,9 @@ class ModelIOGeometry: Geometry {
             let indexType = submesh.indexType
             
             var submeshMaterial = Material()
+            submeshMaterial.texture_index = -1
             var currentColor = defaultColor
-                        
+        
             if let mdlMaterial = submesh.material {
                 mdlMaterial.loadTextures(using: resolver!)
                 
@@ -95,7 +111,7 @@ class ModelIOGeometry: Geometry {
 
                 if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
                     if opacityProperty.type == .float {
-                        submeshMaterial.opacity = opacityProperty.floatValue / 10.0
+                        submeshMaterial.opacity = opacityProperty.floatValue
                     }
                 } else {
                     submeshMaterial.opacity = 1.0
@@ -112,12 +128,13 @@ class ModelIOGeometry: Geometry {
 
                 if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
                     if roughnessProperty.type == .float {
-                        submeshMaterial.roughness = roughnessProperty.floatValue
+                        submeshMaterial.roughness_x = roughnessProperty.floatValue
+                        submeshMaterial.roughness_y = roughnessProperty.floatValue
                     }
                 } else {
-                    submeshMaterial.roughness = 0.0
+                    submeshMaterial.roughness_x = 0.0
+                    submeshMaterial.roughness_y = 0.0
                 }
-                
                 
                 if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
                     if metallicProperty.type == .float {
@@ -127,24 +144,36 @@ class ModelIOGeometry: Geometry {
                     submeshMaterial.metallic = 0.0
                 }
                 
+                if let defaultMaterial = self.defaultMaterial {
+                    submeshMaterial = defaultMaterial
+                }
+                
                 let baseColor = mdlMaterial.property(with: MDLMaterialSemantic.baseColor)
                 let mdlTexture = baseColor?.textureSamplerValue?.texture
                 let textureLoader = MTKTextureLoader(device: device)
+                
+                if let texURL = self.textureURL {
+                    do {
+                        let texture = try textureLoader.newTexture(URL: texURL, options: [.SRGB: false])
+                        let index = TextureRegistry.shared.addTexture(texture, identifier: texURL.path)
+                        submeshMaterial.texture_index = Int32(index)
+
+                    } catch {
+                        fatalError("Couldn't load texture: \(error)")
+                    }
+                }
                 
                 do {
                     if let cgImage = mdlTexture?.imageFromTexture() {
                         let mtlTexture = try textureLoader.newTexture(cgImage: cgImage.takeRetainedValue())
                         let identifier = "\(submesh.hashValue)\(mdlTexture.hashValue)"
                         let index = TextureRegistry.shared.addTexture(mtlTexture, identifier: identifier)
-                        submeshMaterial.texture_index = UInt32(index)
-                    } else {
-                        let index = TextureRegistry.shared.getIndex(for: transparentURL.path)
-                        submeshMaterial.texture_index = UInt32(index)
+                        submeshMaterial.texture_index = Int32(index)
                     }
                 } catch {
                     print("Failed to convert textures: \(error)")
                 }
-                
+
             } else {
                 print("Failed to get material")
             }
@@ -192,7 +221,8 @@ class ModelIOGeometry: Geometry {
                                                 
                         if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
                             if let roughnessMaterialData, roughnessProperty.type == .texture {
-                                currentMaterial.roughness = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
+                                currentMaterial.roughness_x = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
+                                currentMaterial.roughness_y = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
                             }
                         }
                         
@@ -202,7 +232,12 @@ class ModelIOGeometry: Geometry {
                             }
                         }
                         
-                        if let emissionProperty = mdlMaterial.property(with: MDLMaterialSemantic.emission) {
+                        if length(self.emissionColor) > 0 {
+                            emissive = true
+                            lightGeometry?.lightColors.append(contentsOf: [self.emissionColor, self.emissionColor, self.emissionColor])
+                        }
+            
+                        else if let emissionProperty = mdlMaterial.property(with: MDLMaterialSemantic.emission) {
                             if let emissionMaterialData, emissionProperty.type == .texture {
                                 let emissionColor0 = sampleTexture(materialData: emissionMaterialData, at: t0)
                                 let emissionColor1 = sampleTexture(materialData: emissionMaterialData, at: t1)
@@ -291,10 +326,10 @@ class ModelIOGeometry: Geometry {
                         let c2Ptr = vertexData.advanced(by: vertexStride * Int(i2) + offset)
                             .assumingMemoryBound(to: SIMD3<Float>.self)
                         
-                        let c0 = c0Ptr.pointee
-                        let c1 = c1Ptr.pointee
-                        let c2 = c2Ptr.pointee
-                        
+                        var c0 = c0Ptr.pointee
+                        var c1 = c1Ptr.pointee
+                        var c2 = c2Ptr.pointee
+
                         if emissive {
                             lightGeometry?.colors.append(length(c0) < 1e-5 ? c0 : c0)
                             lightGeometry?.colors.append(length(c1) < 1e-5 ? c1 : c1)
@@ -316,7 +351,7 @@ class ModelIOGeometry: Geometry {
                                 color = SIMD3<Float>(repeating: 1.0)
                             }
                         }
-
+//                        color = .one
                         if emissive {
                             lightGeometry?.colors.append(color)
                             lightGeometry?.colors.append(color)

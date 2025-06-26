@@ -16,11 +16,90 @@ constant bool useIntersectionFunctions [[function_constant(1)]];
 
 constant unsigned int primes[] =
 {
-    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137,
-    139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281,
-    283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449,
-    457, 461, 463, 467, 479, 487, 491, 499, 503, 509, 521, 523, 541, 547, 557
+    2,   3,   5,   7,   11,  13,  17,  19,  23,  29,  31,  37,  41,  43,  47,  53,  59,  61,  67,  71,
+    73,  79,  83,  89,  97,  101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173,
+    179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281,
+    283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409,
+    419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503, 509, 521, 523, 541,
+    547, 557, 563, 569, 571, 577, 587, 593, 599, 601, 607, 613, 617, 619, 631, 641, 643, 647, 653, 659,
+    661, 673, 677, 683, 691, 701, 709, 719, 727, 733, 739, 743, 751, 757, 761, 769, 773, 787, 797, 809,
+    811, 821, 823, 827, 829, 839, 853, 857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929, 937, 941,
+    947, 953, 967, 971, 977, 983, 991, 997, 1009, 1013, 1019, 1021, 1031, 1033, 1039, 1049, 1051, 1061, 1063, 1069,
+    1087, 1091, 1093, 1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187, 1193, 1201, 1213, 1217, 1223,
+    1229, 1231, 1237, 1249, 1259, 1277, 1279, 1283, 1289, 1291, 1297, 1301, 1303, 1307, 1319, 1321, 1327, 1361, 1367, 1373,
+    1381, 1399, 1409, 1423, 1427, 1429, 1433, 1439, 1447, 1451, 1453, 1459, 1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511,
+    1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579, 1583, 1597, 1601, 1607, 1609, 1613, 1619, 1621, 1627, 1637, 1657,
+    1663, 1667, 1669, 1693, 1697, 1699, 1709, 1721, 1723, 1733, 1741, 1747, 1753, 1759, 1777, 1783, 1787, 1789, 1801, 1811,
+    1823, 1831, 1847, 1861, 1867, 1871, 1873, 1877, 1879, 1889, 1901, 1907, 1913, 1931, 1933, 1949, 1951, 1973, 1979, 1987,
+    1993, 1997, 1999, 2003, 2011, 2017, 2027, 2029, 2039, 2053, 2063, 2069, 2081, 2083, 2087, 2089, 2099, 2111, 2113, 2129,
+    2131, 2137, 2141, 2143, 2153, 2161, 2179, 2203, 2207, 2213, 2221, 2237, 2239, 2243, 2251, 2267
 };
+
+void debug(float x) {
+    if (x <= -1.0f) {
+        os_log_default.log_info("<= -1.0");
+    } else if (x <= -0.9f) {
+        os_log_default.log_info("-0.9");
+    } else if (x <= -0.8f) {
+        os_log_default.log_info("-0.8");
+    } else if (x <= -0.7f) {
+        os_log_default.log_info("-0.7");
+    } else if (x <= -0.6f) {
+        os_log_default.log_info("-0.6");
+    } else if (x <= -0.5f) {
+        os_log_default.log_info("-0.5");
+    } else if (x <= -0.4f) {
+        os_log_default.log_info("-0.4");
+    } else if (x <= -0.3f) {
+        os_log_default.log_info("-0.3");
+    } else if (x <= -0.2f) {
+        os_log_default.log_info("-0.2");
+    } else if (x <= -0.1f) {
+        os_log_default.log_info("-0.1");
+    } else if (x <= 0.0f) {
+        os_log_default.log_info("-0.0");
+    } else if (x < 0.1f) {
+        os_log_default.log_info("0.0");
+    } else if (x < 0.2f) {
+        os_log_default.log_info("0.1");
+    } else if (x < 0.3f) {
+        os_log_default.log_info("0.2");
+    } else if (x < 0.4f) {
+        os_log_default.log_info("0.3");
+    } else if (x < 0.5f) {
+        os_log_default.log_info("0.4");
+    } else if (x < 0.6f) {
+        os_log_default.log_info("0.5");
+    } else if (x < 0.7f) {
+        os_log_default.log_info("0.6");
+    } else if (x < 0.8f) {
+        os_log_default.log_info("0.7");
+    } else if (x < 0.9f) {
+        os_log_default.log_info("0.8");
+    } else if (x < 1.0f) {
+        os_log_default.log_info("0.9");
+    } else if (x < 2.0f){
+        os_log_default.log_info("1.0");
+    } else if (x < 3.0f){
+        os_log_default.log_info("2.0");
+    } else if (x < 4.0f){
+        os_log_default.log_info("3.0");
+    } else if (x < 5.0f){
+        os_log_default.log_info("4.0");
+    } else if (x < 6.0f){
+        os_log_default.log_info("5.0");
+    } else if (x < 7.0f){
+        os_log_default.log_info("6.0");
+    } else if (x < 8.0f){
+        os_log_default.log_info("7.0");
+    } else if (x < 8.0f){
+        os_log_default.log_info("8.0");
+    } else if (x < 9.0f){
+        os_log_default.log_info("9.0");
+    } else {
+        os_log_default.log_info("> 10.0");
+    }
+}
 
 // some functions from original template code
 // |
@@ -128,12 +207,8 @@ float3 transformDirection(float3 p, float4x3 transform) {
     return transform * float4(p.x, p.y, p.z, 0.0f);
 }
 
-// Reuse the standard ray tracing API's intersection result type since it has storage
-// for all of the data necessary.
 typedef intersector<triangle_data, instancing, world_space_data>::result_type IntersectionResult;
 
-// Intersects a ray with an acceleration structure, dispatching calls to intersection
-// functions if needed.
 IntersectionResult intersect(ray ray,
                              unsigned int mask,
                              device void *resources,
@@ -142,73 +217,21 @@ IntersectionResult intersect(ray ray,
                              visible_function_table<IntersectionFunction> intersectionFunctionTable,
                              bool accept_any_intersection)
 {
-    // Parameters used to configure the intersection query.
     intersection_params params;
     
-    // Create an intersection query to test for intersection between the ray and the geometry
-    // in the scene.  The `intersection_query` object tracks the current state of the acceleration
-    // structure traversal.
     intersection_query<triangle_data, instancing> i;
     
-    // If the sample isn't using intersection functions, provide some hints to Metal for
-    // better performance.
-    if (!useIntersectionFunctions)
-    {
-        params.assume_geometry_type(geometry_type::triangle);
-        params.force_opacity(forced_opacity::opaque);
-    }
-    
-    // Shadow rays check only whether there is an object between the intersection point
-    // and the light source. In that case, tell Metal to return after finding any intersection.
-    params.accept_any_intersection(accept_any_intersection);
+    params.assume_geometry_type(geometry_type::triangle);
+    params.force_opacity(forced_opacity::opaque);
 
-    // Initialize the intersection query with the ray, acceleration structure, and other parameters.
+    params.accept_any_intersection(accept_any_intersection); // get any, not just the closest
+
     i.reset(ray, accelerationStructure, mask, params);
 
-    if (!useIntersectionFunctions)
-    {
-        // No bounding box intersection will be reported if the acceleration structure does
-        // not contain bounding box primitives, so the entire acceleration structure is
-        // traversed using a single call to `next()`.
-        i.next();
-    }
-    else
-    {
-        // Otherwise, we will need to handle bounding box intersections as they are found. Call
-        // `next()` in a loop until it returns `false`, indicating that acceleration structure traversal
-        // is complete.
-        while (i.next())
-        {
-            // The intersection query object keeps track of the "candidate" and "committed"
-            // intersections. The "committed" intersection is the current closest intersection
-            // found, while the "candidate" intersection is a potential intersection. Dispatch
-            // a call to the corresponding intersection function to determine whether to accept
-            // the candidate intersection.
-            unsigned int instanceIndex = i.get_candidate_instance_id();
-            
-            unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
-            
-            BoundingBoxIntersection bb = intersectionFunctionTable[resourceIndex](
-                                             // Ray origin and direction in object space for the candidate instance.
-                                             i.get_candidate_ray_origin(),
-                                             i.get_candidate_ray_direction(),
-                                             // Minimum and maximum intersection distance to consider.
-                                             i.get_ray_min_distance(),
-                                             i.get_committed_distance(),
-                                             // Information about candidate primitive.
-                                             i.get_candidate_primitive_id(),
-                                             resourceIndex,
-                                             resources);
-            
-            // Accept the candidate intersection, making it the new committed intersection.
-            if (bb.accept)
-                i.commit_bounding_box_intersection(bb.distance);
-        }
-    }
+    i.next();
     
     IntersectionResult intersection;
     
-    // Return all the information about the committed intersection.
     intersection.type = i.get_committed_intersection_type();
     intersection.distance = i.get_committed_distance();
     intersection.primitive_id = i.get_committed_primitive_id();
@@ -231,14 +254,79 @@ float scrambledHalton(uint index, uint dimension, uint frameIndex) {
     return fract(value + float(hash(dimension + frameIndex * 719)) / 4294967296.0);
 }
 
-LightSample sampleTriangle(thread AreaLight areaLight,
+inline float sameSignClamp(float x, float epsilon) {
+    if (x < 0.0f) return min(x, -epsilon);
+    else return max(x, epsilon);
+}
+
+inline void createOrthonormalBasis(float3 position, float3 n, thread float3& t, thread float3& b) {
+    float sign = copysign(1.0f, n.z);
+    const float a = -1.0f / (sign + n.z);
+    const float b_val = n.x * n.y * a;
+    t = float3(1.0f + sign * n.x * n.x * a, sign * b_val, -sign * n.x);
+    b = float3(b_val, sign + n.y * n.y * a, -n.y);
+    t = normalize(t);
+    b = normalize(b);
+}
+
+float lambda(float3 w, float3 n, float alpha) {
+    float cosTheta = abs(dot(w, n));
+    float cosTheta2 = cosTheta * cosTheta;
+    float sinTheta2 = 1 - cosTheta2;
+    
+    return 0.5f * (sqrt(1.0f + alpha * alpha * sinTheta2 / cosTheta2) - 1.0f);
+}
+
+float G_Smith(float3 wi, float3 wo, float3 n, float alpha) {
+    float lambda_wi = lambda(wi, n, alpha);
+    float lambda_wo = lambda(wo, n, alpha);
+    return 1.0f / (1.0f + lambda_wi + lambda_wo);
+}
+
+float G1_Smith(float3 w, float3 n, float alpha) {
+    return 1.0f / (1.0f + lambda(w, n, alpha));
+}
+
+inline float D_GGX(float cosTH, float cosBH, float cosNH, float alpha_x, float alpha_y) {
+    float x = cosTH / alpha_x;
+    float y = cosBH / alpha_y;
+    float z = cosNH;
+
+    float denom = x * x + y * y + z * z;
+    
+    return 1.0f / (M_PI_F * alpha_x * alpha_y * denom * denom);
+}
+
+inline float interpolateAlpha(float cosTH, float cosBH, float alpha_x, float alpha_y) {
+    float num = (cosTH * cosTH) * (alpha_x * alpha_x) + (cosBH * cosBH) * (alpha_y * alpha_y);
+    float denom = (cosTH * cosTH) + (cosBH * cosBH);
+    
+    return sqrt(num / denom);
+}
+
+inline float calculateLuminance(float3 w) {
+    return dot(w, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+inline float calculateEpsilon(float3 position) {
+    return min(1e-4f * length(position), 1e-6f);
+}
+
+inline float3 calculateOffset(float3 wo, float3 n, float epsilon) {
+    return wo * 0.1f * epsilon + n * epsilon;
+}
+ 
+inline float calculateEta(PathVertex previous, PathVertex current, bool entering) {
+    if (entering) return 1.0f / current.material.refraction;
+    else return current.material.refraction;
+}
+
+PathVertex sampleTriangle(thread AreaLight areaLight,
                       device LightTriangle *lightTriangles,
                       float selectionPDF,
-                      ray ray,
                       float3 r
                       )
 {
-    LightSample sample;
 
     int left = areaLight.firstTriangleIndex;
     int right = areaLight.firstTriangleIndex + areaLight.triangleCount - 1;
@@ -253,7 +341,7 @@ LightSample sampleTriangle(thread AreaLight areaLight,
             left = mid + 1;
         }
     }
-
+    
     LightTriangle triangle = lightTriangles[left];
     if (r.y + r.z > 1.0f) {
         r.y = 1 - r.y;
@@ -266,175 +354,307 @@ LightSample sampleTriangle(thread AreaLight areaLight,
     
     float3 edge1 = triangle.v1 - triangle.v0;
     float3 edge2 = triangle.v2 - triangle.v0;
-    sample.position = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
-    sample.normal = normalize(cross(edge1, edge2));
+    float3 position = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
+    float epsilon = calculateEpsilon(position);
+    
+    PathVertex vx;
+    vx.normal = normalize(cross(edge1, edge2));
+    vx.position = position + calculateOffset(vx.normal, vx.normal, epsilon);
+    vx.material_color = u * triangle.emission0 + v * triangle.emission1 + w * triangle.emission2;
+    vx.forwardPDF = selectionPDF / areaLight.totalArea;
+    vx.throughput = vx.material_color / vx.forwardPDF;
+    vx.reversePDF = 0.0f;
+    vx.is_delta = false;
+    vx.in_medium = false;
+    vx.mediumDistance = 0.0f;
+    vx.type = LIGHT_VERTEX;
 
-    float3 toLight = sample.position - ray.origin;
-    sample.distance = max(length(toLight), 1e-4f);
-    sample.direction = toLight / sample.distance;
-
-    sample.emission = u * triangle.emission0 + v * triangle.emission1 + w * triangle.emission2;
-    sample.PDF = selectionPDF / triangle.area;
-    return sample;
+    return vx;
 }
 
-LightSample sampleAreaLight(device AreaLight *areaLights,
+PathVertex sampleAreaLight(device AreaLight *areaLights,
                        device LightTriangle *lightTriangles,
                        constant Uniforms& uniforms,
-                       float3 point,
-                       float3 direction,
                        float4 r
                        )
 {
-    LightSample sample;
+    PathVertex vx;
     float weights[MAX_AREA_LIGHTS];
     float totalWeight = 0.0f;
     
     for (unsigned int i = 0; i < uniforms.lightCount; i++) {
         AreaLight light = areaLights[i];
-        
-        float3 toLight = light.position - point;
-        float distanceSq = max(1e-3f, dot(toLight, toLight));
-        float distance = sqrt(distanceSq);
-        float3 toLightNorm = toLight / distance;
-        
-        
-        float cosTheta = max(1e-3f, dot(direction, toLightNorm));
-        float solidAngleFactor = light.totalArea / (distance * distance);
-        float intensity = length(light.color);
-                
-        weights[i] = cosTheta * solidAngleFactor * intensity;
+        float power = calculateLuminance(light.color) * light.totalArea;
+                        
+        weights[i] = power;
         totalWeight += weights[i];
     }
     
+    unsigned int idx = 0;
+    float lightPDF = 1.0f;
+    
     if (totalWeight < 1e-4f) {
-        sample = sampleTriangle(areaLights[0], lightTriangles, 1.0f / float(uniforms.lightCount), point, r.yzw);
-        sample.areaLight = areaLights[0];
-        return sample;
-    }
-    
-    float random = r.x * totalWeight;
-    float accumWeight = 0.0f;
-    
-    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-        accumWeight += weights[i];
-        if (accumWeight >= random) {
-            sample = sampleTriangle(areaLights[i], lightTriangles, weights[i] / totalWeight, point, r.yzw);
-            sample.areaLight = areaLights[i];
-            return sample;
-        }
-    }
-    
-    sample = sampleTriangle(areaLights[uniforms.lightCount - 1], lightTriangles, weights[uniforms.lightCount - 1] / totalWeight, point, r.yzw);
-    sample.areaLight = areaLights[uniforms.lightCount - 1];
-    return sample;
-}
-
-float calculateMISWeight(thread PathVertex *cameraVertices,
-                         thread PathVertex *lightVertices,
-                         int c,
-                         int l,
-                         float cameraToLightPDF,
-                         float lightToCameraPDF
-                         )
-{
-    float realProb = 1.0f;
-
-    for (int i = 0; i < c; i++) {
-        realProb *= cameraVertices[i].forwardPDF;
-    }
-
-    for (int i = 0; i < l; i++) {
-        realProb *= lightVertices[i].forwardPDF;
-    }
-
-    float allProb = realProb;
-
-    for (int s = 0; s < c + l + 2; s++) {
-        if (s == c) continue;
+        idx = r.x * float(uniforms.lightCount);
+        lightPDF = 1.0f / float(uniforms.lightCount);
+    } else {
+        float random = r.x * totalWeight;
+        float accumWeight = 0.0f;
         
-        int cEnd = s;
-        int lEnd = c + l + 2 - s;
-
-        float currProb = 1.0f;
-
-        for (int i = 0; i < cEnd; i++) {
-            if (i <= c) currProb *= cameraVertices[i].forwardPDF;
-            else if (i == c + 1) currProb *= cameraToLightPDF;
-            else currProb *= lightVertices[c - i + l + 1].reversePDF;
-        }
-
-        for (int i = 0; i < lEnd; i++) {
-            if (i <= l) currProb *= lightVertices[i].forwardPDF;
-            else if (i == l + 1) currProb *= lightToCameraPDF;
-            else currProb *= cameraVertices[l - i + c + 1].reversePDF;
-        }
-
-        allProb += currProb;
-    }
-
-    return (realProb * realProb) / (allProb * allProb); // power heuristic
-}
-
-float3 evaluateBSDF(PathVertex vx, float3 outgoingDirection) {
-    Material material = vx.material;
-    float3 incomingDirection = vx.incoming_direction;
-    float3 normal = vx.normal;
-    
-    float cosIncoming = dot(incomingDirection, normal);
-    float cosOutgoing = dot(outgoingDirection, normal);
-    
-    bool sameHemisphere = (cosIncoming * cosOutgoing) > 0;
-    
-    float dielectricF0 = pow((1.0f - material.refraction) / (1.0f + material.refraction), 2.0f);
-    float reflectance = mix(dielectricF0, 0.95f, material.metallic);
-    
-    if (material.opacity < 1.0f) {
-        if (!sameHemisphere) {
-            float transmittance = 1.0f - reflectance;
-            return float3(transmittance) * (1.0f - material.opacity);
-        } else {
-            if (material.roughness < 0.05f) {
-                return float3(reflectance) * vx.material_color;
-            } else {
-                // rough reflection
-                float roughness2 = material.roughness * material.roughness;
-                float3 halfVector = normalize(incomingDirection + outgoingDirection);
-                float NdotH = saturate(dot(normal, halfVector));
-                
-                // microfacet model
-                float D = roughness2 / (M_PI_F * pow(NdotH * NdotH * (roughness2 - 1.0f) + 1.0f, 2.0f));
-                float G = cosIncoming * cosOutgoing;
-                
-                return float3(reflectance) * vx.material_color * D * G / (4.0f * abs(cosIncoming) * abs(cosOutgoing));
+        for (unsigned int i = 0; i < uniforms.lightCount; i++) {
+            accumWeight += weights[i];
+            
+            if (accumWeight >= random) {
+                idx = i;
+                lightPDF = weights[i] / totalWeight;
+                break;
             }
         }
     }
-    else if (material.metallic > 0.5f) {
-        if (material.roughness < 0.05f) {
-            return float3(0.0f);
-        } else {
-            float roughness2 = material.roughness * material.roughness;
-            float3 halfVector = normalize(incomingDirection + outgoingDirection);
-            float NdotH = saturate(dot(normal, halfVector));
-            
-            // GGX
-            float D = roughness2 / (M_PI_F * pow(NdotH * NdotH * (roughness2 - 1.0f) + 1.0f, 2.0f));
-            float G = cosIncoming * cosOutgoing;
-            
-            return  float3(reflectance) * vx.material_color * D * G / (4.0f * abs(cosIncoming) * abs(cosOutgoing));
-        }
+        
+    vx = sampleTriangle(areaLights[idx], lightTriangles, lightPDF, r.yzw);
+    return vx;
+}
+
+float evaluatePDF(thread PathVertex &vx, float3 wo) {
+    float3 wi = vx.incoming_direction;
+    float3 n = vx.normal;
+    Material material = vx.material;
+    
+    float dielectricF0 = pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f);
+    float3 F0 = mix(float3(dielectricF0), vx.material_color, material.metallic);
+    float cosIN = dot(wi, n);
+    bool inside = false;
+    
+    if (cosIN < 0.0f) {
+        n = -n;
+        inside = true;
+    }
+    
+    float3 T, B;
+    createOrthonormalBasis(vx.position, n, T, B);
+
+    cosIN = max(abs(cosIN), 1e-4f);
+    float cosON = sameSignClamp(dot(wo, n), 1e-4f);
+    float3 fresnel = F0 + (float3(1.0f) - F0) * pow(1.0f - cosIN, 5.0f);
+    
+    float specularWeight = calculateLuminance(fresnel);
+    float transmissionWeight = (material.metallic < 0.99f && material.opacity < 0.99f) ? (1.0f - material.metallic) * (1.0f -  specularWeight) : 0.0f;
+    float diffuseWeight = (material.metallic < 0.99f && material.opacity >= 0.99f) ? (1.0f - material.metallic) - specularWeight : 0.0f;
+    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
+        
+    if (totalWeight > 0.0f) {
+        specularWeight /= totalWeight;
+        transmissionWeight /= totalWeight;
+        diffuseWeight /= totalWeight;
+    }
+    
+    float totalPDF = 0.0f;
+    
+    if (cosON > 0.0f) {
+        
+        totalPDF += diffuseWeight * (cosON / M_PI_F);
+        
+        float3 H = normalize(wi + wo);
+        if (dot(H, n) < 0.0f) H = -H;
+        
+        float cosTH = sameSignClamp(dot(T, H), 1e-4f);
+        float cosBH = sameSignClamp(dot(B, H), 1e-4f);
+        float cosNH = sameSignClamp(dot(n, H), 1e-4f);
+        
+        float alpha_x = max(material.roughness_x * material.roughness_x, 0.0101f);
+        float alpha_y = max(material.roughness_y * material.roughness_y, 0.0101f);
+        float alpha = interpolateAlpha(cosTH, cosBH, alpha_x, alpha_y);
+        float D = D_GGX(cosTH, cosBH, cosNH, alpha_x, alpha_y);
+        float G1_wi = G1_Smith(wi, n, alpha);
+//        float G = G_Smith(wi, wo, n, alpha);
+//        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIN, 5.0f);
+        
+        totalPDF += specularWeight * (D * G1_wi) / (4.0f * cosIN);
     }
     else {
-        // lambertian diffuse
-        if (sameHemisphere) {
-            float dielectricReflectance = dielectricF0 + (1.0f - dielectricF0) * pow(1.0f - abs(cosOutgoing), 5.0f);
-            float diffuseFactor = (1.0f - dielectricReflectance) * (1.0f - material.metallic);
-            return vx.material_color * diffuseFactor / M_PI_F;
-        } else {
-            return float3(0.0f);
-        }
+        float eta = inside ? material.refraction : (1.0f / material.refraction);
+        float3 H = normalize(eta * wi + wo);
+        
+        float cosIH = max(abs(dot(wi, H)), 1e-4f);
+        float cosOH = min(dot(wo, H), -1e-4f);
+        
+        float cosTH = sameSignClamp(dot(T, H), 1e-4f);
+        float cosBH = sameSignClamp(dot(B, H), 1e-4f);
+        float cosNH = sameSignClamp(dot(n, H), 1e-4f);
+        
+        float alpha_x = max(material.roughness_x * material.roughness_x, 0.0101f);
+        float alpha_y = max(material.roughness_y * material.roughness_y, 0.0101f);
+        float alpha = interpolateAlpha(cosTH, cosBH, alpha_x, alpha_y);
+        float D = D_GGX(cosTH, cosBH, cosNH, alpha_x, alpha_y);
+        float G1_wi = G1_Smith(wi, n, alpha);
+//        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIN, 5.0f);
+        
+        float denomF = eta * cosIH + cosOH;
+        float jacobianF = (eta * eta * abs(cosOH)) / (denomF * denomF + 1e-10f);
+        totalPDF += transmissionWeight * (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
     }
+    
+    return totalPDF;
+}
+
+float calculateMISWeight(thread PathVertex *cameraVertices, thread PathVertex *lightVertices,
+                         int c, int l,
+                         float cameraToLightPDF, float lightToCameraPDF
+                         )
+{
+    if (c + l == 2) return 1.0f;
+    auto remap0 = [&](float x) -> float { return x != 0.0f ? x : 1.0f; };
+
+    int ci = c - 1;
+    int cip = ci - 1;
+    int li = l - 1;
+    int lip = li - 1;
+
+    float cameraReverseOriginal = cameraVertices[ci].reversePDF;
+    bool  cameraDeltaOriginal = cameraVertices[ci].is_delta;
+    float lightRevOriginal = lightVertices[li].reversePDF;
+    bool  lightDeltaOriginal = lightVertices[li].is_delta;
+
+    cameraVertices[ci].reversePDF = lightToCameraPDF;
+    cameraVertices[ci].is_delta   = false;
+    lightVertices[li].reversePDF  = cameraToLightPDF;
+    lightVertices[li].is_delta    = false;
+
+    float sum = 0.0f;
+    
+    float r = lightToCameraPDF / cameraToLightPDF;
+
+    for (int i = cip; i > 0; i--) {
+        r *= remap0(cameraVertices[i + 1].reversePDF) / remap0(cameraVertices[i].forwardPDF);
+        if (!cameraVertices[i + 1].is_delta && !cameraVertices[i].is_delta)
+            sum += r;
+    }
+
+    r = cameraToLightPDF / lightToCameraPDF;
+
+    for (int i = lip; i >= 0; i--) {
+        r *= remap0(lightVertices[i + 1].reversePDF) / remap0(lightVertices[i].forwardPDF);
+        
+        bool prevDelta = (i > 1) ? lightVertices[i].is_delta : false;
+        if (!lightVertices[i + 1].is_delta && !prevDelta)
+            sum += r;
+    }
+    
+    cameraVertices[ci].reversePDF = cameraReverseOriginal;
+    cameraVertices[ci].is_delta = cameraDeltaOriginal;
+    lightVertices[li].reversePDF = lightRevOriginal;
+    lightVertices[li].is_delta = lightDeltaOriginal;
+
+    return 1.0f / (1.0f + sum);
+}
+
+float3 evaluateBSDF(thread PathVertex &vx, float3 wo, thread float &totalPDF, bool inMedium, float connectionDistance) {
+    float3 wi = vx.incoming_direction;
+    float3 n = vx.normal;
+    Material material = vx.material;
+    
+    float dielectricF0 = pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f);
+    float3 F0 = mix(float3(dielectricF0), vx.material_color, material.metallic);
+    float cosIN = dot(wi, n);
+    bool inside = false;
+    
+    if (cosIN < 0.0f) {
+        n = -n;
+        inside = true;
+    }
+    
+    float3 T, B;
+//    createOrthonormalBasis(n, T, B);
+    createOrthonormalBasis(vx.position, n, T, B);
+    
+    cosIN = max(abs(cosIN), 1e-4f);
+    float cosON = sameSignClamp(dot(wo, n), 1e-4f);
+    float3 fresnel = F0 + (float3(1.0f) - F0) * pow(1.0f - cosIN, 5.0f);
+    float eta = !inside ? (1.0f / material.refraction) : material.refraction;
+    
+    float specularWeight = calculateLuminance(fresnel);
+    float transmissionWeight = (1.0f - material.opacity) * eta * eta * calculateLuminance(1.0f - fresnel);
+    float diffuseWeight = material.opacity * (1.0f - material.metallic) * calculateLuminance(vx.material_color);
+    bool TIR = (material.opacity < 1.0f) && (1.0 - eta * eta * (1.0 - cosIN * cosIN) < 0.0);
+                
+    if (TIR) {
+        specularWeight += transmissionWeight;
+        transmissionWeight = 0.0f;
+    }
+    
+    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
+    
+    if (totalWeight > 0.0f) {
+        specularWeight /= totalWeight;
+        transmissionWeight /= totalWeight;
+        diffuseWeight /= totalWeight;
+    }
+    
+    float3 totalBSDF = float3(0.0f);
+    
+    if (cosIN * cosON > 0.0f) { // reflection
+        
+        totalPDF += diffuseWeight * (cosON / M_PI_F);
+        totalBSDF += diffuseWeight * (vx.material_color / M_PI_F);
+        
+        float3 H = normalize(wi + wo);
+        if (dot(H, n) < 0.0f) H = -H;
+        
+        float cosIH = max(dot(wi, H), 1e-4f);
+        float cosOH = max(dot(wo, H), 1e-4f);
+        
+        float cosTH = sameSignClamp(dot(T, H), 1e-4f);
+        float cosBH = sameSignClamp(dot(B, H), 1e-4f);
+        float cosNH = sameSignClamp(dot(n, H), 1e-4f);
+        
+        float alpha_x = max(material.roughness_x * material.roughness_x, 0.0101f);
+        float alpha_y = max(material.roughness_y * material.roughness_y, 0.0101f);
+        float alpha = interpolateAlpha(cosTH, cosBH, alpha_x, alpha_y);
+        float D = D_GGX(cosTH, cosBH, cosNH, alpha_x, alpha_y);
+        float G1_wi = G1_Smith(wi, n, alpha);
+        float G = G_Smith(wi, wo, n, alpha);
+        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
+        if (TIR) fresnel = float3(1.0f);
+        
+        totalPDF += specularWeight * (D * G1_wi) / (4.0f * cosIN);
+        totalBSDF += specularWeight * (D * G * fresnel) / (4.0f * cosIN * cosON);
+    }
+    else { // transmission
+        float eta = inside ? material.refraction : (1.0f / material.refraction);
+        float3 H = normalize(eta * wi + wo);
+        
+        float cosIH = max(dot(wi, H), 1e-4f);
+        float cosOH = max(dot(wo, H), 1e-4f);
+        
+        float cosTH = sameSignClamp(dot(T, H), 1e-4f);
+        float cosBH = sameSignClamp(dot(B, H), 1e-4f);
+        float cosNH = sameSignClamp(dot(n, H), 1e-4f);
+        
+        float alpha_x = max(material.roughness_x * material.roughness_x, 0.0101f);
+        float alpha_y = max(material.roughness_y * material.roughness_y, 0.0101f);
+        float alpha = interpolateAlpha(cosTH, cosBH, alpha_x, alpha_y);
+        float D = D_GGX(cosTH, cosBH, cosNH, alpha_x, alpha_y);
+        float G1_wi = G1_Smith(wi, n, alpha);
+        float G = G_Smith(wi, wo, n, alpha);
+        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
+        
+        float denomF = eta * cosIH + cosOH;
+        float jacobianF = (eta * eta * abs(cosOH)) / (denomF * denomF + 1e-10f);
+
+        totalPDF += transmissionWeight * (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
+                
+        float denomBSDF = eta * cosIH + cosOH;
+        float jacobian = eta * eta * abs(cosIH * cosOH) / (denomBSDF * denomBSDF + 1e-10f);
+        float3 BSDF = transmissionWeight * D * G * (1.0f - fresnel) * jacobian / abs(cosIN * cosON + 1e-10f);
+        
+        if (inMedium) { // connection from outside to inside
+            BSDF *= exp(-material.absorption * connectionDistance);
+        }
+        
+        totalBSDF += BSDF;
+    }
+    
+    return totalBSDF;
 }
 
 struct TriangleResources
@@ -445,115 +665,421 @@ struct TriangleResources
     device float2 *vertexUVs;
 };
 
-struct BounceInfo {
-    ray ray;
-    int is_delta;
-    float3 normal;
-};
+float2 concentricSampleDisk(float2 u) {
+    float2 u_offset = 2.0f * u - 1.0f;
+    if (u_offset.x == 0.0f && u_offset.y == 0.0f) return float2(0, 0);
 
-float calculateReflectance(Material material) {
-    if (material.metallic > 0.5f) {
-        return 0.9f;
+    float theta, r;
+    if (abs(u_offset.x) > abs(u_offset.y)) {
+        r = u_offset.x;
+        theta = (M_PI_F / 4.0f) * (u_offset.y / u_offset.x);
+    } else {
+        r = u_offset.y;
+        theta = (M_PI_F / 2.0f) - (M_PI_F / 4.0f) * (u_offset.x / u_offset.y);
     }
-    
-    float F0 = pow((1.0f - material.refraction) / (1.0f + material.refraction), 2.0f);
-    float roughnessEffect = 1.0f - material.roughness;
-    
-    return F0 * roughnessEffect;
+    return r * float2(cos(theta), sin(theta));
 }
 
-BounceInfo calculateBounce(ray incidentRay,
-                           float3 intersectionPoint,
-                           float3 normal,
-                           Material material,
-                           uint offset,
-                           uint bounce,
-                           uint frameIndex
-                           )
-{
-    BounceInfo bounceInfo;
-    bounceInfo.ray.max_distance = INFINITY;
-    bounceInfo.is_delta = false;
+float3 sampleGGXNormal(float3 wi, float alpha_x, float alpha_y, float2 r) {
+    float3 V = normalize(float3(wi.x * alpha_x, wi.y * alpha_y, wi.z));
     
-    float2 r = float2(scrambledHalton(offset, 5 + bounce * 13 + 0, frameIndex),
-                      scrambledHalton(offset, 5 + bounce * 13 + 1, frameIndex));
-    float random = scrambledHalton(offset, 5 + bounce * 13 + 2, frameIndex);
+    float lensq = V.x * V.x + V.y * V.y;
+    float3 T1 = lensq > 0.0f ? float3(-V.y, V.x, 0.0f) * rsqrt(lensq) : float3(0.0f, 0.0f, 1.0f);
+    float3 T2 = cross(V, T1);
+    
+    float2 disk = concentricSampleDisk(r);
+    float t1 = disk.x;
+    float t2 = disk.y;
+    
+    float s = 0.5f * (1.0f + V.z);
+    t2 = (1.0f - s) * sqrt(1.0f - t1 * t1) + s * t2;
+    
+    float3 N = t1 * T1 + t2 * T2 + sqrt(max(0.0f, 1.0f - t1 * t1 - t2 * t2)) * V;
+    float3 H = normalize(float3(N.x * alpha_x, N.y * alpha_y, max(-10.0, N.z)));
+    
+    return H;
+}
+
+float3 diffuse(thread PathVertex& currVertex, float3 wi, float2 r) {
+    float3 n = currVertex.normal;
+    
+    float3 diffuseDir = normalize(sampleCosineWeightedHemisphere(r));
+    float3 wo = normalize(alignHemisphereWithNormal(diffuseDir, n));
+    
+    currVertex.forwardPDF = max(dot(wo, n), 1e-4f) / M_PI_F;
+    currVertex.reversePDF = max(dot(wi, n), 1e-4f) / M_PI_F;
+    currVertex.BSDF = currVertex.material_color / M_PI_F;
+    currVertex.is_delta = false;
+        
+    float epsilon = calculateEpsilon(currVertex.position);
+    currVertex.position += calculateOffset(wo, n, epsilon);
+    return wo;
+}
+
+float3 specular(thread PathVertex& vx, float3 wi, float2 r, bool TIR) {
+    float3 n = vx.normal;
+    Material material = vx.material;
+
+    if (dot(wi, n) < 0.0f) {
+        n = -n;
+    }
+
+    float cosIN = max(dot(wi, n), 1e-4f);
+
+    float3 wo;
     
     float dielectricF0 = pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f);
-    float reflectance = mix(dielectricF0, 0.95f, material.metallic);
-    float3 reflected = reflect(incidentRay.direction, normal);
-    
-    float3 n = normal;
-    
-    if (material.opacity < 1.0f && random > material.opacity) {
-        bool entering = dot(incidentRay.direction, n) < 0.0f;
-        n = entering ? n : -n;
-        float eta = entering ? (1.0f / material.refraction) : material.refraction;
-        float cosTheta = saturate(dot(-incidentRay.direction, n));
-        float fresnel = dielectricF0 + (1.0f - dielectricF0) * pow(1.0f - cosTheta, 5.0f);
-        
-        float3 refracted = refract(incidentRay.direction, n, eta);
-        
-        if (r.x > fresnel) { // refract
-            if (length(refracted) < 1e-5f) {
-                refracted = reflected;
-            } // add opacity scaling with beers law
-            
-            bounceInfo.ray.direction = refracted;
+    float3 F0 = mix(float3(dielectricF0), vx.material_color, material.metallic);
 
-        } else { // reflect
-            bounceInfo.ray.direction = reflected;
-        }
+    if (max(material.roughness_x, material.roughness_y) < 0.01f) {
+        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIN, 5.0f);
+        if (TIR) fresnel = float3(1.0f);
+
+        vx.is_delta = true;
+        vx.forwardPDF = 1.0f;
+        vx.reversePDF = 1.0f;
+        vx.BSDF = fresnel / cosIN; // cancel out the cosine in the throughput update; helps against dark edges (cosIN = cosON)
+
+        wo = reflect(-wi, n);
         
-        bounceInfo.ray.origin = intersectionPoint - n * 1e-5f;
     } else {
-        if (material.metallic > 0.5f || random < reflectance) {
-            float3 reflected = reflect(incidentRay.direction, n);
+        
+        float3 T, B;
+        createOrthonormalBasis(vx.position, n, T, B);
+                
+        float3 wiLocal = normalize(float3(dot(wi, T), dot(wi, B), dot(wi, n)));
+                
+        float alpha_x = max(material.roughness_x * material.roughness_x, 0.0101f);
+        float alpha_y = max(material.roughness_y * material.roughness_y, 0.0101f);
+        
+        float3 localH = sampleGGXNormal(wiLocal, alpha_x, alpha_y, r);
+        float3 H = normalize(T * localH.x + B * localH.y + n * localH.z);
+        
+        float cosTH = sameSignClamp(dot(T, H), 1e-4f);
+        float cosBH = sameSignClamp(dot(B, H), 1e-4f);
+        float cosNH = sameSignClamp(dot(n, H), 1e-4f);
+        float alpha = interpolateAlpha(cosTH, cosBH, alpha_x, alpha_y);
+        
+        wo = reflect(-wi, H);
+        
+        if (dot(wo, n) < 0.0f || dot(n, H) <= 0.0f) { // needed
+            vx.forwardPDF = 1e-5f;
+            vx.reversePDF = 1e-5f;
+            vx.BSDF = float3(0.0f, 0.0f, 0.0f);
             
-            if (material.roughness > 0.05f) {
-                float3 randomDir = sampleCosineWeightedHemisphere(r);
-                randomDir = alignHemisphereWithNormal(randomDir, n);
-                bounceInfo.ray.direction = normalize(mix(reflected, randomDir, material.roughness));
-            } else {
-                bounceInfo.ray.direction = reflected;
-            }
         } else {
-            float3 diffuseDir = sampleCosineWeightedHemisphere(r);
-            bounceInfo.ray.direction = alignHemisphereWithNormal(diffuseDir, n);
+
+            float cosON = max(dot(wo, n), 1e-4f);
+            float cosIH = max(dot(wi, H), 1e-4f);
+            float cosNH = max(dot(n, H), 1e-4f);
+            float D = D_GGX(cosTH, cosBH, cosNH, alpha_x, alpha_y);
+            float G1_wi = G1_Smith(wi, n, alpha);
+            float G1_wo = G1_Smith(wo, n, alpha);
+            
+            vx.forwardPDF = (D * G1_wi) / (4.0f * cosIN);
+            vx.reversePDF = (D * G1_wo) / (4.0f * cosON);
+            
+            float G = G_Smith(wi, wo, n, alpha);
+            float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
+            if (TIR) fresnel = float3(1.0f);
+
+            vx.BSDF = (D * G * fresnel) / (4.0f * cosIN * cosON);
+            
+            vx.is_delta = false;
         }
-        bounceInfo.ray.origin = intersectionPoint + n * 1e-5f;
     }
     
-    if (material.opacity < 1.0f) {
-        bounceInfo.is_delta = (material.roughness < 0.2f);
-    } else if (material.metallic > 0.5f) {
-        bounceInfo.is_delta = (material.roughness < 0.2f);
-    } else {
-        bounceInfo.is_delta = false;
-    }
+    if (material.opacity > 0.0f && material.metallic < 1.0f) vx.BSDF *= cosIN;
     
-    bounceInfo.ray.direction = normalize(bounceInfo.ray.direction);
-    bounceInfo.normal = n;
-    return bounceInfo;
+    float epsilon = calculateEpsilon(vx.position);
+    vx.position += calculateOffset(wo, n, epsilon);
+    return wo;
 }
 
-void calculateNewPDFs(thread PathVertex& currVertex,
-                      thread PathVertex& prevVertex,
-                      float3 direction, // of new ray after bounce
-                      float3 n
-                      )
-{
-    if (currVertex.is_delta) {
-        currVertex.forwardPDF = 1.0f;
-        currVertex.reversePDF = 0.0f;
-    } else {
-        float cosTheta = max(0.01f, abs(dot(direction, n)));
-        currVertex.forwardPDF = cosTheta / M_PI_F;
+
+float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float eta) {
+    float3 n = currVertex.normal;
+    Material material = currVertex.material;
+    
+    bool entering = dot(wi, n) > 0.0f;
+//    float eta = entering ? (1.0f / material.refraction) : material.refraction;
+    n = entering ? n : -n;
+    
+    float3 wo;
+    
+    float3 F0 = float3(pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f)); // assume metals cant be transmissive
+    float cosIN = max(dot(wi, n), 1e-10f);
+            
+    float3 absorption = material.absorption;
+
+    if (max(material.roughness_x, material.roughness_y) < 0.01f) {
+        wo = refract(-wi, n, eta);
         
-        float3 toPrev = normalize(prevVertex.position - currVertex.position);
-        float cosToPrev = abs(dot(toPrev, n));
-        currVertex.reversePDF = cosToPrev / M_PI_F;
+        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIN, 5.0f);
+        currVertex.BSDF = (1.0f - fresnel) * eta * eta / cosIN;
+            
+        if (entering) {
+            currVertex.in_medium = true;
+        } else {
+            currVertex.in_medium = false;
+            float3 attenuation = exp(-absorption * currVertex.mediumDistance);
+            currVertex.BSDF *= attenuation;
+            currVertex.mediumDistance = 0.0f;
+        }
+        
+        currVertex.forwardPDF = 1.0f;
+        currVertex.reversePDF = 1.0f;
+        currVertex.is_delta = true;
+
+    } else {
+        float3 T, B;
+        createOrthonormalBasis(currVertex.position, n, T, B);
+        
+        float3 wiLocal = normalize(float3(dot(wi, T), dot(wi, B), dot(wi, n)));
+                
+        float alpha_x = max(material.roughness_x * material.roughness_x, 0.0101f);
+        float alpha_y = max(material.roughness_y * material.roughness_y, 0.0101f);
+
+        float3 localH = sampleGGXNormal(wiLocal, alpha_x, alpha_y, r);
+        float3 H = normalize(T * localH.x + B * localH.y + n * localH.z);
+        
+        float cosTH = sameSignClamp(dot(T, H), 1e-4f);
+        float cosBH = sameSignClamp(dot(B, H), 1e-4f);
+        float cosNH = sameSignClamp(dot(n, H), 1e-4f);
+        float alpha = interpolateAlpha(cosTH, cosBH, alpha_x, alpha_y);
+
+        if (dot(n, H) < 0.0f) {
+            H = -H;
+        }
+
+        wo = refract(-wi, H, eta);
+
+        if (dot(wo, n) > 0.0f) {
+            currVertex.forwardPDF = 1e-5f;
+            currVertex.reversePDF = 1e-5f;
+            currVertex.BSDF = float3(0.0f, 0.0f, 0.0f);
+            return wo;
+        }
+                    
+        float cosON = min(dot(wo, n), -1e-4f);
+        float cosIH = max(dot(wi, H), 1e-4f);
+        float cosOH = min(dot(wo, H), -1e-4f);
+
+        float D = D_GGX(cosTH, cosBH, cosNH, alpha_x, alpha_y);
+        float G1_wi = G1_Smith(wi, n, alpha);
+        float G1_wo = G1_Smith(wo, n, alpha);
+        float eta_inv = 1.0f / eta;
+
+        float denomF = eta * cosIH + cosOH;
+        float jacobianF = (eta * eta * abs(cosOH)) / (denomF * denomF + 1e-10f);
+        currVertex.forwardPDF = (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
+        
+        float denomW = eta_inv * cosOH + cosIH;
+        float jacobianW = (eta_inv * eta_inv * abs(cosIH)) / (denomW * denomW + 1e-10f);
+        currVertex.reversePDF = (D * G1_wo * abs(cosOH) / abs(cosON)) * jacobianW;
+        
+        float G = G_Smith(wi, wo, n, alpha);
+        float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
+        
+        float denomBSDF = eta * cosIH + cosOH;
+        float jacobian = eta * eta * abs(cosIH * cosOH) / (denomBSDF * denomBSDF + 1e-10f);
+        currVertex.BSDF = D * G * (1.0f - fresnel) * jacobian / abs(cosIN * cosON + 1e-10f);
+        
+        if (entering) {
+            currVertex.in_medium = true;
+        } else {
+            currVertex.in_medium = false;
+            float3 attenuation = exp(-absorption * currVertex.mediumDistance);
+            currVertex.BSDF *= attenuation;
+            currVertex.mediumDistance = 0.0f;
+        }
+
+        currVertex.is_delta = false;
     }
+
+    float epsilon = calculateEpsilon(currVertex.position);
+    currVertex.position += wo * epsilon;
+    
+    return wo;
+}
+
+float3 calculateBounce(thread PathVertex& currVertex, thread PathVertex& prevVertex, float3 wi, float2 r2, float r1, float r0) {
+    Material material = currVertex.material;
+    wi = -wi; // convert to pointing away from surface
+    float3 n = currVertex.normal;
+    bool entering = dot(wi, currVertex.normal) > 0.0f;
+    if (entering) n = -n;
+    float eta = calculateEta(prevVertex, currVertex, entering); // FIXME: fix this
+    
+    float3 wo;
+    
+    float dielectricF0 = pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f);
+    float3 F0 = mix(float3(dielectricF0), currVertex.material_color, material.metallic);
+    float cosIN = abs(dot(wi, n));
+    float3 fresnel = F0 + (float3(1.0f) - F0) * pow(1.0f - cosIN, 5.0f);
+    bool TIR = (material.opacity < 1.0f) && (1.0 - eta * eta * (1.0 - cosIN * cosIN) < 0.0);
+        
+    float specularWeight = calculateLuminance(fresnel);
+    float transmissionWeight = (1.0f - material.opacity) * eta * eta * calculateLuminance(1.0f - fresnel);
+    float diffuseWeight = material.opacity * (1.0f - material.metallic) * calculateLuminance(currVertex.material_color);
+    
+    if (TIR) {
+        specularWeight += transmissionWeight;
+        transmissionWeight = 0.0f;
+    }
+    
+    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
+
+    if (totalWeight > 0.0f) {
+        specularWeight /= totalWeight;
+        transmissionWeight /= totalWeight;
+        diffuseWeight /= totalWeight;
+    }
+            
+    if (r1 < diffuseWeight) {
+        wo = diffuse(currVertex, wi, r2);
+
+        currVertex.forwardPDF *= diffuseWeight;
+        currVertex.reversePDF *= diffuseWeight;
+    }
+    else if (TIR || r1 < diffuseWeight + specularWeight) {
+        wo = specular(currVertex, wi, r2, TIR);
+        
+        currVertex.forwardPDF *= specularWeight;
+        currVertex.reversePDF *= specularWeight;
+    }
+    else {
+        wo = transmission(currVertex, wi, r2, eta);
+
+        currVertex.forwardPDF *= transmissionWeight;
+        currVertex.reversePDF *= transmissionWeight;
+    }
+    
+    currVertex.throughput *= currVertex.BSDF * abs(dot(wo, n)) / currVertex.forwardPDF;
+    return wo;
+}
+
+int tracePath(thread ray &ray,
+              int type,
+              float2 pixel,
+              constant Uniforms & uniforms,
+              unsigned int offset,
+              device void *resources,
+              device MTLAccelerationStructureInstanceDescriptor *instances,
+              instance_acceleration_structure accelerationStructure,
+              visible_function_table<IntersectionFunction> intersectionFunctionTable,
+              device AreaLight *areaLights,
+              thread PathVertex *vertices,
+              int maxPathLength,
+              thread float3 &directLightingContribution,
+              device LightTriangle *lightTriangles,
+              array<texture2d<float>, MAX_TEXTURES> textureArray,
+              thread bool &hitLight
+              )
+{
+    int pathLength = 1;
+    float3 throughput = vertices[0].throughput;
+    
+    for (int bounce = 0; bounce < maxPathLength - 1; bounce++) {
+        ray.direction = normalize(ray.direction);
+
+        IntersectionResult intersection = intersect(ray,
+                                                    bounce == 0 ? RAY_MASK_PRIMARY : RAY_MASK_PRIMARY,
+                                                    resources,
+                                                    instances,
+                                                    accelerationStructure,
+                                                    intersectionFunctionTable,
+                                                    false);
+        
+        if (intersection.type == intersection_type::none) {
+            if (type == CAMERA_VERTEX) directLightingContribution += float3(5.0f) * throughput;
+            break;
+        }
+        
+        unsigned int instanceIndex = intersection.instance_id;
+        unsigned int mask = instances[instanceIndex].mask;
+        float4x3 objectToWorldTransform = intersection.object_to_world_transform;
+        float3 intersectionPoint = ray.origin + ray.direction * intersection.distance;
+        
+        thread PathVertex& currVertex = vertices[pathLength];
+        thread PathVertex& prevVertex = vertices[pathLength - 1];
+        currVertex.position = intersectionPoint;
+        currVertex.throughput = throughput;
+        currVertex.incoming_direction = -ray.direction;
+        currVertex.mediumDistance = prevVertex.mediumDistance;
+        currVertex.mediumDistance += prevVertex.in_medium ? length(currVertex.position - prevVertex.position) : 0.0f;
+        currVertex.type = type;
+        
+        unsigned primitiveIndex = intersection.primitive_id;
+        unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
+        float2 barycentric_coords = intersection.triangle_barycentric_coord;
+        
+        if (mask & GEOMETRY_MASK_TRIANGLE) {
+            device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
+            
+            float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
+            float3 worldNormal = normalize(transformDirection(objectNormal, objectToWorldTransform));
+            currVertex.normal = worldNormal;
+            
+            Material material = triangleResources.vertexMaterials[primitiveIndex];
+            
+            currVertex.material = material;
+            
+            float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
+            uv.y = 1 - uv.y;
+//            uv.x = 1 - uv.x;
+
+            currVertex.material_color = interpolateVertexAttribute(triangleResources.vertexColors, primitiveIndex, barycentric_coords);
+            
+            constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
+
+            if (material.texture_index != -1) {
+                texture2d<float> texture = textureArray[material.texture_index];
+                float4 textureValue = texture.sample(textureSampler, uv);
+                float3 textureColor = textureValue.w > 0.0f ? textureValue.xyz : 1.0f;
+                
+                currVertex.material_color *= textureColor;
+            }
+        }
+        
+        if (mask & GEOMETRY_MASK_LIGHT) {
+            if (type == CAMERA_VERTEX) {
+                if (bounce == 0) directLightingContribution += float3(5.0f);
+//                else directLightingContribution += float3(5.0f) * throughput; // FIXME: get real emission
+                hitLight = true;
+            }
+            break;
+        }
+
+        if (++pathLength >= maxPathLength) {
+            break;
+        }
+                                                            
+        float2 r2 = float2(scrambledHalton(offset, 5 + bounce * 13 + 16, uniforms.frameIndex), scrambledHalton(offset, 5 + bounce * 13 + 15, uniforms.frameIndex));
+        float r1 = scrambledHalton(offset, 5 + bounce * 13 + 17, uniforms.frameIndex);
+        float r0 = scrambledHalton(offset, 5 + bounce * 13 + 18, uniforms.frameIndex);
+        
+        ray.direction = calculateBounce(currVertex, prevVertex, ray.direction, r2, r1, r0);
+        ray.min_distance = calculateEpsilon(currVertex.position);
+        ray.origin = currVertex.position;
+        
+        throughput = currVertex.throughput;
+                
+        if (bounce > 5) {
+            float throughputLuminance = calculateLuminance(throughput);
+            float P_surv = min(1.0f, throughputLuminance);
+
+            float rr = scrambledHalton(offset, 5 + bounce * 13 + 40, uniforms.frameIndex);
+
+            if (rr > P_surv) {
+                break;
+            }
+
+            throughput /= P_surv;
+        }
+    }
+
+    return pathLength;
 }
 
 int traceCameraPath(float2 pixel,
@@ -568,7 +1094,8 @@ int traceCameraPath(float2 pixel,
                     int maxPathLength,
                     thread float3 &directLightingContribution,
                     device LightTriangle *lightTriangles,
-                    array<texture2d<float>, MAX_TEXTURES> textureArray
+                    array<texture2d<float>, MAX_TEXTURES> textureArray,
+                    thread bool &hitLight
                     )
 {
     constant Camera& camera = uniforms.camera;
@@ -576,135 +1103,24 @@ int traceCameraPath(float2 pixel,
     thread PathVertex& cameraVertex = cameraVertices[0];
     cameraVertex.position = camera.position;
     cameraVertex.normal = camera.forward;
-    cameraVertex.throughput = float3(1.0f, 1.0f, 1.0f);
+    cameraVertex.throughput = float3(1.0f);
     cameraVertex.forwardPDF = 1.0f;
     cameraVertex.reversePDF = 0.0f;
+    cameraVertex.mediumDistance = 0.0f;
+    cameraVertex.in_medium = false;
     cameraVertex.is_delta = true;
     cameraVertex.type = CAMERA_VERTEX;
-    
-    int pathLength = 1;
-    float3 throughput = float3(1.0f);
-    
+        
     float2 uv = pixel / float2(uniforms.width, uniforms.height);
     uv = uv * 2.0f - 1.0f;
 
     ray ray;
     ray.origin = camera.position + camera.forward * 1e-4f;
     ray.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);
+    ray.min_distance = 1e-4f;
     ray.max_distance = INFINITY;
-            
-    for (int bounce = 0; bounce < maxPathLength - 1; bounce++) {
-        ray.direction = normalize(ray.direction);
-
-        IntersectionResult intersection = intersect(ray,
-                                                    bounce == 0 ? RAY_MASK_PRIMARY : RAY_MASK_PRIMARY,
-                                                    resources,
-                                                    instances,
-                                                    accelerationStructure,
-                                                    intersectionFunctionTable,
-                                                    false);
-        
-        if (intersection.type == intersection_type::none) {
-            break;
-        }
-        
-        unsigned int instanceIndex = intersection.instance_id;
-        unsigned int mask = instances[instanceIndex].mask;
-        float4x3 objectToWorldTransform = intersection.object_to_world_transform;
-        float3 intersectionPoint = ray.origin + ray.direction * intersection.distance;
-        
-        thread PathVertex& currVertex = cameraVertices[pathLength];
-        currVertex.position = intersectionPoint;
-        currVertex.throughput = throughput;
-        currVertex.incoming_direction = -ray.direction;
-        currVertex.type = CAMERA_VERTEX;
-        
-        unsigned primitiveIndex = intersection.primitive_id;
-        unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
-        float2 barycentric_coords = intersection.triangle_barycentric_coord;
-        
-        if (mask & GEOMETRY_MASK_TRIANGLE) {
-            device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
-            
-            float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
-            float3 worldNormal = normalize(transformDirection(objectNormal, objectToWorldTransform));
-            currVertex.normal = worldNormal;
-        
-            Material material = triangleResources.vertexMaterials[primitiveIndex];
-            
-            currVertex.material = material;
-            
-            float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
-            uv.y = 1 - uv.y;
-//            uv.x = 1 - uv.x;
-
-            currVertex.material_color = interpolateVertexAttribute(triangleResources.vertexColors, primitiveIndex, barycentric_coords);
-            
-            constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
-
-            texture2d<float> texture = textureArray[material.texture_index];
-            float4 textureValue = texture.sample(textureSampler, uv);
-            float3 textureColor = textureValue.w > 0.0f ? textureValue.xyz : textureValue.xyz;
-
-//            float3 textureColor = triangleResources.texture.sample(textureSampler, uv * 5.0f).xyz;
-            currVertex.material_color *= textureColor;
-
-            throughput *= currVertex.material_color;
-        }
-        
-        if (++pathLength >= maxPathLength) {
-            break;
-        }
-                
-        float4 r = float4(
-                          scrambledHalton(offset, 5 + bounce * 13 + 4, uniforms.frameIndex),
-                          scrambledHalton(offset, 5 + bounce * 13 + 5, uniforms.frameIndex),
-                          scrambledHalton(offset, 5 + bounce * 13 + 6, uniforms.frameIndex),
-                          scrambledHalton(offset, 5 + bounce * 13 + 7, uniforms.frameIndex)
-                          );
-        
-        LightSample sample = sampleAreaLight(areaLights, lightTriangles, uniforms, currVertex.position, currVertex.normal, r);
-        
-        struct ray shadowRay;
-        shadowRay.origin = currVertex.position + currVertex.normal * 1e-4f;
-        shadowRay.direction = sample.direction;
-        shadowRay.max_distance = sample.distance - 1e-4f;
-        
-        intersection = intersect(shadowRay,
-                                 RAY_MASK_SHADOW,
-                                 resources,
-                                 instances,
-                                 accelerationStructure,
-                                 intersectionFunctionTable,
-                                 true);
-        
-        if (mask & GEOMETRY_MASK_LIGHT) {
-            directLightingContribution += throughput * sample.emission;
-//            directLightingContribution += float3(0.0f, 100000.0f, 0.0f);
-            break;
-        }
-        
-        if (intersection.type == intersection_type::none) {
-            float posToLight = dot(currVertex.normal, sample.direction); // angle between position normal and light direction
-            float surfaceToLight = dot(sample.normal, -sample.direction); // angle between light surface normal and light direction
-            
-            if (posToLight > 0.0f && surfaceToLight > 0.0f) {
-                float3 bsdfValue = evaluateBSDF(currVertex, sample.direction);
-                float distanceSq = max(1e-6f, sample.distance * sample.distance);
-                float3 directLight = throughput * bsdfValue * posToLight * sample.emission / (sample.PDF * distanceSq);
-                
-                directLightingContribution += directLight;
-            }
-        }
-        
-        BounceInfo bounceInfo = calculateBounce(ray, intersectionPoint, currVertex.normal, currVertex.material, offset, bounce, uniforms.frameIndex);
-        currVertex.is_delta = bounceInfo.is_delta;
-        ray = bounceInfo.ray;
-        
-        calculateNewPDFs(currVertex, cameraVertices[pathLength - 1], ray.direction, bounceInfo.normal);
-    }
     
-    return pathLength;
+    return tracePath(ray, CAMERA_VERTEX, pixel, uniforms, offset, resources, instances, accelerationStructure, intersectionFunctionTable, areaLights, cameraVertices, MAX_CAMERA_PATH_LENGTH, directLightingContribution, lightTriangles, textureArray, hitLight);
 }
 
 int traceLightPath(float2 pixel,
@@ -718,7 +1134,9 @@ int traceLightPath(float2 pixel,
                    thread PathVertex *lightVertices,
                    int maxPathLength,
                    device LightTriangle *lightTriangles,
-                   array<texture2d<float>, MAX_TEXTURES> textureArray
+                   array<texture2d<float>, MAX_TEXTURES> textureArray,
+                   thread float3 &directLightingContribution,
+                   thread bool &hitLight
                    )
 {
     float4 r = float4(scrambledHalton(offset, 50, uniforms.frameIndex),
@@ -726,125 +1144,23 @@ int traceLightPath(float2 pixel,
                       scrambledHalton(offset, 52, uniforms.frameIndex),
                       scrambledHalton(offset, 53, uniforms.frameIndex));
     
-    float lightRandom = scrambledHalton(offset, 49, uniforms.frameIndex);
-    uint lightIndex = min(uint(lightRandom * uniforms.lightCount), uniforms.lightCount - 1);
-    
-    LightSample sample = sampleTriangle(areaLights[lightIndex], lightTriangles, 1.0f / float(uniforms.lightCount), float3(0.0f), r.yzw);
-    
-    sample.areaLight = areaLights[lightIndex];
-    AreaLight selectedLight = sample.areaLight;
-    
+    lightVertices[0] = sampleAreaLight(areaLights, lightTriangles, uniforms, r);
     float2 randomDirection = float2(scrambledHalton(offset, 40, uniforms.frameIndex), scrambledHalton(offset, 41, uniforms.frameIndex));
     float3 localDirection = sampleCosineWeightedHemisphere(randomDirection);
-    float3 worldDirection = alignHemisphereWithNormal(localDirection, sample.normal);
+    float3 worldDirection = normalize(alignHemisphereWithNormal(localDirection, lightVertices[0].normal));
     
-    float cosTheta = max(0.0f, dot(worldDirection, sample.normal));
-    float directionPDF = cosTheta / M_PI_F;
-    
-    lightVertices[0].position = sample.position + sample.normal * 1e-4f;
-    lightVertices[0].normal = sample.normal;
-    lightVertices[0].throughput = sample.emission;
-    lightVertices[0].material_color = sample.emission;
-    lightVertices[0].forwardPDF = sample.PDF * directionPDF;
-    lightVertices[0].reversePDF = 0.0f;
-    lightVertices[0].type = LIGHT_VERTEX;
-    lightVertices[0].is_delta = false;
-    
-    int pathLength = 1;
+//    float cosTheta = max(0.0f, dot(worldDirection, sample.normal));
+//    float directionPDF = cosTheta / M_PI_F;
+    float epsilon = calculateEpsilon(lightVertices[0].position);
         
-    float3 throughput = lightVertices[0].throughput;
-    
     ray ray;
-    ray.origin = lightVertices[0].position;
+    ray.origin = lightVertices[0].position + calculateOffset(worldDirection, lightVertices[0].normal, epsilon);
     ray.direction = worldDirection;
     ray.max_distance = INFINITY;
-     
-    for (int bounce = 0; bounce < maxPathLength - 1; bounce++) {
-        IntersectionResult intersection = intersect(ray,
-                                                    bounce == 0 ? RAY_MASK_PRIMARY : RAY_MASK_PRIMARY,
-                                                    resources,
-                                                    instances,
-                                                    accelerationStructure,
-                                                    intersectionFunctionTable,
-                                                    false);
-        
-        if (intersection.type == intersection_type::none) {
-            break;
-        }
-        
-        unsigned int instanceIndex = intersection.instance_id;
-        unsigned int mask = instances[instanceIndex].mask;
-        
-        if (mask & GEOMETRY_MASK_LIGHT) {
-            break;
-        }
-        
-        float4x3 objectToWorldTransform = intersection.object_to_world_transform;
-        float3 intersectionPoint = ray.origin + ray.direction * intersection.distance;
-        
-        thread PathVertex& currVertex = lightVertices[pathLength];
-        currVertex.position = intersectionPoint;
-        currVertex.throughput = throughput;
-        currVertex.incoming_direction = -ray.direction;
-        currVertex.type = LIGHT_VERTEX;
-        
-        unsigned int primitiveIndex = intersection.primitive_id;
-        unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
-        float2 barycentric_coords = intersection.triangle_barycentric_coord;
-        
-        float2 r = float2(scrambledHalton(offset, 5 + bounce * 13 + 6, uniforms.frameIndex),
-                          scrambledHalton(offset, 5 + bounce * 13 + 7, uniforms.frameIndex));
-
-        if (mask & GEOMETRY_MASK_TRIANGLE) {
-            device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
-            
-            float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
-            float3 worldNormal = normalize(transformDirection(objectNormal, objectToWorldTransform));
-            currVertex.normal = worldNormal;
-            
-            Material material = triangleResources.vertexMaterials[primitiveIndex];
-
-            currVertex.material = material;
-
-            float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
-            uv.y = 1 - uv.y;
-//            uv.x = 1 - uv.x;
-
-            currVertex.material_color = interpolateVertexAttribute(triangleResources.vertexColors, primitiveIndex, barycentric_coords);
-
-            constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
-            
-            texture2d<float> texture = textureArray[material.texture_index];
-            float4 textureValue = texture.sample(textureSampler, uv);
-            float3 textureColor = textureValue.w > 0.0f ? textureValue.xyz : textureValue.xyz;
-
-//            float3 textureColor = triangleResources.texture.sample(textureSampler, uv * 5.0f).xyz;
-            currVertex.material_color *= textureColor;
-            throughput *= currVertex.material_color;
-        }
-                
-        if (++pathLength >= maxPathLength) {
-            break;
-        }
-        
-        BounceInfo bounceInfo = calculateBounce(ray, intersectionPoint, currVertex.normal, currVertex.material, offset, bounce, uniforms.frameIndex);
-        ray = bounceInfo.ray;
-        currVertex.is_delta = bounceInfo.is_delta;
-        
-        calculateNewPDFs(currVertex, lightVertices[pathLength - 1], ray.direction, bounceInfo.normal);
-        
-        if (!currVertex.is_delta) {
-            float cosTheta = max(0.01f, dot(ray.direction, currVertex.normal));
-            currVertex.throughput *= cosTheta;
-        }
-
-        throughput = currVertex.throughput;
-    }
+    ray.min_distance = 1e-4f;
     
-    return pathLength;
+    return tracePath(ray, LIGHT_VERTEX, pixel, uniforms, offset, resources, instances, accelerationStructure, intersectionFunctionTable, areaLights, lightVertices, MAX_LIGHT_PATH_LENGTH, directLightingContribution, lightTriangles, textureArray, hitLight);
 }
-
-
 
 uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
 {
@@ -878,12 +1194,11 @@ uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
     return uint2(px, py);
 }
 
-void splat(
-    texture2d<float, access::read_write> splatTex,
-    constant Uniforms& uniforms,
-    uint2 pixelCoordinate,
-    float3 color,
-    device atomic_float* splatBuffer
+void splat(texture2d<float, access::read_write> splatTex,
+           constant Uniforms& uniforms,
+           uint2 pixelCoordinate,
+           float3 color,
+           device atomic_float* splatBuffer
 )
 {
     if (pixelCoordinate.x >= uniforms.width || pixelCoordinate.y >= uniforms.height)
@@ -913,173 +1228,117 @@ void splat(
     }
 }
 
-float3 connectPaths(
-    thread PathVertex *cameraVertices,
-    int cameraPathLength,
-    thread PathVertex *lightVertices,
-    int lightPathLength,
-    device void *resources,
-    device MTLAccelerationStructureInstanceDescriptor *instances,
-    instance_acceleration_structure accelerationStructure,
-    visible_function_table<IntersectionFunction> intersectionFunctionTable,
+float3 connectPaths(thread PathVertex *cameraVertices,
+                    int cameraPathLength,
+                    thread PathVertex *lightVertices,
+                    int lightPathLength,
+                    device void *resources,
+                    device MTLAccelerationStructureInstanceDescriptor *instances,
+                    instance_acceleration_structure accelerationStructure,
+                    visible_function_table<IntersectionFunction> intersectionFunctionTable,
                     texture2d<float, access::read_write> splatTex,
-    constant Uniforms& uniforms,
-    unsigned int offset,
-    device atomic_float* splatBuffer
+                    constant Uniforms& uniforms,
+                    unsigned int offset,
+                    device atomic_float* splatBuffer,
+                    thread bool hitLight
 ) {
     float3 totalContribution = float3(0.0f);
-    
-    for (int c = 1; c < cameraPathLength; c++) {
-        for (int l = 0; l < lightPathLength; l++) {
-            float3 contribution = float3(1.0f, 1.0f, 1.0f);
         
-            if (c == 0 && l == 0) continue;
-            if (c == 0 && l == 1) continue;
+    for (int c = 1; c <= cameraPathLength; c++) { // c/l = 0 means no vertices there at all
+        for (int l = 0; l <= lightPathLength; l++) {
+            int depth = c + l - 2;
             
-            if (cameraVertices[c].is_delta || lightVertices[l].is_delta)
+            if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
-
-            thread PathVertex &cameraVertex = cameraVertices[c];
-            thread PathVertex &lightVertex = lightVertices[l];
-
+            
+            float3 contribution = float3(1.0f);
+            
+            thread PathVertex &cameraVertex = cameraVertices[c - 1];
+            thread PathVertex &lightVertex = lightVertices[l - 1];
+                        
+            if (l == 0) {
+                if (c == cameraPathLength and hitLight) {
+                    PathVertex prevVertex = cameraVertices[c - 2];
+                    
+                    float emitterPDF = 1 / 10.307;
+                    float3 connectionVector = cameraVertex.position - prevVertex.position;
+                    float connectionDistance = length(connectionVector);
+                    float3 connectionDirection = connectionVector / connectionDistance;
+                    float d2 = connectionDistance * connectionDistance;
+                    float cosNL = abs(dot(connectionDirection, prevVertex.normal));
+                    float lightToCameraPDF = emitterPDF * d2 / cosNL;
+                    
+                    contribution *= cameraVertex.throughput * float3(5.0f); // vertex throughput is up until the point
+                    float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, prevVertex.forwardPDF, lightToCameraPDF);
+                    totalContribution += contribution * MISWeight;
+                }
+                continue;
+            }
+            
+            if (cameraVertex.is_delta || lightVertex.is_delta)
+                continue;
+            
             float3 connectionVector = lightVertex.position - cameraVertex.position;
             float connectionDistance = length(connectionVector);
             float3 connectionDirection = connectionVector / connectionDistance;
             
             float cosCamera = dot(connectionDirection, cameraVertex.normal);
             float cosLight = dot(-connectionDirection, lightVertex.normal);
-                        
+            
             if (cosCamera <= 0.0f || cosLight <= 0.0f)
                 continue;
             
+            cosCamera = max(1e-6f, cosCamera);
+            cosLight = max(1e-6f, cosLight);
+                                    
             ray shadowRay;
-            shadowRay.origin = cameraVertex.position + cameraVertex.normal * 1e-4f;
+            float epsilon = calculateEpsilon(cameraVertex.position);
             shadowRay.direction = normalize(connectionDirection);
-            shadowRay.max_distance = connectionDistance - 1e-4f;
+            shadowRay.origin = cameraVertex.position + calculateOffset(shadowRay.direction, cameraVertex.normal, epsilon);
+            shadowRay.min_distance = epsilon;
+            shadowRay.max_distance = connectionDistance - epsilon;
             
             IntersectionResult intersection = intersect(
-                shadowRay,
-                RAY_MASK_SHADOW,
-                resources,
-                instances,
-                accelerationStructure,
-                intersectionFunctionTable,
-                true
-            );
+                                                        shadowRay,
+                                                        RAY_MASK_SHADOW,
+                                                        resources,
+                                                        instances,
+                                                        accelerationStructure,
+                                                        intersectionFunctionTable,
+                                                        true
+                                                        );
             
             if (intersection.type != intersection_type::none) {
-                
-                unsigned int mask = instances[intersection.instance_id].mask;
-
-                unsigned primitiveIndex = intersection.primitive_id;
-                unsigned int resourceIndex = instances[intersection.instance_id].accelerationStructureIndex;
-
-                device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
-                Material material = triangleResources.vertexMaterials[primitiveIndex];
-                float2 barycentric_coords = intersection.triangle_barycentric_coord;
-
-                float opacity = material.opacity;
-                
-                if (opacity >= 0.9f) {
-                    continue;
-                } else {
-                    contribution *= (1.0f - opacity);
-                }
+                continue;
             }
             
-            float3 brdfCamera = evaluateBSDF(cameraVertex, connectionDirection);
-            float3 brdfLight = evaluateBSDF(lightVertex, -connectionDirection);
-            float geometricTerm = (cosCamera * cosLight) / (connectionDistance * connectionDistance);
-            float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, cosCamera / M_PI_F, cosLight / M_PI_F);
+            float geometricTerm = (cosCamera * cosLight) / max(connectionDistance * connectionDistance, 1e-2f);
+            bool inMedium = cameraVertex.in_medium || lightVertex.in_medium;
+
+            float cameraPDF = 1e-10f;
+            float lightPDF = 1e-10f;
             
-            float pdfConversionFactor = 1.0f;
-            if (lightVertex.type == LIGHT_VERTEX && lightVertex.forwardPDF > 0) {
-                pdfConversionFactor = connectionDistance * connectionDistance / cosLight;
+            if (l == 1) {
+                float3 brdfCamera = evaluateBSDF(cameraVertex, connectionDirection, cameraPDF, inMedium, connectionDistance);
+                float cosNL = dot(connectionDirection, lightVertex.normal);
+                lightPDF += lightVertex.forwardPDF * (connectionDistance * connectionDistance) / abs(cosNL);
+                
+                contribution *= (cameraVertex.throughput * brdfCamera
+                                 * lightVertex.throughput * geometricTerm);
+            }
+            else {
+                float3 brdfCamera = evaluateBSDF(cameraVertex, connectionDirection, cameraPDF, inMedium, connectionDistance);
+                float3 brdfLight = evaluateBSDF(lightVertex, -connectionDirection, lightPDF, inMedium, connectionDistance);
+                contribution *= (cameraVertex.throughput * brdfCamera
+                                 * lightVertex.throughput * brdfLight
+                                 * geometricTerm);
             }
             
-            contribution *= cameraVertex.throughput * brdfCamera *
-                           geometricTerm * brdfLight * lightVertex.throughput *
-                           pdfConversionFactor;
+            float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, cameraPDF, lightPDF);
             totalContribution += contribution * MISWeight;
         }
-        
-        
-        for (int l = 1; l < lightPathLength; l++) {
-            if (lightVertices[l].is_delta || lightVertices[l].material.opacity < 0.1f)
-                continue;
-            
-            bool isCausticPath = false;
-            
-            int hitSpecular = 0;
-            
-            for (int v = 1; v <= l; v++) {
-                if (lightVertices[v].is_delta || lightVertices[v].material.metallic > 0.5f ||
-                    lightVertices[v].material.opacity < 0.9f) {
-                    hitSpecular++;
-                } else if (hitSpecular >= 1) { // 1 to show mirror, 2 for glass
-                    isCausticPath = true;
-                    break;
-                }
-            }
-            
-            if (!isCausticPath) continue;
-
-            float3 contribution = float3(1.0f);
-            
-            thread PathVertex& cameraVertex = cameraVertices[0];
-            
-            float3 toCamera = cameraVertex.position - lightVertices[l].position;
-            float distanceToCamera = length(toCamera);
-            float3 toCameraDir = toCamera / distanceToCamera;
-            
-            float cosLight = dot(toCameraDir, lightVertices[l].normal);
-            
-            if (cosLight <= 0.0f)
-                continue;
-            
-            ray shadowRay;
-            shadowRay.origin = lightVertices[l].position + lightVertices[l].normal * 1e-4f;
-            shadowRay.direction = toCameraDir;
-            shadowRay.max_distance = distanceToCamera - 1e-4f;
-            
-            IntersectionResult intersection = intersect(
-                shadowRay,
-                RAY_MASK_SHADOW,
-                resources,
-                instances,
-                accelerationStructure,
-                intersectionFunctionTable,
-                true
-            );
-            
-            if (intersection.type != intersection_type::none) {
-                unsigned int primitiveIndex = intersection.primitive_id;
-                unsigned int resourceIndex = instances[intersection.instance_id].accelerationStructureIndex;
-
-                device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
-                Material material = triangleResources.vertexMaterials[primitiveIndex];
-                float opacity = material.opacity;
-                
-                if (opacity >= 0.9f) {
-                    continue;
-                } else {
-                    contribution *= (1.0f - opacity);
-                }
-            }
-            
-            float3 brdfLight = evaluateBSDF(lightVertices[l], toCameraDir);
-            float geometricTerm = cosLight / (distanceToCamera * distanceToCamera);
-            
-            contribution *= lightVertices[l].throughput * geometricTerm * brdfLight;
-            
-            uint2 pixelCoord = projectToScreen(lightVertices[l].position, uniforms);
-                
-            splat(splatTex, uniforms, pixelCoord, contribution, splatBuffer);
-        }
-    
-        
     }
-    
+        
     return totalContribution;
 }
 
@@ -1121,17 +1380,14 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     cameraRay.direction = normalize(uv.x * uniforms.camera.right +
                                   uv.y * uniforms.camera.up +
                                   uniforms.camera.forward);
+    cameraRay.min_distance = calculateEpsilon(cameraRay.origin);
     cameraRay.max_distance = INFINITY;
     
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
     PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
     
-    float3 accumulatedColor = float3(0.0f);
     float3 directLightingContribution = float3(0.0f);
-    
-    float3 entryPoint = float3(0.0f);
-    bool hasStoredEntryPoint = false;
-    float3 beer = float3(1.0f);
+    bool hitLight = false;
     
     int cameraPathLength = traceCameraPath(
                                            pixel,
@@ -1146,8 +1402,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                                            MAX_CAMERA_PATH_LENGTH,
                                            directLightingContribution,
                                            lightTriangles,
-                                           textureArray
+                                           textureArray,
+                                           hitLight
                                            );
+//    int lightPathLength = 0;
     
     int lightPathLength = traceLightPath(
                                          pixel,
@@ -1161,9 +1419,11 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                                          lightVertices,
                                          MAX_LIGHT_PATH_LENGTH,
                                          lightTriangles,
-                                         textureArray
+                                         textureArray,
+                                         directLightingContribution,
+                                         hitLight
                                          );
-    
+        
     float3 indirectLighting = float3(0.0f);
 
     if (cameraPathLength > 0 && lightPathLength > 0) {
@@ -1179,12 +1439,13 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                                          splatTex,
                                          uniforms,
                                          offset,
-                                         splatBuffer
+                                         splatBuffer,
+                                         hitLight
                                          );
     }
     
     float indirectWeight = 1.0f;
-    float3 totalLighting = (1.0f * 1.0f * directLightingContribution + 1.0f * 3.0f * indirectLighting * indirectWeight);
+    float3 totalLighting = (1.0f * 1.0f * directLightingContribution + 1.0f * 1.0f * indirectLighting * indirectWeight);
     float3 totalSplat = splatTex.read(tid).xyz;
     
     if (uniforms.frameIndex > 0) {
@@ -1201,7 +1462,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     
     dstTex.write(float4(totalLighting, 1.0f), tid);
     splatTex.write(float4(totalSplat, 1.0f), tid);
-    finalImage.write(float4(1.0f * totalLighting + 1.0f * 20.0f * totalSplat, 1.0f), tid);
+    finalImage.write(float4(1.0f * totalLighting + 0.0f * 20.0f * totalSplat, 1.0f), tid);
 }
 
 kernel void clearAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],
@@ -1253,8 +1514,6 @@ kernel void finalizeAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]]
     
     currentSplatTexture.write(float4(newAccumulation, 1.0), gid);
 }
-
-// sample shaders below
 
 // Screen filling quad in normalized device coordinates.
 constant float2 quadVertices[] =

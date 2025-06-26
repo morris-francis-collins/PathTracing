@@ -19,10 +19,10 @@
 #define GEOMETRY_MASK_GEOMETRY (GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_SPHERE)
 
 #define RAY_MASK_PRIMARY   (GEOMETRY_MASK_GEOMETRY | GEOMETRY_MASK_LIGHT | GEOMETRY_MASK_TRANSPARENT | GEOMETRY_MASK_OPAQUE)
-#define RAY_MASK_SHADOW    GEOMETRY_MASK_OPAQUE
+#define RAY_MASK_SHADOW    GEOMETRY_MASK_OPAQUE | GEOMETRY_MASK_LIGHT
 #define RAY_MASK_SECONDARY GEOMETRY_MASK_GEOMETRY | GEOMETRY_MASK_TRANSPARENT | GEOMETRY_MASK_OPAQUE
 
-#define MAX_PATH_LENGTH 6
+#define MAX_PATH_LENGTH 8
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
@@ -34,6 +34,8 @@
 #define CAMERA_FOV_ANGLE 60
 
 #define MAX_TEXTURES 120
+
+#define EPSILON 1e-3f
 
 struct Camera {
     vector_float3 position;
@@ -55,14 +57,10 @@ struct LightTriangle {
 
 struct AreaLight {
     vector_float3 position;
-    vector_float3 forward;
-    vector_float3 right;
-    vector_float3 up;
     vector_float3 color;
     unsigned int firstTriangleIndex;
     unsigned int triangleCount;
     float totalArea;
-    simd_float4x4 transform;
 };
 
 struct Uniforms {
@@ -82,32 +80,29 @@ struct Sphere {
 struct Material {
     float opacity;
     float refraction;
-    float roughness;
+    float roughness_x;
+    float roughness_y;
     float metallic;
-    unsigned int texture_index;
+    vector_float3 absorption;
+    int texture_index;
 };
 
 struct PathVertex {
     vector_float3 position;
     vector_float3 normal;
+    vector_float3 tangent;
+    vector_float3 bitangent;
     vector_float3 throughput;
     vector_float3 material_color;
     vector_float3 incoming_direction;
     struct Material material;
+    float mediumDistance;
     float forwardPDF;
     float reversePDF;
+    vector_float3 BSDF;
     int is_delta;
+    int in_medium;
     int type;
-};
-
-struct LightSample {
-    struct AreaLight areaLight;
-    vector_float3 position;
-    vector_float3 direction;
-    float distance;
-    vector_float3 normal;
-    vector_float3 emission;
-    float PDF;
 };
 
 #endif

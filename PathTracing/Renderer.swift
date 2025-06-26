@@ -273,7 +273,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 geometryDescriptor.intersectionFunctionTableOffset = i
                 let accelDescriptor = MTLPrimitiveAccelerationStructureDescriptor()
                 accelDescriptor.geometryDescriptors = [geometryDescriptor]
-                accelDescriptor.usage = .refit
+                accelDescriptor.usage = .extendedLimits
                 let accelStructure = newAccelerationStructure(descriptor: accelDescriptor)
                 primitiveAccelerationStructures.append(accelStructure)
             } else {
@@ -305,7 +305,7 @@ class Renderer: NSObject, MTKViewDelegate {
         accelDescriptor.instancedAccelerationStructures = primitiveAccelerationStructures
         accelDescriptor.instanceCount = instanceDescriptorCount
         accelDescriptor.instanceDescriptorBuffer = instanceBuffer
-        accelDescriptor.usage = .refit  // mark as dynamic
+        accelDescriptor.usage = .extendedLimits
         
         instanceAccelerationStructure = newAccelerationStructure(descriptor: accelDescriptor)
     }

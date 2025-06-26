@@ -16,12 +16,16 @@ class Geometry {
     var vertexColorBuffer: MTLBuffer?
     var textureCoordinatesBuffer: MTLBuffer?
     var materialBuffer: MTLBuffer?
-    
+    var vertexTangentBuffer: MTLBuffer?
+    var vertexBitangentBuffer: MTLBuffer?
+
     var vertices: [SIMD3<Float>] = []
     var normals: [SIMD3<Float>] = []
     var colors: [SIMD3<Float>] = []
     var texCoords: [SIMD2<Float>] = []
     var materials: [Material] = []
+    var tangents: [SIMD3<Float>] = []
+    var bitangents: [SIMD3<Float>] = []
     
     var lightGeometry: LightGeometry?
     var inwardsNormals: Bool = false
@@ -64,6 +68,20 @@ class Geometry {
             
         }
         
+        if !tangents.isEmpty {
+            vertexTangentBuffer = device.makeBuffer(bytes: tangents,
+                                              length: tangents.count * MemoryLayout<Material>.stride,
+                                              options: options)
+            
+        }
+        
+        if !bitangents.isEmpty {
+            vertexBitangentBuffer = device.makeBuffer(bytes: bitangents,
+                                              length: bitangents.count * MemoryLayout<Material>.stride,
+                                              options: options)
+            
+        }
+
         #if !os(iOS)
         if let buffer = vertexPositionBuffer {
             buffer.didModifyRange(0..<buffer.length)
@@ -82,6 +100,14 @@ class Geometry {
         }
 
         if let buffer = materialBuffer {
+            buffer.didModifyRange(0..<buffer.length)
+        }
+        
+        if let buffer = vertexTangentBuffer {
+            buffer.didModifyRange(0..<buffer.length)
+        }
+
+        if let buffer = vertexBitangentBuffer {
             buffer.didModifyRange(0..<buffer.length)
         }
         #endif
@@ -111,10 +137,10 @@ class ObjGeometry: Geometry {
     init(device: MTLDevice, objURL: URL, textureURL: URL = transparentURL, color: SIMD3<Float> = .one, emissionColor: SIMD3<Float> = .zero, material: Material = PLASTIC, inwardsNormals: Bool = false) {
         super.init(device: device)
         lightGeometry = LightGeometry(device: device)
-
+        
         self.inwardsNormals = inwardsNormals
         self.material = material
-            
+        
         guard let fileContent = try? String(contentsOf: objURL, encoding: .utf8) else {
             print("Failed to read OBJ file from \(objURL)")
             return
@@ -176,7 +202,6 @@ class ObjGeometry: Geometry {
             }
         }
         
-//        print("Parsed \(vertices.count) vertices from OBJ file")
                 
         let textureLoader = MTKTextureLoader(device: device)
         let options: [MTKTextureLoader.Option: Any] = [
@@ -185,13 +210,10 @@ class ObjGeometry: Geometry {
         do {
             texture = try textureLoader.newTexture(URL: textureURL, options: options)
             let index = TextureRegistry.shared.addTexture(texture!, identifier: textureURL.path)
-            self.material?.texture_index = UInt32(index)
+            self.material?.texture_index = Int32(index)
         } catch {
             fatalError("Couldn't load texture: \(error)")
         }
-        
-        
-
         
         for face in faces {
             for vertex in face {
@@ -319,7 +341,7 @@ class GeometryInstance {
             cumulativeArea += lightTriangles[i].area
             lightTriangles[i].cdf = cumulativeArea / totalArea
         }
-        
+        print(totalArea)
         return (lightTriangles, totalArea, averageEmission / Float(lightColors.count))
     }
 }
