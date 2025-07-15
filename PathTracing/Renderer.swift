@@ -214,7 +214,7 @@ class Renderer: NSObject, MTKViewDelegate {
             }
         }
         
-        let bufferSize = Int(2 * 800) * Int(2 * 600) * 3 * MemoryLayout<Float>.size
+        let bufferSize = Int(2 * PIXEL_WIDTH) * Int(2 * PIXEL_HEIGHT) * 3 * MemoryLayout<Float>.size
         atomicSplatBuffer = device.makeBuffer(length: bufferSize,
                                               options: .storageModeManaged)
         

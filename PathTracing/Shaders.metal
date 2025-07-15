@@ -14,6 +14,8 @@ using namespace raytracing;
 constant unsigned int resourcesStride  [[function_constant(0)]];
 constant bool useIntersectionFunctions [[function_constant(1)]];
 
+#define DEBUG(...) os_log_default.log_info(__VA_ARGS__)
+
 constant unsigned int primes[] =
 {
     2,   3,   5,   7,   11,  13,  17,  19,  23,  29,  31,  37,  41,  43,  47,  53,  59,  61,  67,  71,
@@ -36,69 +38,11 @@ constant unsigned int primes[] =
 };
 
 void debug(float x) {
-    if (x <= -1.0f) {
-        os_log_default.log_info("<= -1.0");
-    } else if (x <= -0.9f) {
-        os_log_default.log_info("-0.9");
-    } else if (x <= -0.8f) {
-        os_log_default.log_info("-0.8");
-    } else if (x <= -0.7f) {
-        os_log_default.log_info("-0.7");
-    } else if (x <= -0.6f) {
-        os_log_default.log_info("-0.6");
-    } else if (x <= -0.5f) {
-        os_log_default.log_info("-0.5");
-    } else if (x <= -0.4f) {
-        os_log_default.log_info("-0.4");
-    } else if (x <= -0.3f) {
-        os_log_default.log_info("-0.3");
-    } else if (x <= -0.2f) {
-        os_log_default.log_info("-0.2");
-    } else if (x <= -0.1f) {
-        os_log_default.log_info("-0.1");
-    } else if (x <= 0.0f) {
-        os_log_default.log_info("-0.0");
-    } else if (x < 0.1f) {
-        os_log_default.log_info("0.0");
-    } else if (x < 0.2f) {
-        os_log_default.log_info("0.1");
-    } else if (x < 0.3f) {
-        os_log_default.log_info("0.2");
-    } else if (x < 0.4f) {
-        os_log_default.log_info("0.3");
-    } else if (x < 0.5f) {
-        os_log_default.log_info("0.4");
-    } else if (x < 0.6f) {
-        os_log_default.log_info("0.5");
-    } else if (x < 0.7f) {
-        os_log_default.log_info("0.6");
-    } else if (x < 0.8f) {
-        os_log_default.log_info("0.7");
-    } else if (x < 0.9f) {
-        os_log_default.log_info("0.8");
-    } else if (x < 1.0f) {
-        os_log_default.log_info("0.9");
-    } else if (x < 2.0f){
-        os_log_default.log_info("1.0");
-    } else if (x < 3.0f){
-        os_log_default.log_info("2.0");
-    } else if (x < 4.0f){
-        os_log_default.log_info("3.0");
-    } else if (x < 5.0f){
-        os_log_default.log_info("4.0");
-    } else if (x < 6.0f){
-        os_log_default.log_info("5.0");
-    } else if (x < 7.0f){
-        os_log_default.log_info("6.0");
-    } else if (x < 8.0f){
-        os_log_default.log_info("7.0");
-    } else if (x < 8.0f){
-        os_log_default.log_info("8.0");
-    } else if (x < 9.0f){
-        os_log_default.log_info("9.0");
-    } else {
-        os_log_default.log_info("> 10.0");
-    }
+    os_log_default.log_info("%f", x);
+}
+
+void debug(float3 w) {
+    os_log_default.log_info("mag : %f : float3(%f, %f, %f)", length(w), w.x, w.y, w.z);
 }
 
 // some functions from original template code
@@ -243,6 +187,16 @@ IntersectionResult intersect(ray ray,
     return intersection;
 }
 
+#pragma mark PDFs and BSDFs
+
+inline float lambertianDiffusePDF(float3 w, float3 n) {
+    return max(dot(w, n), 1e-6f) / M_PI_F;
+}
+
+inline float3 lambertianDiffuseBSDF(float3 albedo) {
+    return albedo / M_PI_F;
+}
+
 uint hash(uint input) {
     uint state = input * 747796405u + 2891336453u;
     uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
@@ -321,13 +275,38 @@ inline float calculateEta(PathVertex previous, PathVertex current, bool entering
     else return current.material.refraction;
 }
 
+inline float3 calculateConnectionDirection(PathVertex start, PathVertex end) {
+    return normalize(end.position - start.position);
+}
+
+inline void calculateInteractionWeights(PathVertex vx, float3 fresnel, float eta, bool TIR, thread float &diffuseWeight, thread float &specularWeight, thread float &transmissionWeight) {
+    Material material = vx.material;
+
+    specularWeight = calculateLuminance(fresnel);
+    transmissionWeight = (1.0f - material.opacity) * eta * eta * calculateLuminance(1.0f - fresnel);
+    diffuseWeight = material.opacity * (1.0f - material.metallic) * calculateLuminance(vx.material_color);
+
+    if (TIR) {
+        specularWeight += transmissionWeight;
+        transmissionWeight = 0.0f;
+    }
+
+    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
+
+    if (totalWeight > 0.0f) {
+        specularWeight /= totalWeight;
+        transmissionWeight /= totalWeight;
+        diffuseWeight /= totalWeight;
+    }
+}
+
+
 PathVertex sampleTriangle(thread AreaLight areaLight,
                       device LightTriangle *lightTriangles,
                       float selectionPDF,
                       float3 r
                       )
 {
-
     int left = areaLight.firstTriangleIndex;
     int right = areaLight.firstTriangleIndex + areaLight.triangleCount - 1;
     float target = r.x;
@@ -356,7 +335,7 @@ PathVertex sampleTriangle(thread AreaLight areaLight,
     float3 edge2 = triangle.v2 - triangle.v0;
     float3 position = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
     float epsilon = calculateEpsilon(position);
-    
+
     PathVertex vx;
     vx.normal = normalize(cross(edge1, edge2));
     vx.position = position + calculateOffset(vx.normal, vx.normal, epsilon);
@@ -415,8 +394,41 @@ PathVertex sampleAreaLight(device AreaLight *areaLights,
     return vx;
 }
 
-float evaluatePDF(thread PathVertex &vx, float3 wo) {
-    float3 wi = vx.incoming_direction;
+float convertDensity(float PDF, PathVertex vx, PathVertex nxt) {
+    float3 w = nxt.position - vx.position;
+    float d2_inv = 1.0f / length_squared(w);
+    float cosN = abs(dot(nxt.normal, w * sqrt(d2_inv)));
+    return PDF * cosN * d2_inv;
+}
+
+float evaluateLightPDF(PathVertex vx, PathVertex nxt) {
+    float3 wo = calculateConnectionDirection(vx, nxt);
+    float d2_inv = 1.0f / length_squared(wo);
+    wo *= sqrt(d2_inv);
+    float PDF;
+    
+    PDF = abs(dot(vx.normal, wo)) / M_PI_F; // PDF of sampling nxt from vx
+    float cosN = abs(dot(nxt.normal, wo)); // convert to area measure
+
+    return PDF * d2_inv * cosN;
+}
+
+float cameraPDF(PathVertex vx, PathVertex nxt) {
+    float3 wo = calculateConnectionDirection(vx, nxt);
+    return 1.0f / (A * pow(dot(wo, vx.normal), 3.0f));
+}
+
+float evaluatePDF(thread PathVertex &vx, thread PathVertex &prev, thread PathVertex &nxt) {
+    if (vx.type & LIGHT_VERTEX) {
+        return evaluateLightPDF(vx, nxt);
+    }
+    if (vx.type & CAMERA_VERTEX) {
+        return convertDensity(cameraPDF(vx, nxt), vx, nxt); // pinhole
+    }
+    
+    float3 wi = -calculateConnectionDirection(prev, vx);
+    float3 wo = calculateConnectionDirection(vx, nxt);
+        
     float3 n = vx.normal;
     Material material = vx.material;
     
@@ -431,23 +443,18 @@ float evaluatePDF(thread PathVertex &vx, float3 wo) {
     }
     
     float3 T, B;
+//    createOrthonormalBasis(n, T, B);
     createOrthonormalBasis(vx.position, n, T, B);
-
+    
     cosIN = max(abs(cosIN), 1e-4f);
     float cosON = sameSignClamp(dot(wo, n), 1e-4f);
     float3 fresnel = F0 + (float3(1.0f) - F0) * pow(1.0f - cosIN, 5.0f);
+    float eta = !inside ? (1.0f / material.refraction) : material.refraction;
     
-    float specularWeight = calculateLuminance(fresnel);
-    float transmissionWeight = (material.metallic < 0.99f && material.opacity < 0.99f) ? (1.0f - material.metallic) * (1.0f -  specularWeight) : 0.0f;
-    float diffuseWeight = (material.metallic < 0.99f && material.opacity >= 0.99f) ? (1.0f - material.metallic) - specularWeight : 0.0f;
-    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
-        
-    if (totalWeight > 0.0f) {
-        specularWeight /= totalWeight;
-        transmissionWeight /= totalWeight;
-        diffuseWeight /= totalWeight;
-    }
-    
+    float diffuseWeight, specularWeight, transmissionWeight;
+    bool TIR = (material.opacity < 1.0f) && (1.0 - eta * eta * (1.0 - cosIN * cosIN) < 0.0);
+    calculateInteractionWeights(vx, fresnel, eta, TIR, diffuseWeight, specularWeight, transmissionWeight);
+
     float totalPDF = 0.0f;
     
     if (cosON > 0.0f) {
@@ -494,12 +501,12 @@ float evaluatePDF(thread PathVertex &vx, float3 wo) {
         totalPDF += transmissionWeight * (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
     }
     
-    return totalPDF;
+    return convertDensity(totalPDF, vx, nxt);
 }
 
 float calculateMISWeight(thread PathVertex *cameraVertices, thread PathVertex *lightVertices,
                          int c, int l,
-                         float cameraToLightPDF, float lightToCameraPDF
+                         PathVertex sampled
                          )
 {
     if (c + l == 2) return 1.0f;
@@ -510,46 +517,122 @@ float calculateMISWeight(thread PathVertex *cameraVertices, thread PathVertex *l
     int li = l - 1;
     int lip = li - 1;
 
-    float cameraReverseOriginal = cameraVertices[ci].reversePDF;
-    bool  cameraDeltaOriginal = cameraVertices[ci].is_delta;
-    float lightRevOriginal = lightVertices[li].reversePDF;
-    bool  lightDeltaOriginal = lightVertices[li].is_delta;
+    PathVertex origVx;
+    
+    if (l == 1) {
+        origVx = lightVertices[0];
+        lightVertices[0] = sampled;
+    }
+    
+    float originalCameraReverse = cameraVertices[ci].reversePDF;
+    bool  origCamDelta   = cameraVertices[ci].is_delta;
+    float origCamPrevRev = (cip >= 0) ? cameraVertices[cip].reversePDF : 0.0f;
+    bool  origCamPrevDel = (cip >= 0) ? cameraVertices[cip].is_delta   : false;
 
-    cameraVertices[ci].reversePDF = lightToCameraPDF;
-    cameraVertices[ci].is_delta   = false;
-    lightVertices[li].reversePDF  = cameraToLightPDF;
-    lightVertices[li].is_delta    = false;
+    float origLgtRev     = lightVertices[li].reversePDF;
+    bool  origLgtDelta   = lightVertices[li].is_delta;
+    float origLgtPrevRev = (lip >= 0) ? lightVertices[lip].reversePDF : 0.0f;
+    bool  origLgtPrevDel = (lip >= 0) ? lightVertices[lip].is_delta   : false;
+                
+    if (ci >= 0) {
+        if (li >= 0) {
+            cameraVertices[ci].reversePDF = evaluatePDF(lightVertices[li], lightVertices[lip], cameraVertices[ci]);
+        } else {
+            cameraVertices[ci].reversePDF = lightVertices[0].forwardPDF; // FIXME: may not work for multiple lights
+        }
+        cameraVertices[ci].is_delta = false;
+    }
+    
+    if (cip >= 0) {
+        if (li >= 0) {
+            cameraVertices[cip].reversePDF = evaluatePDF(cameraVertices[ci], lightVertices[li], cameraVertices[cip]);
+        } else {
+            cameraVertices[cip].reversePDF = evaluateLightPDF(cameraVertices[ci], cameraVertices[cip]);
+        }
+    }
+    
+    if (li >= 0) {
+        lightVertices[li].reversePDF = evaluatePDF(cameraVertices[ci], cameraVertices[cip], lightVertices[li]);
+        lightVertices[li].is_delta = false;
+    }
+    
+    if (lip >= 0) {
+        lightVertices[lip].reversePDF = evaluatePDF(lightVertices[li], cameraVertices[ci], lightVertices[lip]);
 
+    }
+    
     float sum = 0.0f;
-    
-    float r = lightToCameraPDF / cameraToLightPDF;
+    float r = 1.0f;
 
-    for (int i = cip; i > 0; i--) {
-        r *= remap0(cameraVertices[i + 1].reversePDF) / remap0(cameraVertices[i].forwardPDF);
-        if (!cameraVertices[i + 1].is_delta && !cameraVertices[i].is_delta)
+    for (int i = ci; i > 0; --i) {
+        r *= remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF);
+
+        if (!cameraVertices[i].is_delta && !cameraVertices[i - 1].is_delta)
             sum += r;
     }
 
-    r = cameraToLightPDF / lightToCameraPDF;
+    r = 1;
+    
+    for (int i = li; i >= 0; --i) {
+        r *= remap0(lightVertices[i].reversePDF) / remap0(lightVertices[i].forwardPDF);
+        bool prevDelta = (i > 0) ? lightVertices[i - 1].is_delta : false;
 
-    for (int i = lip; i >= 0; i--) {
-        r *= remap0(lightVertices[i + 1].reversePDF) / remap0(lightVertices[i].forwardPDF);
+        if (!lightVertices[i].is_delta && !prevDelta)
+            sum += r;
+    }
         
-        bool prevDelta = (i > 1) ? lightVertices[i].is_delta : false;
-        if (!lightVertices[i + 1].is_delta && !prevDelta)
-            sum += r;
+    cameraVertices[ci].reversePDF = originalCameraReverse;
+    cameraVertices[ci].is_delta   = origCamDelta;
+    if (cip >= 0) {
+        cameraVertices[cip].reversePDF = origCamPrevRev;
+        cameraVertices[cip].is_delta   = origCamPrevDel;
+    }
+
+    lightVertices[li].reversePDF = origLgtRev;
+    lightVertices[li].is_delta = origLgtDelta;
+    if (lip >= 0) {
+        lightVertices[lip].reversePDF = origLgtPrevRev;
+        lightVertices[lip].is_delta   = origLgtPrevDel;
     }
     
-    cameraVertices[ci].reversePDF = cameraReverseOriginal;
-    cameraVertices[ci].is_delta = cameraDeltaOriginal;
-    lightVertices[li].reversePDF = lightRevOriginal;
-    lightVertices[li].is_delta = lightDeltaOriginal;
+    if (l == 1) {
+        lightVertices[0] = origVx;
+    }
 
     return 1.0f / (1.0f + sum);
 }
 
-float3 evaluateBSDF(thread PathVertex &vx, float3 wo, thread float &totalPDF, bool inMedium, float connectionDistance) {
+bool isVisible(float3 position, float3 n, float3 direction, float connectionDistance,
+               device void *resources,
+               device MTLAccelerationStructureInstanceDescriptor *instances,
+               instance_acceleration_structure accelerationStructure,
+               visible_function_table<IntersectionFunction> intersectionFunctionTable
+               )
+{
+    ray shadowRay;
+    float epsilon = calculateEpsilon(position);
+    
+    shadowRay.direction = direction;
+    shadowRay.origin = position + calculateOffset(shadowRay.direction, n, epsilon);
+    shadowRay.min_distance = epsilon;
+    shadowRay.max_distance = connectionDistance - epsilon;
+    
+    IntersectionResult intersection = intersect(
+                                                shadowRay,
+                                                RAY_MASK_SHADOW,
+                                                resources,
+                                                instances,
+                                                accelerationStructure,
+                                                intersectionFunctionTable,
+                                                true
+                                                );
+    
+    return intersection.type == intersection_type::none;
+}
+
+float3 evaluateBSDF(thread PathVertex &vx, thread PathVertex &nxt) {
     float3 wi = vx.incoming_direction;
+    float3 wo = calculateConnectionDirection(vx, nxt);
     float3 n = vx.normal;
     Material material = vx.material;
     
@@ -572,29 +655,14 @@ float3 evaluateBSDF(thread PathVertex &vx, float3 wo, thread float &totalPDF, bo
     float3 fresnel = F0 + (float3(1.0f) - F0) * pow(1.0f - cosIN, 5.0f);
     float eta = !inside ? (1.0f / material.refraction) : material.refraction;
     
-    float specularWeight = calculateLuminance(fresnel);
-    float transmissionWeight = (1.0f - material.opacity) * eta * eta * calculateLuminance(1.0f - fresnel);
-    float diffuseWeight = material.opacity * (1.0f - material.metallic) * calculateLuminance(vx.material_color);
+    float diffuseWeight, specularWeight, transmissionWeight;
     bool TIR = (material.opacity < 1.0f) && (1.0 - eta * eta * (1.0 - cosIN * cosIN) < 0.0);
-                
-    if (TIR) {
-        specularWeight += transmissionWeight;
-        transmissionWeight = 0.0f;
-    }
-    
-    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
-    
-    if (totalWeight > 0.0f) {
-        specularWeight /= totalWeight;
-        transmissionWeight /= totalWeight;
-        diffuseWeight /= totalWeight;
-    }
+    calculateInteractionWeights(vx, fresnel, eta, TIR, diffuseWeight, specularWeight, transmissionWeight);
     
     float3 totalBSDF = float3(0.0f);
     
     if (cosIN * cosON > 0.0f) { // reflection
         
-        totalPDF += diffuseWeight * (cosON / M_PI_F);
         totalBSDF += diffuseWeight * (vx.material_color / M_PI_F);
         
         float3 H = normalize(wi + wo);
@@ -616,7 +684,6 @@ float3 evaluateBSDF(thread PathVertex &vx, float3 wo, thread float &totalPDF, bo
         float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
         if (TIR) fresnel = float3(1.0f);
         
-        totalPDF += specularWeight * (D * G1_wi) / (4.0f * cosIN);
         totalBSDF += specularWeight * (D * G * fresnel) / (4.0f * cosIN * cosON);
     }
     else { // transmission
@@ -640,18 +707,17 @@ float3 evaluateBSDF(thread PathVertex &vx, float3 wo, thread float &totalPDF, bo
         
         float denomF = eta * cosIH + cosOH;
         float jacobianF = (eta * eta * abs(cosOH)) / (denomF * denomF + 1e-10f);
-
-        totalPDF += transmissionWeight * (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
                 
         float denomBSDF = eta * cosIH + cosOH;
         float jacobian = eta * eta * abs(cosIH * cosOH) / (denomBSDF * denomBSDF + 1e-10f);
         float3 BSDF = transmissionWeight * D * G * (1.0f - fresnel) * jacobian / abs(cosIN * cosON + 1e-10f);
         
-        if (inMedium) { // connection from outside to inside
+        if (vx.in_medium || nxt.in_medium) { // connection from outside to inside
+            float connectionDistance = length(vx.position - nxt.position);
             BSDF *= exp(-material.absorption * connectionDistance);
         }
         
-        totalBSDF += BSDF;
+        totalBSDF += transmissionWeight * BSDF;
     }
     
     return totalBSDF;
@@ -700,15 +766,15 @@ float3 sampleGGXNormal(float3 wi, float alpha_x, float alpha_y, float2 r) {
     return H;
 }
 
-float3 diffuse(thread PathVertex& currVertex, float3 wi, float2 r) {
+float3 diffuse(thread PathVertex& currVertex, thread PathVertex& prevVertex, thread float& forwardPDF, thread float& reversePDF, float3 wi, float2 r) {
     float3 n = currVertex.normal;
     
     float3 diffuseDir = normalize(sampleCosineWeightedHemisphere(r));
     float3 wo = normalize(alignHemisphereWithNormal(diffuseDir, n));
     
-    currVertex.forwardPDF = max(dot(wo, n), 1e-4f) / M_PI_F;
-    currVertex.reversePDF = max(dot(wi, n), 1e-4f) / M_PI_F;
-    currVertex.BSDF = currVertex.material_color / M_PI_F;
+    forwardPDF = lambertianDiffusePDF(wo, n);
+    reversePDF = lambertianDiffusePDF(wi, n);
+    currVertex.BSDF = lambertianDiffuseBSDF(currVertex.material_color);
     currVertex.is_delta = false;
         
     float epsilon = calculateEpsilon(currVertex.position);
@@ -716,7 +782,7 @@ float3 diffuse(thread PathVertex& currVertex, float3 wi, float2 r) {
     return wo;
 }
 
-float3 specular(thread PathVertex& vx, float3 wi, float2 r, bool TIR) {
+float3 specular(thread PathVertex& vx, thread PathVertex& prev, thread float& forwardPDF, thread float& reversePDF, float3 wi, float2 r, bool TIR) {
     float3 n = vx.normal;
     Material material = vx.material;
 
@@ -736,8 +802,8 @@ float3 specular(thread PathVertex& vx, float3 wi, float2 r, bool TIR) {
         if (TIR) fresnel = float3(1.0f);
 
         vx.is_delta = true;
-        vx.forwardPDF = 1.0f;
-        vx.reversePDF = 1.0f;
+        forwardPDF = 0.0f;
+        reversePDF = 0.0f;
         vx.BSDF = fresnel / cosIN; // cancel out the cosine in the throughput update; helps against dark edges (cosIN = cosON)
 
         wo = reflect(-wi, n);
@@ -762,9 +828,9 @@ float3 specular(thread PathVertex& vx, float3 wi, float2 r, bool TIR) {
         
         wo = reflect(-wi, H);
         
-        if (dot(wo, n) < 0.0f || dot(n, H) <= 0.0f) { // needed
-            vx.forwardPDF = 1e-5f;
-            vx.reversePDF = 1e-5f;
+        if (dot(wo, n) < 0.0f || dot(n, H) < 0.0f) { // needed
+            forwardPDF = 0.0f;
+            reversePDF = 0.0f;
             vx.BSDF = float3(0.0f, 0.0f, 0.0f);
             
         } else {
@@ -776,8 +842,8 @@ float3 specular(thread PathVertex& vx, float3 wi, float2 r, bool TIR) {
             float G1_wi = G1_Smith(wi, n, alpha);
             float G1_wo = G1_Smith(wo, n, alpha);
             
-            vx.forwardPDF = (D * G1_wi) / (4.0f * cosIN);
-            vx.reversePDF = (D * G1_wo) / (4.0f * cosON);
+            forwardPDF = (D * G1_wi) / (4.0f * cosIN);
+            reversePDF = (D * G1_wo) / (4.0f * cosON);
             
             float G = G_Smith(wi, wo, n, alpha);
             float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
@@ -797,7 +863,7 @@ float3 specular(thread PathVertex& vx, float3 wi, float2 r, bool TIR) {
 }
 
 
-float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float eta) {
+float3 transmission(thread PathVertex& currVertex, thread PathVertex& prevVertex, thread float& forwardPDF, thread float& reversePDF, float3 wi, float2 r, float eta) {
     float3 n = currVertex.normal;
     Material material = currVertex.material;
     
@@ -814,9 +880,10 @@ float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float et
 
     if (max(material.roughness_x, material.roughness_y) < 0.01f) {
         wo = refract(-wi, n, eta);
+        float cosON = abs(dot(wo, n));
         
         float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIN, 5.0f);
-        currVertex.BSDF = (1.0f - fresnel) * eta * eta / cosIN;
+        currVertex.BSDF = (1.0f - fresnel) * eta * eta / cosON;
             
         if (entering) {
             currVertex.in_medium = true;
@@ -827,8 +894,8 @@ float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float et
             currVertex.mediumDistance = 0.0f;
         }
         
-        currVertex.forwardPDF = 1.0f;
-        currVertex.reversePDF = 1.0f;
+        forwardPDF = 0.0f;
+        reversePDF = 0.0f;
         currVertex.is_delta = true;
 
     } else {
@@ -855,8 +922,8 @@ float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float et
         wo = refract(-wi, H, eta);
 
         if (dot(wo, n) > 0.0f) {
-            currVertex.forwardPDF = 1e-5f;
-            currVertex.reversePDF = 1e-5f;
+            forwardPDF = 0.0f;
+            reversePDF = 0.0f;
             currVertex.BSDF = float3(0.0f, 0.0f, 0.0f);
             return wo;
         }
@@ -872,11 +939,11 @@ float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float et
 
         float denomF = eta * cosIH + cosOH;
         float jacobianF = (eta * eta * abs(cosOH)) / (denomF * denomF + 1e-10f);
-        currVertex.forwardPDF = (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
+        forwardPDF = (D * G1_wi * abs(cosIH) / abs(cosIN)) * jacobianF;
         
         float denomW = eta_inv * cosOH + cosIH;
         float jacobianW = (eta_inv * eta_inv * abs(cosIH)) / (denomW * denomW + 1e-10f);
-        currVertex.reversePDF = (D * G1_wo * abs(cosOH) / abs(cosON)) * jacobianW;
+        reversePDF = (D * G1_wo * abs(cosOH) / abs(cosON)) * jacobianW;
         
         float G = G_Smith(wi, wo, n, alpha);
         float3 fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIH, 5.0f);
@@ -896,14 +963,14 @@ float3 transmission(thread PathVertex& currVertex, float3 wi, float2 r, float et
 
         currVertex.is_delta = false;
     }
+    
 
     float epsilon = calculateEpsilon(currVertex.position);
     currVertex.position += wo * epsilon;
-    
     return wo;
 }
 
-float3 calculateBounce(thread PathVertex& currVertex, thread PathVertex& prevVertex, float3 wi, float2 r2, float r1, float r0) {
+float3 calculateBounce(thread PathVertex& currVertex, thread PathVertex& prevVertex, thread float& forwardPDF, float3 wi, float2 r2, float r1, float r0) {
     Material material = currVertex.material;
     wi = -wi; // convert to pointing away from surface
     float3 n = currVertex.normal;
@@ -918,49 +985,44 @@ float3 calculateBounce(thread PathVertex& currVertex, thread PathVertex& prevVer
     float cosIN = abs(dot(wi, n));
     float3 fresnel = F0 + (float3(1.0f) - F0) * pow(1.0f - cosIN, 5.0f);
     bool TIR = (material.opacity < 1.0f) && (1.0 - eta * eta * (1.0 - cosIN * cosIN) < 0.0);
-        
-    float specularWeight = calculateLuminance(fresnel);
-    float transmissionWeight = (1.0f - material.opacity) * eta * eta * calculateLuminance(1.0f - fresnel);
-    float diffuseWeight = material.opacity * (1.0f - material.metallic) * calculateLuminance(currVertex.material_color);
-    
-    if (TIR) {
-        specularWeight += transmissionWeight;
-        transmissionWeight = 0.0f;
-    }
-    
-    float totalWeight = specularWeight + transmissionWeight + diffuseWeight;
+    float diffuseWeight, specularWeight, transmissionWeight;
 
-    if (totalWeight > 0.0f) {
-        specularWeight /= totalWeight;
-        transmissionWeight /= totalWeight;
-        diffuseWeight /= totalWeight;
-    }
-            
+    calculateInteractionWeights(currVertex, fresnel, eta, TIR, diffuseWeight, specularWeight, transmissionWeight);
+    float reversePDF, scaledPDF;
+
     if (r1 < diffuseWeight) {
-        wo = diffuse(currVertex, wi, r2);
+        wo = diffuse(currVertex, prevVertex, forwardPDF, reversePDF, wi, r2);
 
-        currVertex.forwardPDF *= diffuseWeight;
-        currVertex.reversePDF *= diffuseWeight;
+        scaledPDF = (forwardPDF != 0.0f ? forwardPDF : 1.0f) * diffuseWeight;
+        forwardPDF *= diffuseWeight;
+        reversePDF *= diffuseWeight;
     }
     else if (TIR || r1 < diffuseWeight + specularWeight) {
-        wo = specular(currVertex, wi, r2, TIR);
+        wo = specular(currVertex, prevVertex, forwardPDF, reversePDF, wi, r2, TIR);
         
-        currVertex.forwardPDF *= specularWeight;
-        currVertex.reversePDF *= specularWeight;
+        scaledPDF = (forwardPDF != 0.0f ? forwardPDF : 1.0f) * specularWeight;
+        forwardPDF *= specularWeight;
+        reversePDF *= specularWeight;
     }
     else {
-        wo = transmission(currVertex, wi, r2, eta);
-
-        currVertex.forwardPDF *= transmissionWeight;
-        currVertex.reversePDF *= transmissionWeight;
+        wo = transmission(currVertex, prevVertex, forwardPDF, reversePDF, wi, r2, eta);
+        
+        scaledPDF = (forwardPDF != 0.0f ? forwardPDF : 1.0f) * transmissionWeight;
+        forwardPDF *= transmissionWeight;
+        reversePDF *= transmissionWeight;
     }
-    
-    currVertex.throughput *= currVertex.BSDF * abs(dot(wo, n)) / currVertex.forwardPDF;
+        
+    currVertex.throughput *= currVertex.BSDF * abs(dot(wo, n)) / scaledPDF;
+#ifdef BDPT
+    prevVertex.reversePDF = convertDensity(reversePDF, currVertex, prevVertex);
+#endif
     return wo;
 }
 
 int tracePath(thread ray &ray,
+              float3 throughput,
               int type,
+              thread float& forwardPDF,
               float2 pixel,
               constant Uniforms & uniforms,
               unsigned int offset,
@@ -978,8 +1040,7 @@ int tracePath(thread ray &ray,
               )
 {
     int pathLength = 1;
-    float3 throughput = vertices[0].throughput;
-    
+        
     for (int bounce = 0; bounce < maxPathLength - 1; bounce++) {
         ray.direction = normalize(ray.direction);
 
@@ -1005,16 +1066,17 @@ int tracePath(thread ray &ray,
         thread PathVertex& prevVertex = vertices[pathLength - 1];
         currVertex.position = intersectionPoint;
         currVertex.throughput = throughput;
+        currVertex.reversePDF = 0.0f;
         currVertex.incoming_direction = -ray.direction;
         currVertex.mediumDistance = prevVertex.mediumDistance;
         currVertex.mediumDistance += prevVertex.in_medium ? length(currVertex.position - prevVertex.position) : 0.0f;
-        currVertex.type = type;
+        currVertex.type = SURFACE_VERTEX;
         
         unsigned primitiveIndex = intersection.primitive_id;
         unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
         float2 barycentric_coords = intersection.triangle_barycentric_coord;
         
-        if (mask & GEOMETRY_MASK_TRIANGLE) {
+        if (true) {
             device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
             
             float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
@@ -1042,10 +1104,15 @@ int tracePath(thread ray &ray,
             }
         }
         
+        currVertex.forwardPDF = convertDensity(forwardPDF, currVertex, prevVertex);
+                
         if (mask & GEOMETRY_MASK_LIGHT) {
             if (type == CAMERA_VERTEX) {
-                if (bounce == 0) directLightingContribution += float3(5.0f);
-//                else directLightingContribution += float3(5.0f) * throughput; // FIXME: get real emission
+#ifdef BDPT
+                if (bounce == 0)
+#endif
+                    directLightingContribution += float3(50.0f) * throughput;
+                
                 hitLight = true;
             }
             break;
@@ -1059,15 +1126,15 @@ int tracePath(thread ray &ray,
         float r1 = scrambledHalton(offset, 5 + bounce * 13 + 17, uniforms.frameIndex);
         float r0 = scrambledHalton(offset, 5 + bounce * 13 + 18, uniforms.frameIndex);
         
-        ray.direction = calculateBounce(currVertex, prevVertex, ray.direction, r2, r1, r0);
+        ray.direction = calculateBounce(currVertex, prevVertex, forwardPDF, ray.direction, r2, r1, r0);
         ray.min_distance = calculateEpsilon(currVertex.position);
         ray.origin = currVertex.position;
         
         throughput = currVertex.throughput;
                 
-        if (bounce > 5) {
+        if (bounce > 3) {
             float throughputLuminance = calculateLuminance(throughput);
-            float P_surv = min(1.0f, throughputLuminance);
+            float P_surv = min(0.99f, throughputLuminance);
 
             float rr = scrambledHalton(offset, 5 + bounce * 13 + 40, uniforms.frameIndex);
 
@@ -1104,7 +1171,7 @@ int traceCameraPath(float2 pixel,
     cameraVertex.position = camera.position;
     cameraVertex.normal = camera.forward;
     cameraVertex.throughput = float3(1.0f);
-    cameraVertex.forwardPDF = 1.0f;
+    cameraVertex.forwardPDF = 0.0f;
     cameraVertex.reversePDF = 0.0f;
     cameraVertex.mediumDistance = 0.0f;
     cameraVertex.in_medium = false;
@@ -1120,7 +1187,10 @@ int traceCameraPath(float2 pixel,
     ray.min_distance = 1e-4f;
     ray.max_distance = INFINITY;
     
-    return tracePath(ray, CAMERA_VERTEX, pixel, uniforms, offset, resources, instances, accelerationStructure, intersectionFunctionTable, areaLights, cameraVertices, MAX_CAMERA_PATH_LENGTH, directLightingContribution, lightTriangles, textureArray, hitLight);
+    float forwardPDF = 1.0f / (A * pow(dot(ray.direction, camera.forward), 3.0f));
+    float3 throughput = float3(1.0f);
+    
+    return tracePath(ray, throughput, CAMERA_VERTEX, forwardPDF, pixel, uniforms, offset, resources, instances, accelerationStructure, intersectionFunctionTable, areaLights, cameraVertices, MAX_CAMERA_PATH_LENGTH, directLightingContribution, lightTriangles, textureArray, hitLight);
 }
 
 int traceLightPath(float2 pixel,
@@ -1149,17 +1219,19 @@ int traceLightPath(float2 pixel,
     float3 localDirection = sampleCosineWeightedHemisphere(randomDirection);
     float3 worldDirection = normalize(alignHemisphereWithNormal(localDirection, lightVertices[0].normal));
     
-//    float cosTheta = max(0.0f, dot(worldDirection, sample.normal));
-//    float directionPDF = cosTheta / M_PI_F;
+    float directionPDF = abs(dot(worldDirection, lightVertices[0].normal)) / M_PI_F;
+    
     float epsilon = calculateEpsilon(lightVertices[0].position);
-        
     ray ray;
     ray.origin = lightVertices[0].position + calculateOffset(worldDirection, lightVertices[0].normal, epsilon);
     ray.direction = worldDirection;
     ray.max_distance = INFINITY;
-    ray.min_distance = 1e-4f;
-    
-    return tracePath(ray, LIGHT_VERTEX, pixel, uniforms, offset, resources, instances, accelerationStructure, intersectionFunctionTable, areaLights, lightVertices, MAX_LIGHT_PATH_LENGTH, directLightingContribution, lightTriangles, textureArray, hitLight);
+    ray.min_distance = epsilon;
+
+    float forwardPDF = directionPDF; // for L1.forwardPDF
+    float3 throughput = lightVertices[0].throughput / forwardPDF;
+        
+    return tracePath(ray, throughput, LIGHT_VERTEX, forwardPDF, pixel, uniforms, offset, resources, instances, accelerationStructure, intersectionFunctionTable, areaLights, lightVertices, MAX_LIGHT_PATH_LENGTH, directLightingContribution, lightTriangles, textureArray, hitLight);
 }
 
 uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
@@ -1189,8 +1261,8 @@ uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
         return uint2(UINT_MAX, UINT_MAX);
     }
 
-    uint px = uint(uv.x * float(uniforms.width - 1));
-    uint py = uint(uv.y * float(uniforms.height - 1));
+    uint px = min(uint(uv.x * float(uniforms.width)), uniforms.width - 1);
+    uint py = min(uint(uv.y * float(uniforms.height)), uniforms.height - 1);
     return uint2(px, py);
 }
 
@@ -1201,31 +1273,16 @@ void splat(texture2d<float, access::read_write> splatTex,
            device atomic_float* splatBuffer
 )
 {
-    if (pixelCoordinate.x >= uniforms.width || pixelCoordinate.y >= uniforms.height)
+    if (pixelCoordinate.x >= uniforms.width || pixelCoordinate.y >= uniforms.height) {
         return;
-    
-    float3 scaledColor = color * 1.0f;
-    int k = 0;
-    
-    for (int i = -k; i <= k; i++) {
-        for (int j = -k; j <= k; j++) {
-            uint2 splatCoord = uint2(pixelCoordinate.x + i, pixelCoordinate.y + j);
-            
-            if (splatCoord.x >= uniforms.width || splatCoord.y >= uniforms.height)
-                continue;
-            
-            uint width = uniforms.width;
-            uint pixelIndex = (splatCoord.y * width + splatCoord.x) * 3;
-            
-            float dist = length(float2(i, j));
-            float weight = exp(-(dist * dist) / (2.0f * k * k + 1.0f));
-            float3 contribution = weight * scaledColor;
-            
-            atomic_fetch_add_explicit(&splatBuffer[pixelIndex], contribution.r, memory_order_relaxed);
-            atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 1], contribution.g, memory_order_relaxed);
-            atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 2], contribution.b, memory_order_relaxed);
-        }
     }
+    
+    uint width = uniforms.width;
+    uint pixelIndex = (pixelCoordinate.y * width + pixelCoordinate.x) * 3;
+        
+    atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 0], color.r, memory_order_relaxed);
+    atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 1], color.g, memory_order_relaxed);
+    atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 2], color.b, memory_order_relaxed);
 }
 
 float3 connectPaths(thread PathVertex *cameraVertices,
@@ -1240,42 +1297,45 @@ float3 connectPaths(thread PathVertex *cameraVertices,
                     constant Uniforms& uniforms,
                     unsigned int offset,
                     device atomic_float* splatBuffer,
-                    thread bool hitLight
+                    thread bool hitLight,
+                    device AreaLight *areaLights,
+                    device LightTriangle *lightTriangles
 ) {
     float3 totalContribution = float3(0.0f);
-        
+
     for (int c = 1; c <= cameraPathLength; c++) { // c/l = 0 means no vertices there at all
         for (int l = 0; l <= lightPathLength; l++) {
             int depth = c + l - 2;
             
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
+        
+            float3 contribution;;
             
-            float3 contribution = float3(1.0f);
+            float4 r4 = float4(scrambledHalton(offset, c * 2 + l + 1, uniforms.frameIndex),
+                               scrambledHalton(offset, c * 2 + l + 2, uniforms.frameIndex),
+                               scrambledHalton(offset, c * 2 + l + 3, uniforms.frameIndex),
+                               scrambledHalton(offset, c * 2 + l + 4, uniforms.frameIndex)
+                               );
             
-            thread PathVertex &cameraVertex = cameraVertices[c - 1];
-            thread PathVertex &lightVertex = lightVertices[l - 1];
+            PathVertex cameraVertex = cameraVertices[c - 1];
+            PathVertex lightVertex = l != 1 ? lightVertices[l - 1] : sampleAreaLight(areaLights, lightTriangles, uniforms, r4);
+            PathVertex sampled;
                         
             if (l == 0) {
+                continue;
                 if (c == cameraPathLength and hitLight) {
-                    PathVertex prevVertex = cameraVertices[c - 2];
-                    
-                    float emitterPDF = 1 / 10.307;
-                    float3 connectionVector = cameraVertex.position - prevVertex.position;
-                    float connectionDistance = length(connectionVector);
-                    float3 connectionDirection = connectionVector / connectionDistance;
-                    float d2 = connectionDistance * connectionDistance;
-                    float cosNL = abs(dot(connectionDirection, prevVertex.normal));
-                    float lightToCameraPDF = emitterPDF * d2 / cosNL;
-                    
-                    contribution *= cameraVertex.throughput * float3(5.0f); // vertex throughput is up until the point
-                    float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, prevVertex.forwardPDF, lightToCameraPDF);
+                    contribution = cameraVertex.throughput * lightVertices[0].material_color; // vertex throughput is up until the point
+
+                    float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, sampled);
+//                    DEBUG("c = %d, l = 0 -- MIS: %f", c, MISWeight);
                     totalContribution += contribution * MISWeight;
                 }
                 continue;
             }
+//            continue;
             
-            if (cameraVertex.is_delta || lightVertex.is_delta)
+            if ((c > 1 and cameraVertex.is_delta) || lightVertex.is_delta)
                 continue;
             
             float3 connectionVector = lightVertex.position - cameraVertex.position;
@@ -1290,55 +1350,69 @@ float3 connectPaths(thread PathVertex *cameraVertices,
             
             cosCamera = max(1e-6f, cosCamera);
             cosLight = max(1e-6f, cosLight);
-                                    
-            ray shadowRay;
-            float epsilon = calculateEpsilon(cameraVertex.position);
-            shadowRay.direction = normalize(connectionDirection);
-            shadowRay.origin = cameraVertex.position + calculateOffset(shadowRay.direction, cameraVertex.normal, epsilon);
-            shadowRay.min_distance = epsilon;
-            shadowRay.max_distance = connectionDistance - epsilon;
             
-            IntersectionResult intersection = intersect(
-                                                        shadowRay,
-                                                        RAY_MASK_SHADOW,
-                                                        resources,
-                                                        instances,
-                                                        accelerationStructure,
-                                                        intersectionFunctionTable,
-                                                        true
-                                                        );
-            
-            if (intersection.type != intersection_type::none) {
+            if (!isVisible(cameraVertex.position, cameraVertex.normal, connectionDirection, connectionDistance, resources, instances, accelerationStructure, intersectionFunctionTable)) {
                 continue;
             }
+                                                            
+            float d2 = max(connectionDistance * connectionDistance, 0.0f);
+            float geometricTerm = (cosCamera * cosLight) / d2;
             
-            float geometricTerm = (cosCamera * cosLight) / max(connectionDistance * connectionDistance, 1e-2f);
-            bool inMedium = cameraVertex.in_medium || lightVertex.in_medium;
+            if (c == 1) {
+//                continue;
+                float pdf = connectionDistance * connectionDistance / cosCamera;
+                float3 cam = 1.0f / (A * pow(cosCamera, 4.0f));
+                cam /= pdf;
+                float3 brdfLight = evaluateBSDF(lightVertex, cameraVertex);
 
-            float cameraPDF = 1e-10f;
-            float lightPDF = 1e-10f;
-            
-            if (l == 1) {
-                float3 brdfCamera = evaluateBSDF(cameraVertex, connectionDirection, cameraPDF, inMedium, connectionDistance);
-                float cosNL = dot(connectionDirection, lightVertex.normal);
-                lightPDF += lightVertex.forwardPDF * (connectionDistance * connectionDistance) / abs(cosNL);
-                
-                contribution *= (cameraVertex.throughput * brdfCamera
+                contribution = (cam * brdfLight
                                  * lightVertex.throughput * geometricTerm);
             }
+            else if (l == 1) {
+//                continue;
+
+                sampled = lightVertex;
+                
+//                debug(A);
+                float3 brdfCamera = evaluateBSDF(cameraVertex, lightVertex);
+//                debug(sampled.throughput);
+                contribution = (cameraVertex.throughput * brdfCamera
+                                 * sampled.throughput * geometricTerm);
+//                debug(sampled.throughput);
+//                debug(contribution);
+//
+//                DEBUG("cambrdf: %f", brdfCamera.x);
+
+            }
             else {
-                float3 brdfCamera = evaluateBSDF(cameraVertex, connectionDirection, cameraPDF, inMedium, connectionDistance);
-                float3 brdfLight = evaluateBSDF(lightVertex, -connectionDirection, lightPDF, inMedium, connectionDistance);
-                contribution *= (cameraVertex.throughput * brdfCamera
+//                continue;
+                sampled = cameraVertex;
+                float3 brdfCamera = evaluateBSDF(cameraVertex, lightVertex);
+                float3 brdfLight = evaluateBSDF(lightVertex, cameraVertex);
+                contribution = (cameraVertex.throughput * brdfCamera
                                  * lightVertex.throughput * brdfLight
                                  * geometricTerm);
+//                DEBUG("cambrdf: %f, lightbrdf: %f", brdfCamera.x, brdfLight.x);
             }
             
-            float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, cameraPDF, lightPDF);
-            totalContribution += contribution * MISWeight;
+            float MISWeight = calculateMISWeight(cameraVertices, lightVertices, c, l, sampled);
+            contribution *= MISWeight;
+
+//            if (false)
+//                DEBUG("c: %d, l: %d, weight: %f, mag: %f, g: %f, cmag: %f, lmag %f",
+//                      c, l, MISWeight, length(contribution), geometricTerm, length(cameraVertex.throughput), length(lightVertex.throughput));
+//            DEBUG("c: %d, weight: %f", c, MISWeight);
+        
+//            debug(MISWeight);
+            if (c == 1) {
+                uint2 pixel = projectToScreen(lightVertex.position, uniforms);
+                splat(splatTex, uniforms, pixel, contribution, splatBuffer);
+            } else {
+                totalContribution += contribution;
+            }
         }
     }
-        
+    
     return totalContribution;
 }
 
@@ -1361,7 +1435,6 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              array<texture2d<float>, MAX_TEXTURES> textureArray [[texture(8)]]
                              )
 {
-
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
         return;
     
@@ -1405,8 +1478,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                                            textureArray,
                                            hitLight
                                            );
-//    int lightPathLength = 0;
     
+#ifndef BDPT
+    int lightPathLength = 0;
+#else
     int lightPathLength = traceLightPath(
                                          pixel,
                                          uniforms,
@@ -1423,6 +1498,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                                          directLightingContribution,
                                          hitLight
                                          );
+#endif
         
     float3 indirectLighting = float3(0.0f);
 
@@ -1440,7 +1516,9 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                                          uniforms,
                                          offset,
                                          splatBuffer,
-                                         hitLight
+                                         hitLight,
+                                         areaLights,
+                                         lightTriangles
                                          );
     }
     
@@ -1462,7 +1540,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     
     dstTex.write(float4(totalLighting, 1.0f), tid);
     splatTex.write(float4(totalSplat, 1.0f), tid);
-    finalImage.write(float4(1.0f * totalLighting + 0.0f * 20.0f * totalSplat, 1.0f), tid);
+    finalImage.write(float4(1.0f * totalLighting + 1.0f * 1.0f * totalSplat, 1.0f), tid);
 }
 
 kernel void clearAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],

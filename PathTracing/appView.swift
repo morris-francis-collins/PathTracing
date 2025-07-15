@@ -14,7 +14,7 @@ struct appView: View {
             Text("Path Tracing")
         
             ContentView()
-                .frame(width: 800, height: 600)
+                .frame(width: CGFloat(PIXEL_WIDTH), height: CGFloat(PIXEL_HEIGHT))
         }
     }
 }

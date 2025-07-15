@@ -5,7 +5,7 @@
 //  Created on 4/11/25.
 //
 
-var GLASS = Material(opacity: 0.0, refraction: 1.5, roughness_x: 0.0, roughness_y: 0.0, metallic: 0.0, absorption: 0.4 * SIMD3<Float>(1, 0.361, 0.576), texture_index: -1)
+var GLASS = Material(opacity: 0.0, refraction: 1.5, roughness_x: 0.0, roughness_y: 0.0, metallic: 0.0, absorption: 0.3 * SIMD3<Float>(1, 0.361, 0.576), texture_index: -1)
 var PLASTIC = Material(opacity: 1.0, refraction: 1.45, roughness_x: 0.9, roughness_y: 0.9, metallic: 0.0, absorption: .zero, texture_index: -1)
 var MIRROR = Material(opacity: 1.0, refraction: 1.5, roughness_x: 0, roughness_y: 0, metallic: 1.0, absorption: .zero, texture_index: -1)
 var GLOSSY_PLASTIC = Material(opacity: 1.0, refraction: 1.45, roughness_x: 0.10, roughness_y: 0.10, metallic: 0.0, absorption: .zero, texture_index: -1)
