@@ -3,7 +3,7 @@
 //  PathTracing
 //
 
-#include "definitions.h"
+#include "Shaders.h"
 
 #include <metal_stdlib>
 #include <simd/simd.h>

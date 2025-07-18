@@ -278,7 +278,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = moritz.PathTracing;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = PathTracing/definitions.h;
+				SWIFT_OBJC_BRIDGING_HEADER = PathTracing/Metal/Shaders.h;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -305,7 +305,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = moritz.PathTracing;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = PathTracing/definitions.h;
+				SWIFT_OBJC_BRIDGING_HEADER = PathTracing/Metal/Shaders.h;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
