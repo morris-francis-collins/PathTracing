@@ -97,7 +97,7 @@ class ModelIOGeometry: Geometry {
             let indexType = submesh.indexType
             
             var submeshMaterial = Material()
-            submeshMaterial.texture_index = -1
+            submeshMaterial.textureIndex = -1
             var currentColor = defaultColor
         
             if let mdlMaterial = submesh.material {
@@ -109,13 +109,13 @@ class ModelIOGeometry: Geometry {
                     }
                 }
 
-                if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
-                    if opacityProperty.type == .float {
-                        submeshMaterial.opacity = opacityProperty.floatValue
-                    }
-                } else {
-                    submeshMaterial.opacity = 1.0
-                }
+//                if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
+//                    if opacityProperty.type == .float {
+//                        submeshMaterial.opacity = opacityProperty.floatValue
+//                    }
+//                } else {
+//                    submeshMaterial.opacity = 1.0
+//                }
 
                 
                 if let refractionProperty = mdlMaterial.property(with: MDLMaterialSemantic.materialIndexOfRefraction) {
@@ -128,12 +128,10 @@ class ModelIOGeometry: Geometry {
 
                 if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
                     if roughnessProperty.type == .float {
-                        submeshMaterial.roughness_x = roughnessProperty.floatValue
-                        submeshMaterial.roughness_y = roughnessProperty.floatValue
+                        submeshMaterial.roughness = roughnessProperty.floatValue
                     }
                 } else {
-                    submeshMaterial.roughness_x = 0.0
-                    submeshMaterial.roughness_y = 0.0
+                    submeshMaterial.roughness = 0.0
                 }
                 
                 if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
@@ -156,7 +154,7 @@ class ModelIOGeometry: Geometry {
                     do {
                         let texture = try textureLoader.newTexture(URL: texURL, options: [.SRGB: false])
                         let index = TextureRegistry.shared.addTexture(texture, identifier: texURL.path)
-                        submeshMaterial.texture_index = Int32(index)
+                        submeshMaterial.textureIndex = Int32(index)
 
                     } catch {
                         fatalError("Couldn't load texture: \(error)")
@@ -168,7 +166,7 @@ class ModelIOGeometry: Geometry {
                         let mtlTexture = try textureLoader.newTexture(cgImage: cgImage.takeRetainedValue())
                         let identifier = "\(submesh.hashValue)\(mdlTexture.hashValue)"
                         let index = TextureRegistry.shared.addTexture(mtlTexture, identifier: identifier)
-                        submeshMaterial.texture_index = Int32(index)
+                        submeshMaterial.textureIndex = Int32(index)
                     }
                 } catch {
                     print("Failed to convert textures: \(error)")
@@ -213,16 +211,15 @@ class ModelIOGeometry: Geometry {
                     triangleTexCoords.append(t2)
                     
                     if let mdlMaterial = submesh.material {
-                        if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
-                            if let opacityMaterialData, opacityProperty.type == .texture {
-                                currentMaterial.opacity = averageMaterialValue(from: opacityMaterialData, t0: t0, t1: t1, t2: t2).x
-                            }
-                        }
+//                        if let opacityProperty = mdlMaterial.property(with: MDLMaterialSemantic.opacity) {
+//                            if let opacityMaterialData, opacityProperty.type == .texture {
+//                                currentMaterial.opacity = averageMaterialValue(from: opacityMaterialData, t0: t0, t1: t1, t2: t2).x
+//                            }
+//                        }
                                                 
                         if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
                             if let roughnessMaterialData, roughnessProperty.type == .texture {
-                                currentMaterial.roughness_x = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
-                                currentMaterial.roughness_y = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
+                                currentMaterial.roughness = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
                             }
                         }
                         

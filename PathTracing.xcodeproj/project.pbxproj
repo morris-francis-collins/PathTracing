@@ -10,22 +10,9 @@
 		1DB937E62DBC835A00B93D69 /* PathTracing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathTracing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		1D59DB742DBF5D4300E54BA1 /* Exceptions for "PathTracing" folder in "PathTracing" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Unused/scene.bin,
-			);
-			target = 1DB937E52DBC835A00B93D69 /* PathTracing */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1DB937E82DBC835A00B93D69 /* PathTracing */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				1D59DB742DBF5D4300E54BA1 /* Exceptions for "PathTracing" folder in "PathTracing" target */,
-			);
 			path = PathTracing;
 			sourceTree = "<group>";
 		};

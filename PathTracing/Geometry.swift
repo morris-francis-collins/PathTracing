@@ -210,7 +210,7 @@ class ObjGeometry: Geometry {
         do {
             texture = try textureLoader.newTexture(URL: textureURL, options: options)
             let index = TextureRegistry.shared.addTexture(texture!, identifier: textureURL.path)
-            self.material?.texture_index = Int32(index)
+            self.material?.textureIndex = Int32(index)
         } catch {
             fatalError("Couldn't load texture: \(error)")
         }
