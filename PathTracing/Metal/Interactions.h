@@ -22,6 +22,7 @@ struct SurfaceInteraction {
     Material material;
     float3 textureColor;
     bool hitLight;
+    int lightIndex;
 };
 
 typedef intersector<triangle_data, instancing, world_space_data>::result_type IntersectionResult;
@@ -38,6 +39,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
+                                         device int *lightIndices,
                                          int resourcesStride,
                                          array<texture2d<float>, MAX_TEXTURES> textureArray
                                          );
@@ -61,7 +63,6 @@ inline T interpolateVertexAttribute(device T *attributes, unsigned int primitive
 }
 
 inline bool isVisible(float3 pos1, float3 pos2,
-                      float3 n1, float3 n2,
                       device void *resources,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure
@@ -71,25 +72,21 @@ inline bool isVisible(float3 pos1, float3 pos2,
     float3 w = pos2 - pos1;
     float dist = length(w);
     w /= dist;
-
-    pos1 += calculateOffset(w, n1, epsilon);
-    pos2 += calculateOffset(-w, n2, epsilon);
     
     ray shadowRay;
     shadowRay.direction = w;
-    shadowRay.origin = pos1 + calculateOffset(w, w, epsilon);
+    shadowRay.origin = pos1;
     shadowRay.min_distance = epsilon;
     shadowRay.max_distance = dist - epsilon;
     
-    IntersectionResult intersection = intersect(
-                                                shadowRay,
+    IntersectionResult intersection = intersect(shadowRay,
                                                 RAY_MASK_SHADOW,
                                                 resources,
                                                 instances,
                                                 accelerationStructure,
                                                 true
                                                 );
-    
+
     return intersection.type == intersection_type::none;
 }
 

@@ -80,7 +80,6 @@ class ModelIOGeometry: Geometry {
         let tangentAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeTangent)
         let bitangentAttribute = mesh.vertexDescriptor.attributeNamed(MDLVertexAttributeBitangent)
 
-        
         var triangleVertices: [SIMD3<Float>] = []
         var triangleNormals: [SIMD3<Float>] = []
         var triangleTexCoords: [SIMD2<Float>] = []
@@ -88,7 +87,8 @@ class ModelIOGeometry: Geometry {
         var triangleMaterials: [Material] = []
         var triangleTangents: [SIMD3<Float>] = []
         var triangleBitangents: [SIMD3<Float>] = []
-                
+        var triangleLightIndices: [Int] = []
+                        
         for submesh in mesh.submeshes! {
             guard let submesh = submesh as? MDLSubmesh else { fatalError("Could not cast to submesh") }
             let indexBuffer = submesh.indexBuffer

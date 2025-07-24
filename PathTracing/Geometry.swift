@@ -234,7 +234,7 @@ class ObjGeometry: Geometry {
                     colors.append(color)
                     texCoords.append(uv)
                     materials.append(self.material!)
-                }
+                }                
             }
         }
 

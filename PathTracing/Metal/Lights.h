@@ -7,14 +7,17 @@
 
 #pragma once
 
-#define MAX_AREA_LIGHTS 16
-
 #include <simd/simd.h>
 #include "Utility.h"
+#include "Interactions.h"
+
+#define MAX_LIGHTS 16
+#define SCENE_RADIUS 8
 
 enum LightType : unsigned int {
     POINT_LIGHT = 0,
     AREA_LIGHT = 1,
+    DIRECTIONAL_LIGHT = 2
 };
 
 struct Light {
@@ -23,9 +26,10 @@ struct Light {
     int delta;
     vector_float3 position;
     vector_float3 color;
-    unsigned int firstTriangleIndex; // area lights only below
+    unsigned int firstTriangleIndex; // area lights only
     unsigned int triangleCount;
     float totalArea;
+    vector_float3 direction; // directional lights only
 };
 
 struct LightTriangle {
@@ -39,14 +43,6 @@ struct LightTriangle {
     float cdf;
 };
 
-struct AreaLight {
-    vector_float3 position;
-    vector_float3 color;
-    unsigned int firstTriangleIndex;
-    unsigned int triangleCount;
-    float totalArea;
-};
-
 #ifdef __METAL_VERSION__
 #include <metal_stdlib>
 using namespace metal;
@@ -57,10 +53,23 @@ struct LightSample {
     float3 normal;
     float3 emission;
     float PDF;
+    
+    LightSample(float3 _position, float3 _normal, float3 _emission, float _PDF) {
+        position = _position;
+        normal = _normal;
+        emission = _emission;
+        PDF = _PDF;
+    }
 };
 
-LightSample sampleLight(thread AreaLight& areaLight, device LightTriangle *lightTriangles, float3 r3);
+float getLightSelectionPDF(device Light *lights, constant Uniforms& uniforms, unsigned int lightIndex);
 
-AreaLight selectLight(device AreaLight *areaLights, device LightTriangle *lightTriangles, constant Uniforms& uniforms, float r, thread float& selectionPDF);
+float getLightSamplePDF(thread Light& light);
+
+LightSample sampleAreaLight(thread Light& areaLight, device LightTriangle *lightTriangles, float3 r3);
+
+LightSample sampleLight(thread Light& light, device LightTriangle *lightTriangles, float3 r3);
+
+Light selectLight(device Light *lights, device LightTriangle *lightTriangles, constant Uniforms& uniforms, float r, thread float& selectionPDF);
 
 #endif

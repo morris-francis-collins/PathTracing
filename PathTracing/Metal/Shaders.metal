@@ -36,20 +36,22 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float, access::read_write> dstTex,
                              device void *resources,
                              device MTLAccelerationStructureInstanceDescriptor *instances,
-                             device AreaLight *areaLights,
+                             device Light *lights,
                              instance_acceleration_structure accelerationStructure,
                              visible_function_table<IntersectionFunction> intersectionFunctionTable,
                              device atomic_float* splatBuffer,
                              texture2d<float> prevSplat,
                              texture2d<float, access::read_write> splatTex,
                              texture2d<float, access::write> finalImage,
+                             texture2d<float> environmentMapTexture,
                              device LightTriangle *lightTriangles,
-                             array<texture2d<float>, MAX_TEXTURES> textureArray [[texture(8)]]
+                             array<texture2d<float>, MAX_TEXTURES> textureArray [[texture(8)]],
+                             device int *lightIndices
                              )
 {
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
         return;
-    
+
     unsigned int offset = randomTex.read(tid).x;
     
     float2 pixel = (float2)tid;
@@ -58,8 +60,8 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     pixel += r;
     
     HaltonSampler sampler = HaltonSampler(offset, uniforms.frameIndex);
-
-    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, areaLights, lightTriangles, textureArray, sampler);
+    
+    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, textureArray, sampler);
     
     float3 totalSplat = splatTex.read(tid).xyz;
     

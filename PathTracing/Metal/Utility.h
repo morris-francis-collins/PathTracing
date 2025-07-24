@@ -26,16 +26,6 @@
 #define MAX_TEXTURES 120
 #define EPSILON 1e-3f
 
-//struct Material {
-//    float opacity;
-//    float refraction;
-//    float roughness_x;
-//    float roughness_y;
-//    float metallic;
-//    vector_float3 absorption;
-//    int texture_index;
-//};
-
 struct Camera {
     vector_float3 position;
     vector_float3 right;

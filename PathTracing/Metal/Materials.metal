@@ -16,7 +16,6 @@ BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, Material material, float2 r2) 
     
     float3 BSDF = material.color / M_PI_F;
     float PDF = dot(wo, n) / M_PI_F;
-    if (PDF < 0.0f) debug(PDF);
     
     return BSDFSample(BSDF, wo, PDF);
 }

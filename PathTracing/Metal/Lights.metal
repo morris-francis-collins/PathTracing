@@ -7,14 +7,58 @@
 
 #include <metal_stdlib>
 #include "Lights.h"
+#include "Interactions.h"
 
 using namespace metal;
 using namespace raytracing;
 
-LightSample sampleLight(thread AreaLight& areaLight,
-                        device LightTriangle *lightTriangles,
-                        float3 r3
-                      )
+float getLightPower(device const Light& light) {
+    switch (light.type) {
+        case POINT_LIGHT:
+            return 4.0f * M_PI_F * calculateLuminance(light.color);
+        case AREA_LIGHT:
+            return calculateLuminance(light.color) * light.totalArea;
+        case DIRECTIONAL_LIGHT:
+            return M_PI_F * SCENE_RADIUS * SCENE_RADIUS * calculateLuminance(light.color);
+        default:
+            return 0.0f;
+    }
+}
+
+float getLightSelectionPDF(device Light *lights, constant Uniforms& uniforms, unsigned int lightIndex) {
+    float strategy, sum = 0.0f;
+    
+    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
+        if (i == lightIndex) {
+            strategy = getLightPower(lights[i]);
+        }
+        sum += getLightPower(lights[i]);
+    }
+    
+    return strategy / sum;
+}
+
+float getLightSamplePDF(thread Light& light) {
+    switch (light.type) {
+        case POINT_LIGHT:
+            return 0.0f;
+        case AREA_LIGHT:
+            return 1.0f / light.totalArea;
+        case DIRECTIONAL_LIGHT:
+            return 0.0f;
+        default:
+            return 0.0f;
+    }
+}
+
+LightSample samplePointLight(thread Light& pointLight) {
+    return LightSample(pointLight.position, float3(0.0f), pointLight.color, 1.0f);
+}
+
+LightSample sampleAreaLight(thread Light& areaLight,
+                            device LightTriangle *lightTriangles,
+                            float3 r3
+                            )
 {
     int left = areaLight.firstTriangleIndex;
     int right = areaLight.firstTriangleIndex + areaLight.triangleCount - 1;
@@ -43,30 +87,45 @@ LightSample sampleLight(thread AreaLight& areaLight,
     float3 edge1 = triangle.v1 - triangle.v0;
     float3 edge2 = triangle.v2 - triangle.v0;
     float3 position = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
+    float3 normal = normalize(cross(edge1, edge2));
     float epsilon = calculateEpsilon(position);
-
-    LightSample lightSample;
-    lightSample.normal = normalize(cross(edge1, edge2));
-    lightSample.position = position + calculateOffset(lightSample.normal, lightSample.normal, epsilon);
-    lightSample.PDF = 1.0f / areaLight.totalArea;
-    lightSample.emission = areaLight.color;
     
-    return lightSample;
+    return LightSample(position + calculateOffset(normal, normal, epsilon), normal, areaLight.color, 1.0f / areaLight.totalArea);
 }
 
-AreaLight selectLight(device AreaLight *areaLights,
-                      device LightTriangle *lightTriangles,
-                      constant Uniforms& uniforms,
-                      float r,
-                      thread float& selectionPDF
-                          )
+LightSample sampleDirectionalLight(thread Light& directionalLight) {
+    return LightSample(float3(0.0f), float3(0.0f), directionalLight.color, 1.0f);
+}
+
+LightSample sampleLight(thread Light& light,
+                        device LightTriangle *lightTriangles,
+                        float3 r3
+                        )
 {
-    float weights[MAX_AREA_LIGHTS];
+    switch (light.type) {
+        case POINT_LIGHT:
+            return samplePointLight(light);
+        case AREA_LIGHT:
+            return sampleAreaLight(light, lightTriangles, r3);
+        case DIRECTIONAL_LIGHT:
+            return sampleDirectionalLight(light);
+        default:
+            return LightSample(float3(0.0f), float3(0.0f), float3(0.0f), 0.0f);
+    }
+}
+
+Light selectLight(device Light *lights,
+                  device LightTriangle *lightTriangles,
+                  constant Uniforms& uniforms,
+                  float r,
+                  thread float& selectionPDF
+                  )
+{
+    float weights[MAX_LIGHTS];
     float totalWeight = 0.0f;
     
     for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-        AreaLight light = areaLights[i];
-        float power = calculateLuminance(light.color) * light.totalArea;
+        float power = getLightPower(lights[i]);
                         
         weights[i] = power;
         totalWeight += weights[i];
@@ -92,7 +151,5 @@ AreaLight selectLight(device AreaLight *areaLights,
         }
     }
 
-    return areaLights[idx];
+    return lights[idx];
 }
-
-

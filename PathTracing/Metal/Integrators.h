@@ -50,8 +50,10 @@ float3 pathIntegrator(float2 pixel,
                       device void *resources,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure,
-                      device AreaLight *areaLights,
+                      device Light *lights,
                       device LightTriangle *lightTriangles,
+                      device int *lightIndices,
+                      texture2d<float> environmentMapTexture,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
                       HaltonSampler haltonSampler
                       );

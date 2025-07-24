@@ -22,11 +22,14 @@ class GameScene: ObservableObject {
     let device: MTLDevice
     var geometries: [Geometry] = []
     var instances: [GeometryInstance] = []
-    var lights: [AreaLight] = []
+    var lights: [Light] = []
     var lightBuffer: MTLBuffer?
     var lightTriangles: [LightTriangle] = []
     var lightTriangleBuffer: MTLBuffer?
     var textures: [MTLTexture] = []
+    var lightIndices: [Int32] = []
+    var lightIndicesBuffer: MTLBuffer?
+    var environmentMapTexture: MTLTexture?
     
     var cameraPosition: SIMD3<Float> = SIMD3<Float>(0, 0, -1)
     var cameraTarget: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
@@ -52,14 +55,11 @@ class GameScene: ObservableObject {
         geometries.append(mesh)
     }
     
-    func addInstance(_ instance: GeometryInstance) {
+    func addInstance(_ instance: GeometryInstance, lightIndex: Int32 = -1) {
         instances.append(instance)
+        lightIndices.append(lightIndex)
     }
     
-    func addLight(_ light: AreaLight) {
-        lights.append(light)
-    }
-        
     func uploadToBuffers() {
         for geometry in geometries {
             geometry.uploadToBuffers()
@@ -67,12 +67,32 @@ class GameScene: ObservableObject {
         
         let options = getManagedBufferStorageMode()
 
-        lightBuffer = device.makeBuffer(bytes: lights, length: lights.count * MemoryLayout<AreaLight>.size, options: options)
+        lightBuffer = device.makeBuffer(bytes: lights, length: lights.count * MemoryLayout<Light>.size, options: options)
         lightTriangleBuffer = device.makeBuffer(bytes: lightTriangles, length: lightTriangles.count * MemoryLayout<LightTriangle>.size, options: options)
+        lightIndicesBuffer = device.makeBuffer(bytes: lightIndices, length: lightIndices.count * MemoryLayout<Int32>.size, options: options)
+        
+        if (environmentMapTexture == nil) {
+            let desc = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .rgba8Unorm,
+                width:  1,
+                height: 1,
+                mipmapped: false
+            )
+            desc.usage = .shaderRead
+            let tex = device.makeTexture(descriptor: desc)!
+            var black: [UInt8] = [0, 0, 0, 255]
+            tex.replace(region: MTLRegion(origin: MTLOrigin(), size: MTLSize(width: 1, height: 1, depth: 1)),
+                        mipmapLevel: 0,
+                        withBytes: &black,
+                        bytesPerRow: 4)
+            
+            environmentMapTexture = tex
+        }
         
         #if !os(iOS)
         lightBuffer?.didModifyRange(0..<lightBuffer!.length)
         lightTriangleBuffer?.didModifyRange(0..<lightTriangleBuffer!.length)
+        lightIndicesBuffer?.didModifyRange(0..<lightIndicesBuffer!.length)
         #endif
     }
     
@@ -442,7 +462,6 @@ class GameScene: ObservableObject {
 
         buildColorfulBox()
 
-
         let whiteCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), material: GLASS)
         whiteCubeGeometry.uploadToBuffers()
         addGeometry(whiteCubeGeometry)
@@ -511,9 +530,9 @@ class GameScene: ObservableObject {
             mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
         )
         
-        var GOLD = GLASS
+        var GOLD = MIRROR
         GOLD.color = SIMD3<Float>(1.0, 0.84, 0.6)
-        GOLD.roughness = 0.2
+        GOLD.roughness = 0.45
         let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GOLD)
         let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
         let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
@@ -544,15 +563,21 @@ class GameScene: ObservableObject {
 //        addInstance(pyramidInstance)
 //        addInstance(tableInstance)
         
-        let lightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), emissionColor: 10 * .one, material: GLASS)
+        addEnvironmentMapTexture(textureURL: skyURL)
+        
+        let lightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), emissionColor: 1 * .one, material: GLASS)
 
         addInstance(with: lightGeometry,
-                    translation: SIMD3<Float>(0.0, 3.399, -1.0),
+                    translation: SIMD3<Float>(0.0, 3.399 + 1.0, -1.0),
                     scale: SIMD3<Float>(4.0, 0.00001, 0.8))
+
+//        addInstance(with: lightGeometry,
+//                    translation: SIMD3<Float>(0.0, 3.399 + 1.0, 1.0),
+//                    scale: SIMD3<Float>(4.0, 0.00001, 0.8))
         
-        addInstance(with: lightGeometry,
-                    translation: SIMD3<Float>(0.0, 3.399, 1.0),
-                    scale: SIMD3<Float>(4.0, 0.00001, 0.8))
+//        addPointLight(position: SIMD3<Float>(-1.0, 2.5, 0.0), color: 10 * .one)
+        
+//        addDirectionalLight(direction: SIMD3<Float>(0.0, 0.0, 1.0), color: 10 * .one)
         
 //        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, emissionColor: SIMD3<Float>(repeating: 10.0))
 //        
@@ -1207,16 +1232,45 @@ class GameScene: ObservableObject {
             )
         }
         
-        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, emissionColor: SIMD3<Float>(repeating: 5.0))
+        var glassMaterial = GLASS
+        
+        for i in 0...10 {
+            glassMaterial.roughness = Float(i) * 0.1
+
+            let scalingGlassGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: glassMaterial)
+
+            addInstance(with: scalingGlassGeometry,
+                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.2, 1.5),
+                        scale: SIMD3<Float>(0.4, 0.4, 0.4)
+            )
+        }
+        
+//        var metal = MIRROR
+//        metal.roughness = 0.4
+//        metal.color = SIMD3<Float>(0.2, 0.7, 0.9)
+//        let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: metal)
+//
+//        addInstance(with: dragonGeometry,
+//                    translation: SIMD3<Float>(0.0, -0.5, 0.0),
+//                    rotation: SIMD3<Float>(0, .pi + 0.5, 0),
+//                    scale: SIMD3<Float>(0.15, 0.15, 0.15)
+//        )
+        
+        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, emissionColor: SIMD3<Float>(repeating: 0.01))
         
                 addInstance(with: lightBallGeometry,
                             translation: SIMD3<Float>(-0.0, 3.99, 0.0),
-                            scale: 5 * SIMD3<Float>(0.5, 0.001, 0.5)
+                            scale: 0.1 * SIMD3<Float>(0.5, 0.001, 0.5)
                             )
+
+        addEnvironmentMapTexture(textureURL: skyURL)
+//        addDirectionalLight(direction: simd_normalize(SIMD3<Float>(0.0, -0.5, 1.0)), color: 10 * .one)
+//        addDirectionalLight(direction: simd_normalize(SIMD3<Float>(0.5, -0.5, 0.75)), color: 10 * .one)
+
     }
 
     func addInstance(with geometry: Geometry, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one,
-                     lightAmplifier: Float = 1.0, mask: UInt32 =  GEOMETRY_MASK_OPAQUE) {
+                     lightAmplifier: Float = 1.0, mask: UInt32 = GEOMETRY_MASK_OPAQUE) {
         
         guard let lightGeometry = geometry.getLightGeometry() else { fatalError("Could not find light geometry") }
                 
@@ -1229,7 +1283,7 @@ class GameScene: ObservableObject {
                                                   rotation: rotation,
                                                   scale: scale,
                                                   mask: GEOMETRY_MASK_TRIANGLE | mask)
-            instances.append(opaqueInstance)
+            addInstance(opaqueInstance)
         }
 
         if !lightGeometry.vertices.isEmpty {
@@ -1243,21 +1297,69 @@ class GameScene: ObservableObject {
                                                scale: scale,
                                                mask: GEOMETRY_MASK_LIGHT)
             
-            addLight(lightInstance: lightInstance, lightForward: SIMD3<Float>(0.0, -1.0, 0.0)) // TODO: do something with forward later
+            addLight(lightInstance: lightInstance)
             instances.append(lightInstance)
         }
     }
     
-    func addLight(lightInstance: GeometryInstance, lightForward: SIMD3<Float>) {
+    func addLight(lightInstance: GeometryInstance) {
         let (newLightTriangles, newLightArea, averageColor) = lightInstance.getLightTriangles()
-        let leftAreaLight = AreaLight(position: lightInstance.translation,
-                                      color: averageColor,
-                                      firstTriangleIndex: UInt32(lightTriangles.count),
-                                      triangleCount: UInt32(newLightTriangles.count),
-                                      totalArea: newLightArea
-                                     )
-        
+
+        let newLight = Light(type: AREA_LIGHT,
+                             index: UInt32(lights.count),
+                             delta: 0,
+                             position: lightInstance.translation,
+                             color: averageColor,
+                             firstTriangleIndex: UInt32(lightTriangles.count),
+                             triangleCount: UInt32(newLightTriangles.count),
+                             totalArea: newLightArea,
+                             direction: .zero
+        )
+
+        lightIndices.append(Int32(lights.count))
         lightTriangles += newLightTriangles
-        addLight(leftAreaLight)
+        lights.append(newLight)
+    }
+    
+    func addPointLight(position: SIMD3<Float>, color: SIMD3<Float>) {
+        let newPointLight = Light(type: POINT_LIGHT,
+                             index: UInt32(lights.count),
+                             delta: 1,
+                             position: position,
+                             color: color,
+                             firstTriangleIndex: 0,
+                             triangleCount: 0,
+                             totalArea: 0.0,
+                             direction: .zero
+        )
+        
+        lights.append(newPointLight)
+    }
+    
+    func addDirectionalLight(direction: SIMD3<Float>, color: SIMD3<Float>) {
+        let newDirectionalLight = Light(type: DIRECTIONAL_LIGHT,
+                             index: UInt32(lights.count),
+                             delta: 1,
+                             position: .zero,
+                             color: color,
+                             firstTriangleIndex: 0,
+                             triangleCount: 0,
+                             totalArea: 0,
+                             direction: direction)
+        
+        lights.append(newDirectionalLight)
+    }
+    
+    func addEnvironmentMapTexture(textureURL: URL) {
+        let textureLoader = MTKTextureLoader(device: device)
+        let options: [MTKTextureLoader.Option: Any] = [
+            .SRGB: false
+        ]
+        
+        do {
+            environmentMapTexture = try textureLoader.newTexture(URL: textureURL, options: options)
+        } catch {
+            fatalError("Couldn't load environemntMap texture texture: \(error)")
+        }
     }
 }

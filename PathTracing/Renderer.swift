@@ -293,8 +293,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 : []
             instanceDescriptors[instanceIndex].intersectionFunctionTableOffset = 0
             instanceDescriptors[instanceIndex].mask = UInt32(instance.mask)
-            let transformMatrix = instance.getPackedTransform()
-            instanceDescriptors[instanceIndex].transformationMatrix = transformMatrix
+            instanceDescriptors[instanceIndex].transformationMatrix = instance.getPackedTransform()
         }
         
         #if !os(iOS)
@@ -450,7 +449,9 @@ class Renderer: NSObject, MTKViewDelegate {
         computeEncoder.setTexture(splatTargets[0], index: 3)
         computeEncoder.setTexture(splatTargets[1], index: 4)
         computeEncoder.setTexture(finalImage, index: 5)
+        computeEncoder.setTexture(scene.environmentMapTexture, index: 6)
         computeEncoder.setBuffer(scene.lightTriangleBuffer, offset: 0, index: 7)
+        computeEncoder.setBuffer(scene.lightIndicesBuffer, offset: 0, index: 8)
         
         let allTextures = TextureRegistry.shared.getTextures()
         for (index, texture) in allTextures.enumerated() {

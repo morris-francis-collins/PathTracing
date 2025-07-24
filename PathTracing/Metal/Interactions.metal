@@ -57,6 +57,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
+                                         device int *lightIndices,
                                          int resourcesStride,
                                          array<texture2d<float>, MAX_TEXTURES> textureArray
                                          )
@@ -68,12 +69,11 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     unsigned int mask = instances[instanceIndex].mask;
     float4x3 objectToWorldTransform = intersection.object_to_world_transform;
     
-    surfaceInteraction.hitLight = mask & GEOMETRY_MASK_LIGHT;
     
     unsigned primitiveIndex = intersection.primitive_id;
     unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
     float2 barycentric_coords = intersection.triangle_barycentric_coord;
-
+    
     device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
     
     float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
@@ -82,7 +82,19 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     
     Material material = triangleResources.vertexMaterials[primitiveIndex];
     surfaceInteraction.material = material;
-        
+    
+    surfaceInteraction.hitLight = mask & GEOMETRY_MASK_LIGHT;
+    surfaceInteraction.lightIndex = lightIndices[instanceIndex];
+    
+//    if (surfaceInteraction.hitLight) {
+//        if (surfaceInteraction.lightIndex == -1) {
+//            DEBUG("hit light, no light idx");
+//        }
+////        DEBUG("light idx: %d, primitive idx: %d, instance idx: %d", lightIndices[instanceIndex], primitiveIndex, instanceIndex);
+//    } else if (surfaceInteraction.lightIndex != -1) {
+//        DEBUG("no hit light, light idx");
+//    }
+            
     float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
     uv.y = 1 - uv.y;
     

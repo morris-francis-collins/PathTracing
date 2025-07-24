@@ -23,7 +23,6 @@ struct Material {
     int textureIndex;
 };
 
-
 #ifdef __METAL_VERSION__
 #include <metal_stdlib>
 using namespace metal;
