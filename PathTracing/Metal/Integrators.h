@@ -54,6 +54,7 @@ float3 pathIntegrator(float2 pixel,
                       device LightTriangle *lightTriangles,
                       device int *lightIndices,
                       texture2d<float> environmentMapTexture,
+                      device float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
                       HaltonSampler haltonSampler
                       );

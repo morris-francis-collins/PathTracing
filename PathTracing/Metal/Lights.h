@@ -14,10 +14,15 @@
 #define MAX_LIGHTS 16
 #define SCENE_RADIUS 8
 
+#define ENVIRONMENT_MAP_HEIGHT 2048
+#define ENVIRONMENT_MAP_WIDTH 4096
+#define ENVIRONMENT_MAP_SCALE 0.1
+
 enum LightType : unsigned int {
     POINT_LIGHT = 0,
     AREA_LIGHT = 1,
-    DIRECTIONAL_LIGHT = 2
+    DIRECTIONAL_LIGHT = 2,
+    ENVIRONMENT_MAP = 3
 };
 
 struct Light {
@@ -62,13 +67,20 @@ struct LightSample {
     }
 };
 
+float environmentLightSamplePDF(float2 uv, device float *environmentMapCDF);
+
 float getLightSelectionPDF(device Light *lights, constant Uniforms& uniforms, unsigned int lightIndex);
 
 float getLightSamplePDF(thread Light& light);
 
 LightSample sampleAreaLight(thread Light& areaLight, device LightTriangle *lightTriangles, float3 r3);
 
-LightSample sampleLight(thread Light& light, device LightTriangle *lightTriangles, float3 r3);
+LightSample sampleLight(thread Light& light,
+                        device LightTriangle *lightTriangles,
+                        texture2d<float> environmentMapTexture,
+                        device float *environmentMapCDF,
+                        float3 r3
+                        );
 
 Light selectLight(device Light *lights, device LightTriangle *lightTriangles, constant Uniforms& uniforms, float r, thread float& selectionPDF);
 

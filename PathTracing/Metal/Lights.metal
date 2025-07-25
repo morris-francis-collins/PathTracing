@@ -20,6 +20,8 @@ float getLightPower(device const Light& light) {
             return calculateLuminance(light.color) * light.totalArea;
         case DIRECTIONAL_LIGHT:
             return M_PI_F * SCENE_RADIUS * SCENE_RADIUS * calculateLuminance(light.color);
+        case ENVIRONMENT_MAP:
+            return 4.0f * M_PI_F * M_PI_F * SCENE_RADIUS * SCENE_RADIUS * ENVIRONMENT_MAP_SCALE * calculateLuminance(light.color);
         default:
             return 0.0f;
     }
@@ -38,6 +40,15 @@ float getLightSelectionPDF(device Light *lights, constant Uniforms& uniforms, un
     return strategy / sum;
 }
 
+float environmentLightSamplePDF(float2 uv, device float *environmentMapCDF) {
+    int x = clamp(int(uv.x * float(ENVIRONMENT_MAP_WIDTH)), 0, ENVIRONMENT_MAP_WIDTH - 1);
+    int y = clamp(int(uv.y * float(ENVIRONMENT_MAP_HEIGHT)), 0, ENVIRONMENT_MAP_HEIGHT - 1);
+    int i = y * ENVIRONMENT_MAP_WIDTH + x;
+
+    float pixelPDF = environmentMapCDF[i] - (i > 0 ? environmentMapCDF[i - 1] : 0.0f);
+    return pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sin(uv.y * M_PI_F));
+}
+
 float getLightSamplePDF(thread Light& light) {
     switch (light.type) {
         case POINT_LIGHT:
@@ -46,6 +57,8 @@ float getLightSamplePDF(thread Light& light) {
             return 1.0f / light.totalArea;
         case DIRECTIONAL_LIGHT:
             return 0.0f;
+        case ENVIRONMENT_MAP:
+            return 1.0f;
         default:
             return 0.0f;
     }
@@ -97,8 +110,63 @@ LightSample sampleDirectionalLight(thread Light& directionalLight) {
     return LightSample(float3(0.0f), float3(0.0f), directionalLight.color, 1.0f);
 }
 
+LightSample sampleEnvironmentMap(thread Light& environmentMap,
+                                 texture2d<float> environmentMapTexture,
+                                 device float *environmentMapCDF,
+                                 float r1
+                                 )
+{
+    int l = 0, r = ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT - 1;
+    
+    while (l < r) {
+        int m = l + (r - l) / 2;
+        
+        if (environmentMapCDF[m] < r1) {
+            l = m + 1;
+        } else {
+            r = m;
+        }
+    }
+    
+    int y = l / ENVIRONMENT_MAP_WIDTH;
+    int x = l % ENVIRONMENT_MAP_WIDTH;
+//    DEBUG("%f, %f, %f, %f", environmentMapCDF[0], environmentMapCDF[ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT - 1], environmentMapCDF[100000], environmentMapCDF[ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT]);
+//    DEBUG("xy; %d, %d", x, y);
+    float u = (float(x) + 0.5f) / float(ENVIRONMENT_MAP_WIDTH);
+    float v = (float(y) + 0.5f) / float(ENVIRONMENT_MAP_HEIGHT);
+    
+    constexpr sampler envSampler(min_filter::linear, mag_filter::linear, s_address::repeat, t_address::clamp_to_edge);
+    float3 emission = ENVIRONMENT_MAP_SCALE * environmentMapTexture.sample(envSampler, float2(u, v)).xyz;
+//    DEBUG("uv; %f, %f, mag: %f", u, v, length(emission));
+//    if (length(emission) > 1.0f) debug(emission);
+//    DEBUG("uv; %f, %f - emission: %f", u, v, length(emission));
+//    debug(emission);
+    float phi = u * 2.0f * M_PI_F;
+    float theta = v * M_PI_F;
+    
+    float sinTheta = sin(theta);
+    float cosTheta = cos(theta);
+    float sinPhi = sin(phi);
+    float cosPhi = cos(phi);
+    
+    float3 direction;
+    direction.x = -sinTheta * cosPhi;
+    direction.y = cosTheta;              // Y is up
+    direction.z = -sinTheta * sinPhi;
+    
+    float pixelPDF = environmentMapCDF[l] - (l > 0 ? environmentMapCDF[l - 1] : 0.0f);
+    float solidAnglePDF = pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sinTheta);
+//    DEBUG("pixelPDF: %f, solid angle PDF: %f", pixelPDF, solidAnglePDF);
+//    debug(direction);
+//    debug(emission);
+    
+    return LightSample(direction, float3(0.0f), emission, solidAnglePDF);
+}
+
 LightSample sampleLight(thread Light& light,
                         device LightTriangle *lightTriangles,
+                        texture2d<float> environmentMapTexture,
+                        device float *environmentMapCDF,
                         float3 r3
                         )
 {
@@ -109,6 +177,8 @@ LightSample sampleLight(thread Light& light,
             return sampleAreaLight(light, lightTriangles, r3);
         case DIRECTIONAL_LIGHT:
             return sampleDirectionalLight(light);
+        case ENVIRONMENT_MAP:
+            return sampleEnvironmentMap(light, environmentMapTexture, environmentMapCDF, r3.x);
         default:
             return LightSample(float3(0.0f), float3(0.0f), float3(0.0f), 0.0f);
     }

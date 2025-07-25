@@ -22,6 +22,7 @@ float3 pathIntegrator(float2 pixel,
                       device LightTriangle *lightTriangles,
                       device int *lightIndices,
                       texture2d<float> environmentMapTexture,
+                      device float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
                       HaltonSampler haltonSampler
                       )
@@ -55,12 +56,15 @@ float3 pathIntegrator(float2 pixel,
         if (intersection.type == intersection_type::none) {
             constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
             float3 dir = ray.direction;
-            
+
             float u = (atan2(dir.z, dir.x) + M_PI_F) / (2.0f * M_PI_F);
-            float v = (asin(clamp(dir.y, -1.0f, 1.0f)) + M_PI_2_F) / M_PI_F;
+            float v = 1.0f - (asin(clamp(dir.y, -1.0f, 1.0f)) + M_PI_2_F) / M_PI_F;
             
-            float4 textureValue = environmentMapTexture.sample(textureSampler, float2(u, 1.0f - v));
-            contribution += 5 * throughput * textureValue.xyz;
+            float lightPDF = environmentLightSamplePDF(float2(u, v), environmentMapCDF);
+            float weight = balanceHeuristic(PDF, lightPDF);
+
+            float4 textureValue = environmentMapTexture.sample(textureSampler, float2(u, v));
+            contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue.xyz * weight;
             break;
         }
         
@@ -105,14 +109,19 @@ float3 pathIntegrator(float2 pixel,
         if (!bsdfSample.delta) {
             float selectionPDF;
             Light light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(light, lightTriangles, haltonSampler.r3());
+            LightSample lightSample = sampleLight(light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
             
             float3 wi = -ray.direction;
             float3 pos1 = surfaceInteraction.position;
             float3 wo, pos2;
             float distance;
             
-            if (light.type == DIRECTIONAL_LIGHT) {
+            if (light.type == ENVIRONMENT_MAP) {
+                wo = lightSample.position;
+                pos2 = pos1 + 2.0f * SCENE_RADIUS * wo;
+                distance = 1.0f;
+//                debug(lightSample.position);
+            } else if (light.type == DIRECTIONAL_LIGHT) {
                 wo = -light.direction;
                 pos2 = pos1 + 2.0f * SCENE_RADIUS * wo;
                 distance = 1.0f;
@@ -126,8 +135,7 @@ float3 pathIntegrator(float2 pixel,
             float cosCamera = dot(wo, n);
             float cosLight = any(lightSample.normal != 0.0f) ? dot(-wo, lightSample.normal) : 1.0f;
 
-            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, pos2, resources, instances, accelerationStructure)) {
-
+            if ((cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, pos2, resources, instances, accelerationStructure))) {
                 float3 BSDF = getBXDF(wi, wo, n, material);
                 float G = cosCamera * cosLight / (distance * distance);
                 float lightPDF = selectionPDF * lightSample.PDF;
@@ -137,6 +145,7 @@ float3 pathIntegrator(float2 pixel,
                 } else {
                     float bsdfPDF = getPDF(wi, wo, n, material);
                     float weight = balanceHeuristic(lightPDF, bsdfPDF);
+//                    if (light.type == ENVIRONMENT_MAP) debug(lightSample.emission );
                     contribution += throughput * BSDF * lightSample.emission * G * weight / lightPDF;
                 }
             }

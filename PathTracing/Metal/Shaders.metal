@@ -46,7 +46,8 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float> environmentMapTexture,
                              device LightTriangle *lightTriangles,
                              array<texture2d<float>, MAX_TEXTURES> textureArray [[texture(8)]],
-                             device int *lightIndices
+                             device int *lightIndices,
+                             device float *environmentMapCDF
                              )
 {
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
@@ -61,7 +62,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     
     HaltonSampler sampler = HaltonSampler(offset, uniforms.frameIndex);
     
-    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, textureArray, sampler);
+    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
     
     float3 totalSplat = splatTex.read(tid).xyz;
     

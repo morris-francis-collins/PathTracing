@@ -452,7 +452,8 @@ class Renderer: NSObject, MTKViewDelegate {
         computeEncoder.setTexture(scene.environmentMapTexture, index: 6)
         computeEncoder.setBuffer(scene.lightTriangleBuffer, offset: 0, index: 7)
         computeEncoder.setBuffer(scene.lightIndicesBuffer, offset: 0, index: 8)
-        
+        computeEncoder.setBuffer(scene.environmentMapCDFBuffer, offset: 0, index: 9)
+
         let allTextures = TextureRegistry.shared.getTextures()
         for (index, texture) in allTextures.enumerated() {
             computeEncoder.setTexture(texture, index: 8 + index)
