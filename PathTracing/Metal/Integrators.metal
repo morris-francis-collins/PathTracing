@@ -59,35 +59,39 @@ float3 pathIntegrator(float2 pixel,
 
             float u = (atan2(dir.z, dir.x) + M_PI_F) / (2.0f * M_PI_F);
             float v = 1.0f - (asin(clamp(dir.y, -1.0f, 1.0f)) + M_PI_2_F) / M_PI_F;
-            
-            float lightPDF = environmentLightSamplePDF(float2(u, v), environmentMapCDF);
-            float weight = balanceHeuristic(PDF, lightPDF);
-
             float4 textureValue = environmentMapTexture.sample(textureSampler, float2(u, v));
-            contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue.xyz * weight;
+
+            if (prevSpecular) {
+                contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue.xyz;
+            } else {
+                float lightPDF = environmentLightSamplePDF(float2(u, v), environmentMapCDF);
+                float weight = powerHeuristic(PDF, lightPDF);
+                contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue.xyz * weight;
+            }
+            
             break;
         }
         
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices ,resourceStride, textureArray);
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textureArray);
         Material material = surfaceInteraction.material;
         float3 n = surfaceInteraction.normal;
         
         if (surfaceInteraction.hitLight) {
             Light light = lights[surfaceInteraction.lightIndex];
             float3 color = light.color;
-            
+
             if (prevSpecular) {
                 contribution += throughput * color;
             } else {
-                float lightPDF = getLightSelectionPDF(lights, uniforms, surfaceInteraction.lightIndex) * getLightSamplePDF(light);                
-                float weight = balanceHeuristic(PDF, lightPDF);
+                float lightPDF = getLightSelectionPDF(lights, uniforms, surfaceInteraction.lightIndex) * getLightSamplePDF(light);
+                float weight = powerHeuristic(PDF, lightPDF);
                 contribution += throughput * color * weight;
             }
             break;
         }
         
         BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, haltonSampler.r3());
-        bsdfSample.BSDF *= surfaceInteraction.textureColor;
+        bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
         
         PDF = bsdfSample.PDF;
         float3 wo = bsdfSample.wo;
@@ -102,41 +106,23 @@ float3 pathIntegrator(float2 pixel,
             throughput *= exp(absorption * attenuationDistance);
             attenuationDistance = 0.0f;
         }
-        
-        throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
-        if (all(throughput < 1e-10f)) break;
-                
+                        
         if (!bsdfSample.delta) {
             float selectionPDF;
             Light light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
+            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
             
-            float3 wi = -ray.direction;
-            float3 pos1 = surfaceInteraction.position;
-            float3 wo, pos2;
-            float distance;
-            
-            if (light.type == ENVIRONMENT_MAP) {
-                wo = lightSample.position;
-                pos2 = pos1 + 2.0f * SCENE_RADIUS * wo;
-                distance = 1.0f;
-//                debug(lightSample.position);
-            } else if (light.type == DIRECTIONAL_LIGHT) {
-                wo = -light.direction;
-                pos2 = pos1 + 2.0f * SCENE_RADIUS * wo;
-                distance = 1.0f;
-            } else {
-                wo = lightSample.position - pos1;
-                distance = length(wo);
-                wo /= distance;
-                pos2 = lightSample.position;
-            }
+            float3 wi = -ray.direction, wo = lightSample.wo;
+            float3 pos1 = surfaceInteraction.position, pos2 = lightSample.position;
+            float distance = lightSample.distance;
             
             float cosCamera = dot(wo, n);
-            float cosLight = any(lightSample.normal != 0.0f) ? dot(-wo, lightSample.normal) : 1.0f;
-
-            if ((cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, pos2, resources, instances, accelerationStructure))) {
+            float cosLight = light.type == AREA_LIGHT ? dot(-wo, lightSample.normal) : 1.0f;
+        
+            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, pos2, resources, instances, accelerationStructure)) {
                 float3 BSDF = getBXDF(wi, wo, n, material);
+                BSDF *= surfaceInteraction.textureColor; // ensure
+
                 float G = cosCamera * cosLight / (distance * distance);
                 float lightPDF = selectionPDF * lightSample.PDF;
 
@@ -144,12 +130,14 @@ float3 pathIntegrator(float2 pixel,
                     contribution += throughput * BSDF * lightSample.emission * G / lightPDF;
                 } else {
                     float bsdfPDF = getPDF(wi, wo, n, material);
-                    float weight = balanceHeuristic(lightPDF, bsdfPDF);
-//                    if (light.type == ENVIRONMENT_MAP) debug(lightSample.emission );
+                    float weight = powerHeuristic(lightPDF, bsdfPDF);
                     contribution += throughput * BSDF * lightSample.emission * G * weight / lightPDF;
                 }
             }
         }
+        
+        throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
+        if (all(throughput < 1e-10f)) break;
         
         if (bounce > 4) {
             float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
@@ -164,4 +152,3 @@ float3 pathIntegrator(float2 pixel,
 
     return contribution;
 }
-

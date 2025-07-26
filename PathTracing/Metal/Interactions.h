@@ -75,7 +75,7 @@ inline bool isVisible(float3 pos1, float3 pos2,
     
     ray shadowRay;
     shadowRay.direction = w;
-    shadowRay.origin = pos1;
+    shadowRay.origin = pos1 + w * 0.1; // needs offset here
     shadowRay.min_distance = epsilon;
     shadowRay.max_distance = dist - epsilon;
     

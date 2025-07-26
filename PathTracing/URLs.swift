@@ -13,6 +13,7 @@ let transparentURL = Bundle.main.url(forResource: "transparent", withExtension: 
 let checkerBoardURL = Bundle.main.url(forResource: "checkerboard", withExtension: "jpg")!
 let skyURL = Bundle.main.url(forResource: "qwantani_puresky_4k", withExtension: "exr")!
 let duskURL = Bundle.main.url(forResource: "qwantani_dusk_2_puresky_4k", withExtension: "exr")!
+let metroURL = Bundle.main.url(forResource: "metro_noord_4k", withExtension: "exr")!
 
 // MARK: Models
 

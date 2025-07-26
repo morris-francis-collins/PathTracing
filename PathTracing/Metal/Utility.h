@@ -168,4 +168,10 @@ inline float balanceHeuristic(float main, float other) {
     return main / (main + other);
 }
 
+inline float powerHeuristic(float main, float other) {
+    float main2 = main * main;
+    float other2 = other * other;
+    return main2 / (main2 + other2);
+}
+
 #endif

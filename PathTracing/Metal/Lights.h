@@ -16,7 +16,7 @@
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
-#define ENVIRONMENT_MAP_SCALE 0.1
+#define ENVIRONMENT_MAP_SCALE 5
 
 enum LightType : unsigned int {
     POINT_LIGHT = 0,
@@ -56,13 +56,17 @@ using namespace raytracing;
 struct LightSample {
     float3 position;
     float3 normal;
+    float3 wo;
     float3 emission;
+    float distance;
     float PDF;
     
-    LightSample(float3 _position, float3 _normal, float3 _emission, float _PDF) {
+    LightSample(float3 _position, float3 _normal, float3 _wo, float3 _emission, float _distance, float _PDF) {
         position = _position;
         normal = _normal;
+        wo = _wo;
         emission = _emission;
+        distance = _distance;
         PDF = _PDF;
     }
 };
@@ -75,7 +79,8 @@ float getLightSamplePDF(thread Light& light);
 
 LightSample sampleAreaLight(thread Light& areaLight, device LightTriangle *lightTriangles, float3 r3);
 
-LightSample sampleLight(thread Light& light,
+LightSample sampleLight(float3 position,
+                        thread Light& light,
                         device LightTriangle *lightTriangles,
                         texture2d<float> environmentMapTexture,
                         device float *environmentMapCDF,

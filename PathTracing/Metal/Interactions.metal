@@ -86,15 +86,6 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     surfaceInteraction.hitLight = mask & GEOMETRY_MASK_LIGHT;
     surfaceInteraction.lightIndex = lightIndices[instanceIndex];
     
-//    if (surfaceInteraction.hitLight) {
-//        if (surfaceInteraction.lightIndex == -1) {
-//            DEBUG("hit light, no light idx");
-//        }
-////        DEBUG("light idx: %d, primitive idx: %d, instance idx: %d", lightIndices[instanceIndex], primitiveIndex, instanceIndex);
-//    } else if (surfaceInteraction.lightIndex != -1) {
-//        DEBUG("no hit light, light idx");
-//    }
-            
     float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
     uv.y = 1 - uv.y;
     
