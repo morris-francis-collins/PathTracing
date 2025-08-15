@@ -59,16 +59,18 @@ float3 pathIntegrator(float2 pixel,
 
             float u = (atan2(dir.z, dir.x) + M_PI_F) / (2.0f * M_PI_F);
             float v = 1.0f - (asin(clamp(dir.y, -1.0f, 1.0f)) + M_PI_2_F) / M_PI_F;
-            float4 textureValue = environmentMapTexture.sample(textureSampler, float2(u, v));
+            float3 textureValue = environmentMapTexture.sample(textureSampler, float2(u, v)).xyz;
+            
+            if (all(textureValue < 1e-10f)) break;
 
             if (prevSpecular) {
-                contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue.xyz;
+                contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue;
             } else {
                 float lightPDF = environmentLightSamplePDF(float2(u, v), environmentMapCDF);
                 float weight = powerHeuristic(PDF, lightPDF);
-                contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue.xyz * weight;
+                contribution += ENVIRONMENT_MAP_SCALE * throughput * textureValue * weight;
             }
-            
+
             break;
         }
         
@@ -82,11 +84,13 @@ float3 pathIntegrator(float2 pixel,
 
             if (prevSpecular) {
                 contribution += throughput * color;
+
             } else {
                 float lightPDF = getLightSelectionPDF(lights, uniforms, surfaceInteraction.lightIndex) * getLightSamplePDF(light);
                 float weight = powerHeuristic(PDF, lightPDF);
                 contribution += throughput * color * weight;
             }
+
             break;
         }
         
@@ -135,7 +139,7 @@ float3 pathIntegrator(float2 pixel,
                 }
             }
         }
-        
+                
         throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
         if (all(throughput < 1e-10f)) break;
         

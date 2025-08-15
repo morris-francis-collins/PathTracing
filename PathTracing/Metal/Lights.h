@@ -16,7 +16,7 @@
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
-#define ENVIRONMENT_MAP_SCALE 5
+#define ENVIRONMENT_MAP_SCALE 2
 
 enum LightType : unsigned int {
     POINT_LIGHT = 0,

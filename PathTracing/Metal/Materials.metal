@@ -17,7 +17,7 @@ BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, Material material, float2 r2) 
     float3 BSDF = material.color / M_PI_F;
     float PDF = dot(wo, n) / M_PI_F;
     
-    return BSDFSample(BSDF, wo, PDF);
+    return BSDFSample(max(BSDF, float3(0.0f)), wo, max(0.01f, PDF));
 }
 
 float3 diffuseBRDF(Material material) {

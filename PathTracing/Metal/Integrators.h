@@ -17,26 +17,10 @@
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
-#define CAMERA_VERTEX 1
-#define LIGHT_VERTEX 2
-#define SURFACE_VERTEX 4
-
-struct PathVertex {
-    vector_float3 position;
-    vector_float3 normal;
-    vector_float3 tangent;
-    vector_float3 bitangent;
-    vector_float3 throughput;
-    vector_float3 material_color;
-    vector_float3 incoming_direction;
-    struct Material material;
-    float mediumDistance;
-    float forwardPDF;
-    float reversePDF;
-    vector_float3 BSDF;
-    int is_delta;
-    int in_medium;
-    int type;
+enum VertexType : unsigned int {
+    CAMERA_VERTEX = 0,
+    LIGHT_VERTEX = 1,
+    SURFACE_VERTEX = 2
 };
 
 #ifdef __METAL_VERSION__
@@ -58,4 +42,25 @@ float3 pathIntegrator(float2 pixel,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
                       HaltonSampler haltonSampler
                       );
+
+struct PathVertex {
+    enum VertexType type;
+    float3 throughput;
+    SurfaceInteraction interaction;
+    float forwardPDF;
+    float reversePDF;
+    bool delta;
+    
+//    PathVertex(VertexType _type, float3 _throughput, SurfaceInteraction _interaction, float _forwardPDF, float _reversePDF, bool _delta) {
+//        type = _type;
+//        throughput = _throughput;
+//        interaction = _interaction;
+//        forwardPDF = _forwardPDF;
+//        reversePDF = _reversePDF;
+//        delta = _delta;
+//    }
+    
+    
+};
+
 #endif

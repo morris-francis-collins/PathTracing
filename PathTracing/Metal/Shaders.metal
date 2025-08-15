@@ -78,9 +78,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         totalSplat /= (uniforms.frameIndex + 1);
     }
     
+
     dstTex.write(float4(contribution, 1.0f), tid);
     splatTex.write(float4(totalSplat, 1.0f), tid);
-    finalImage.write(float4(contribution + totalSplat, 1.0f), tid);
+    finalImage.write(float4(contribution, 1.0f), tid);
 }
 
 kernel void clearAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],
