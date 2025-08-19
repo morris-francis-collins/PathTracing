@@ -71,22 +71,49 @@ struct LightSample {
     }
 };
 
-float environmentLightSamplePDF(float2 uv, device float *environmentMapCDF);
+struct LightEmissionSample {
+    float3 position;
+    float3 normal;
+    float3 wo;
+    float3 emission;
+    float positionPDF;
+    float directionPDF;
+    
+    LightEmissionSample(float3 _position, float3 _normal, float3 _wo, float3 _emission, float _positionPDF, float _directionPDF) {
+        position = _position;
+        normal = _normal;
+        wo = _wo;
+        emission = _emission;
+        positionPDF = _positionPDF;
+        directionPDF = _directionPDF;
+    }
+};
 
-float getLightSelectionPDF(device Light *lights, constant Uniforms& uniforms, unsigned int lightIndex);
+float environmentLightSamplePDF(float2 uv, constant float *environmentMapCDF);
 
-float getLightSamplePDF(thread Light& light);
+float getLightSelectionPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms);
 
-LightSample sampleAreaLight(thread Light& areaLight, device LightTriangle *lightTriangles, float3 r3);
+float getLightSamplePDF(constant Light& light);
+
+LightSample sampleAreaLight(constant Light& areaLight, constant LightTriangle *lightTriangles, float3 r3);
 
 LightSample sampleLight(float3 position,
-                        thread Light& light,
-                        device LightTriangle *lightTriangles,
+                        constant Light& light,
+                        constant LightTriangle *lightTriangles,
                         texture2d<float> environmentMapTexture,
-                        device float *environmentMapCDF,
+                        constant float *environmentMapCDF,
                         float3 r3
                         );
 
-Light selectLight(device Light *lights, device LightTriangle *lightTriangles, constant Uniforms& uniforms, float r, thread float& selectionPDF);
+constant Light& selectLight(constant Light *lights, constant LightTriangle *lightTriangles, constant Uniforms& uniforms, float r, thread float& selectionPDF);
 
+LightEmissionSample sampleLightEmission(constant Light& light,
+                                        constant LightTriangle *lightTriangles,
+                                        texture2d<float> environmentMapTexture,
+                                        constant float *environmentMapCDF,
+                                        float2 r2,
+                                        float3 r3
+                                        );
+
+float getLightDirectionPDF(constant Light& light, float3 w, float3 n);
 #endif

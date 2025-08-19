@@ -26,11 +26,21 @@
 #define MAX_TEXTURES 120
 #define EPSILON 1e-3f
 
+#define PIXEL_WIDTH 800.0f
+#define PIXEL_HEIGHT 600.0f
+#define ASPECT_RATIO (PIXEL_WIDTH / PIXEL_HEIGHT)
+#define A 4 * ASPECT_RATIO * pow(tan(M_PI_F * CAMERA_FOV_ANGLE * 0.5f / 180.0f), 2.0f)
+
 struct Camera {
     vector_float3 position;
     vector_float3 right;
     vector_float3 up;
     vector_float3 forward;
+    
+#ifdef __METAL_VERSION__
+//    void cameraRayPDF(thread metal::raytracing::ray& ray, thread float& positionPDF, thread float& directionPDF);
+//    metal::raytracing::ray generateRay(float2 pixel, unsigned int width, unsigned int height);
+#endif
 };
 
 struct Uniforms {
@@ -123,6 +133,10 @@ void debug(float x);
 
 void debug(float3 w);
 
+void debug(float3 w1, float3 w2);
+
+void unimplemented();
+
 inline float calculateEpsilon(float3 position) {
     return min(1e-4f * length(position), 1e-6f);
 }
@@ -173,5 +187,12 @@ inline float powerHeuristic(float main, float other) {
     float other2 = other * other;
     return main2 / (main2 + other2);
 }
+
+inline float isBlack(float3 w) {
+    return all(w < 1e-10f);
+}
+
+void cameraRayPDF(const constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF);
+ray generateRay(float2 pixel, const constant Uniforms& uniforms);
 
 #endif

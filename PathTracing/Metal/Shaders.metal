@@ -36,7 +36,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float, access::read_write> dstTex,
                              device void *resources,
                              device MTLAccelerationStructureInstanceDescriptor *instances,
-                             device Light *lights,
+                             constant Light *lights,
                              instance_acceleration_structure accelerationStructure,
                              visible_function_table<IntersectionFunction> intersectionFunctionTable,
                              device atomic_float* splatBuffer,
@@ -44,10 +44,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float, access::read_write> splatTex,
                              texture2d<float, access::write> finalImage,
                              texture2d<float> environmentMapTexture,
-                             device LightTriangle *lightTriangles,
+                             constant LightTriangle *lightTriangles,
                              array<texture2d<float>, MAX_TEXTURES> textureArray [[texture(8)]],
-                             device int *lightIndices,
-                             device float *environmentMapCDF
+                             constant int *lightIndices,
+                             constant float *environmentMapCDF
                              )
 {
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
@@ -63,6 +63,8 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     HaltonSampler sampler = HaltonSampler(offset, uniforms.frameIndex);
     
     float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
+    
+//    float3 contribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
     
     float3 totalSplat = splatTex.read(tid).xyz;
     

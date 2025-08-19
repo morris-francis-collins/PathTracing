@@ -20,7 +20,7 @@ BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, Material material, float2 r2) 
     return BSDFSample(max(BSDF, float3(0.0f)), wo, max(0.01f, PDF));
 }
 
-float3 diffuseBRDF(Material material) {
+float3 diffuseBRDF(float3 wi, float3 wo, Material material) {
     return material.color / M_PI_F;
 }
 
@@ -29,7 +29,6 @@ float diffusePDF(float3 wi, float3 wo, float3 n) {
 }
 
 BSDFSample sampleConductorBRDF(float3 wi, float3 n, Material material, float2 r2) {
-    
     float cosIN = dot(wi, n);
     float dielectricF0 = pow((material.refraction - 1.0f) / (material.refraction + 1.0f), 2.0f);
     float3 F0 = mix(float3(dielectricF0), material.color, material.metallic);
@@ -73,9 +72,8 @@ BSDFSample sampleConductorBRDF(float3 wi, float3 n, Material material, float2 r2
 }
 
 float3 conductorBSDF(float3 wi, float3 wo, float3 n, Material material) {
-    if (material.roughness < 0.01f) {
+    if (material.roughness < 0.01f)
         return float3(0.0f);
-    }
     
     float3 T, B;
     createOrthonormalBasis(n, T, B);
@@ -101,9 +99,8 @@ float3 conductorBSDF(float3 wi, float3 wo, float3 n, Material material) {
 }
 
 float conductorPDF(float3 wi, float3 wo, float3 n, Material material) {
-    if (material.roughness < 0.01f) {
+    if (material.roughness < 0.01f)
         return 0.0f;
-    }
     
     float3 T, B;
     createOrthonormalBasis(n, T, B);
@@ -319,13 +316,13 @@ float3 getBXDF(float3 wi, float3 wo, float3 n, Material material) {
     float3 BXDF;
     
     if (material.BXDFs == DIFFUSE) {
-        BXDF = diffuseBRDF(material);
+        BXDF = diffuseBRDF(wi, wo, material);
     } else if (material.BXDFs == CONDUCTOR) {
         BXDF = conductorBSDF(wi, wo, n, material);
     } else if (material.BXDFs == SPECULAR_TRANSMISSION) {
         BXDF = dielectricBSDF(wi, wo, n, material);
     } else {
-        DEBUG("getBXDF - BXDF not found.");
+        DEBUG("getBXDF - BXDF not found. BXDF: %d", material.BXDFs);
 //        BXDF = float3(1.0f);
     }
 

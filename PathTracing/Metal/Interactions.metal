@@ -57,7 +57,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
-                                         device int *lightIndices,
+                                         constant int *lightIndices,
                                          int resourcesStride,
                                          array<texture2d<float>, MAX_TEXTURES> textureArray
                                          )
@@ -101,4 +101,44 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     }
 
     return surfaceInteraction;
+}
+
+bool isVisible(float3 pos1, float3 normal1,
+                     float3 pos2, float3 normal2,
+                     device void *resources,
+                     device MTLAccelerationStructureInstanceDescriptor *instances,
+                     instance_acceleration_structure accelerationStructure)
+{
+    float3 w = pos2 - pos1;
+    float dist = length(w);
+    w /= dist;
+    
+//    if (dot(normal1, w) < 0.0f || dot(normal2, -w) < 0.0f) {
+//        return false;
+//    }
+    
+    float epsilon1 = calculateEpsilon(pos1);
+    float epsilon2 = calculateEpsilon(pos2);
+    
+    float3 offsetOrigin = pos1 + calculateOffset(normal1, w, epsilon1);
+    float3 offsetTarget = pos2 + calculateOffset(normal2, -w, epsilon2);
+
+    float3 offsetDir = offsetTarget - offsetOrigin;
+    float offsetDist = length(offsetDir);
+    offsetDir /= offsetDist;
+    
+    ray shadowRay;
+    shadowRay.origin = offsetOrigin;
+    shadowRay.direction = offsetDir;
+    shadowRay.min_distance = 0.0f;
+    shadowRay.max_distance = offsetDist * (1.0f - 1e-5f);
+    
+    IntersectionResult intersection = intersect(shadowRay,
+                                                RAY_MASK_SHADOW,
+                                                resources,
+                                                instances,
+                                                accelerationStructure,
+                                                true);
+    
+    return intersection.type == intersection_type::none;
 }

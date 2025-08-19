@@ -18,11 +18,11 @@ float3 pathIntegrator(float2 pixel,
                       device void *resources,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure,
-                      device Light *lights,
-                      device LightTriangle *lightTriangles,
-                      device int *lightIndices,
+                      constant Light *lights,
+                      constant LightTriangle *lightTriangles,
+                      constant int *lightIndices,
                       texture2d<float> environmentMapTexture,
-                      device float *environmentMapCDF,
+                      constant float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
                       HaltonSampler haltonSampler
                       )
@@ -79,14 +79,14 @@ float3 pathIntegrator(float2 pixel,
         float3 n = surfaceInteraction.normal;
         
         if (surfaceInteraction.hitLight) {
-            Light light = lights[surfaceInteraction.lightIndex];
+//            break;
+            constant Light& light = lights[surfaceInteraction.lightIndex];
             float3 color = light.color;
 
             if (prevSpecular) {
                 contribution += throughput * color;
-
             } else {
-                float lightPDF = getLightSelectionPDF(lights, uniforms, surfaceInteraction.lightIndex) * getLightSamplePDF(light);
+                float lightPDF = getLightSelectionPDF(light, lights, uniforms) * getLightSamplePDF(light);
                 float weight = powerHeuristic(PDF, lightPDF);
                 contribution += throughput * color * weight;
             }
@@ -113,7 +113,7 @@ float3 pathIntegrator(float2 pixel,
                         
         if (!bsdfSample.delta) {
             float selectionPDF;
-            Light light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
+            constant Light& light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
             LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
             
             float3 wi = -ray.direction, wo = lightSample.wo;
@@ -123,7 +123,7 @@ float3 pathIntegrator(float2 pixel,
             float cosCamera = dot(wo, n);
             float cosLight = light.type == AREA_LIGHT ? dot(-wo, lightSample.normal) : 1.0f;
         
-            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, pos2, resources, instances, accelerationStructure)) {
+            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, resources, instances, accelerationStructure)) {
                 float3 BSDF = getBXDF(wi, wo, n, material);
                 BSDF *= surfaceInteraction.textureColor; // ensure
 
@@ -155,4 +155,518 @@ float3 pathIntegrator(float2 pixel,
     }
 
     return contribution;
+}
+
+int tracePath(float2 pixel,
+              constant Uniforms& uniforms,
+              constant unsigned int& resourceStride,
+              device void *resources,
+              device MTLAccelerationStructureInstanceDescriptor *instances,
+              instance_acceleration_structure accelerationStructure,
+              constant Light *lights,
+              constant LightTriangle *lightTriangles,
+              constant int *lightIndices,
+              texture2d<float> environmentMapTexture,
+              constant float *environmentMapCDF,
+              array<texture2d<float>, MAX_TEXTURES> textureArray,
+              HaltonSampler haltonSampler,
+              ray ray,
+              int maxDepth,
+              thread PathVertex *vertices,
+              VertexType type,
+              float3 throughput,
+              float forwardPDF
+              )
+{
+    int bounces = 1;
+    
+    for (int bounce = 1; bounce < maxDepth; bounce++) {
+        thread PathVertex& vx = vertices[bounces];
+        thread PathVertex& prev = vertices[bounces - 1];
+        
+        IntersectionResult intersection = intersect(ray,
+                                                    RAY_MASK_PRIMARY,
+                                                    resources,
+                                                    instances,
+                                                    accelerationStructure,
+                                                    false);
+        
+        if (intersection.type == intersection_type::none) {
+            if (type == CAMERA_VERTEX) {
+                // create light vx. we have no environment lights now so this is a placeholder.
+//                bounces++;
+            }
+            break;
+        }
+        
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textureArray);
+        Material material = surfaceInteraction.material;
+        
+        float3 n = surfaceInteraction.normal;
+        
+        vx = createSurfaceVertex(surfaceInteraction, throughput, forwardPDF, prev);
+
+        if (++bounces >= maxDepth) {
+            break;
+        }
+
+        if (surfaceInteraction.hitLight) {
+            break;
+        }
+
+                
+        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, haltonSampler.r3());
+        bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
+        
+        float3 wo = bsdfSample.wo;
+        float epsilon = calculateEpsilon(surfaceInteraction.position);
+                
+        forwardPDF = bsdfSample.PDF;
+        throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
+                
+        float reversePDF = getPDF(wo, -ray.direction, n, material);
+        
+        if (bsdfSample.delta) {
+            vx.delta = true;
+            vx.forwardPDF = 0.0f;
+            vx.reversePDF = 0.0f;
+        }
+        
+        prev.reversePDF = convertDensity(reversePDF, vx, prev);
+        
+        if (all(throughput < 1e-10f)) break;
+        if (bounce > 4) {
+            float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
+            if (haltonSampler.r() > q) break;
+            throughput /= q;
+        }
+
+        ray.origin = surfaceInteraction.position + calculateOffset(wo, n, epsilon);
+        ray.direction = wo;
+        ray.min_distance = epsilon;
+    }
+
+    return bounces;
+}
+
+int traceCameraPath(float2 pixel,
+                    constant Uniforms& uniforms,
+                    constant unsigned int& resourceStride,
+                    device void *resources,
+                    device MTLAccelerationStructureInstanceDescriptor *instances,
+                    instance_acceleration_structure accelerationStructure,
+                    constant Light *lights,
+                    constant LightTriangle *lightTriangles,
+                    constant int *lightIndices,
+                    texture2d<float> environmentMapTexture,
+                    constant float *environmentMapCDF,
+                    array<texture2d<float>, MAX_TEXTURES> textureArray,
+                    HaltonSampler haltonSampler,
+                    thread PathVertex *cameraVertices
+                    )
+{
+    constant Camera& camera = uniforms.camera;
+    ray ray = generateRay(pixel, uniforms);
+    
+    float3 throughput = float3(1.0f);
+    float positionPDF, directionPDF;
+    cameraRayPDF(camera, ray.direction, positionPDF, directionPDF);
+    
+    cameraVertices[0] = createCameraVertex(camera, camera.position, camera.forward, directionPDF); // directionPDF?
+    
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, 1);
+}
+
+int traceLightPath(float2 pixel,
+                   constant Uniforms& uniforms,
+                   constant unsigned int& resourceStride,
+                   device void *resources,
+                   device MTLAccelerationStructureInstanceDescriptor *instances,
+                   instance_acceleration_structure accelerationStructure,
+                   constant Light *lights,
+                   constant LightTriangle *lightTriangles,
+                   constant int *lightIndices,
+                   texture2d<float> environmentMapTexture,
+                   constant float *environmentMapCDF,
+                   array<texture2d<float>, MAX_TEXTURES> textureArray,
+                   HaltonSampler haltonSampler,
+                   thread PathVertex *lightVertices
+                   )
+{
+    float selectionPDF;
+    constant Light& light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
+    LightEmissionSample lightEmissionSample = sampleLightEmission(light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r2(), haltonSampler.r3());
+    float positionPDF = lightEmissionSample.positionPDF;
+    float directionPDF = lightEmissionSample.directionPDF;
+    float3 normal = lightEmissionSample.normal;
+
+    ray ray;
+    float epsilon = calculateEpsilon(lightEmissionSample.position);
+    ray.origin = lightEmissionSample.position + calculateOffset(lightEmissionSample.wo, normal, epsilon);
+    ray.direction = lightEmissionSample.wo;
+    ray.min_distance = epsilon;
+    ray.max_distance = INFINITY;
+    
+    lightVertices[0] = createLightVertex(light, ray.origin, normal, light.color, positionPDF * selectionPDF);
+    float3 throughput = light.color / (selectionPDF * positionPDF * directionPDF);
+//    DEBUG("light throughput: %f", length(throughput));
+//    DEBUG("selection: %f, position: %f, direction %f:", selectionPDF, positionPDF, directionPDF);
+    if (lightVertices[0].isOnSurface()) throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
+    
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
+}
+
+float3 calculateGeometricTerm(thread PathVertex& cameraVertex,
+                              thread PathVertex& lightVertex,
+                              device void *resources,
+                              device MTLAccelerationStructureInstanceDescriptor *instances,
+                              instance_acceleration_structure accelerationStructure
+                              )
+{
+    if (!isVisible(cameraVertex.position(), cameraVertex.normal(), lightVertex.position(), lightVertex.normal(), resources, instances, accelerationStructure)) {
+        return float3(0.0f);
+    }
+//    debug(lightVertex.position(), cameraVertex.position());
+    float3 connectionVector = lightVertex.position() - cameraVertex.position();
+    float connectionDistance = length(connectionVector);
+    float3 connectionDirection = connectionVector / connectionDistance;
+    
+    float G = 1.0f / (connectionDistance * connectionDistance);
+    //    if (length(lightVertex.normal()) < 0.1) {
+    //        DEBUG("no light normal");
+    //    }
+    //    debug(lightVertex.normal());
+    //    if (cosCamera > 0.1) {
+    //        debug(cosCamera);
+    //    }
+    //    DEBUG("normal: float3(%f, %f, %f), connectiondir: float3(%f, %f, %f)",
+    //          cameraVertex.normal().x, cameraVertex.normal().y, cameraVertex.normal().z, connectionDirection.x, connectionDirection.y, connectionDirection.z);
+    //    DEBUG("pos1: float3(%f, %f, %f), pos2: float3(%f, %f, %f)",
+    //          cameraVertex.position().x, cameraVertex.position().y, cameraVertex.position().z, lightVertex.position().x, lightVertex.position().y, lightVertex.position().z);
+    if (cameraVertex.isOnSurface()) {
+        
+//        DEBUG("coscamera: %f", dot(cameraVertex.normal(), connectionDirection));
+        G *= (dot(cameraVertex.normal(), connectionDirection));
+    }
+//    
+    if (lightVertex.isOnSurface()) {
+//        DEBUG("coslight: %f", dot(lightVertex.normal(), -connectionDirection));
+        G *= (dot(lightVertex.normal(), -connectionDirection));
+    }
+    
+    return G;
+}
+
+float calculateMISWeight(constant Uniforms& uniforms,
+                         constant Light* lights,
+                         thread PathVertex *cameraVertices,
+                         thread PathVertex *lightVertices,
+                         int c, int l,
+                         thread PathVertex& sampled
+                         )
+{
+    if (c + l == 2) return 1.0f;
+    auto remap0 = [&](float x) -> float { return x != 0.0f ? x : 1.0f; };
+
+    int ci = c - 1;
+    int cip = ci - 1;
+    int li = l - 1;
+    int lip = li - 1;
+
+    PathVertex origVx;
+    
+    if (l == 1) {
+        origVx = lightVertices[0];
+        lightVertices[0] = sampled;
+    }
+    if (c == 1) {
+        origVx = cameraVertices[0];
+        cameraVertices[0] = sampled;
+    }
+    
+    float originalCameraReverse = cameraVertices[ci].reversePDF;
+    bool  origCamDelta   = cameraVertices[ci].delta;
+    float origCamPrevRev = (cip >= 0) ? cameraVertices[cip].reversePDF : 0.0f;
+    bool  origCamPrevDel = (cip >= 0) ? cameraVertices[cip].delta   : false;
+
+    float origLgtRev     = lightVertices[li].reversePDF;
+    bool  origLgtDelta   = lightVertices[li].delta;
+    float origLgtPrevRev = (lip >= 0) ? lightVertices[lip].reversePDF : 0.0f;
+    bool  origLgtPrevDel = (lip >= 0) ? lightVertices[lip].delta   : false;
+                
+    if (ci >= 0) {
+        if (li >= 0) {
+//            if (lip < 0) DEBUG("lip < 0, li type: %d", lightVertices[li].type);
+            cameraVertices[ci].reversePDF = lightVertices[li].PDF(lightVertices[lip], cameraVertices[ci]);
+//            cameraVertices[ci].reversePDF = evaluatePDF(lightVertices[li], lightVertices[lip], cameraVertices[ci]);
+//            debug(lightVertices[li].type == LIGHT_VERTEX);
+//            DEBUG("ci . %f", (cameraVertices[ci].reversePDF));
+//            if (cameraVertices[ci].reversePDF < 0)
+//                DEBUG("ci li >= 0 negative. %f", cameraVertices[ci].reversePDF);
+        } else {
+            constant Light& light = lights[cameraVertices[ci].si.lightIndex];
+            cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms);
+//            DEBUG("ci else. %f", cameraVertices[ci].reversePDF);
+
+//            if (cameraVertices[ci].reversePDF < 0)
+//                DEBUG("ci else negative. %f", cameraVertices[ci].reversePDF);
+
+        }
+        cameraVertices[ci].delta = false;
+    }
+    
+    if (cip >= 0) {
+        if (li >= 0) {
+            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip]);
+//            cameraVertices[cip].reversePDF = evaluatePDF(cameraVertices[ci], lightVertices[li], cameraVertices[cip]);
+//            DEBUG("cip. %f", (cameraVertices[cip].reversePDF));
+
+//            if (cameraVertices[cip].reversePDF < 0)
+//                DEBUG("cip li >= 0 negative. %f", cameraVertices[cip].reversePDF);
+
+        } else { // l = 0 case
+            constant Light& light = lights[cameraVertices[ci].si.lightIndex];
+//            DEBUG("is light %d, light idx %d, type %d", cameraVertices[ci].isLight(), cameraVertices[ci].si.lightIndex, cameraVertices[ci].type);
+            cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip]);
+//            cameraVertices[cip].reversePDF = evaluateLightPDF(cameraVertices[ci], cameraVertices[cip]);
+//            DEBUG("cip else. %f", cameraVertices[cip].reversePDF);
+
+//            if (cameraVertices[cip].reversePDF < 0)
+//                DEBUG("cip else negative. %f", cameraVertices[cip].reversePDF);
+
+        }
+    }
+    
+    if (li >= 0) {
+        lightVertices[li].reversePDF = cameraVertices[ci].PDF(cameraVertices[cip], lightVertices[li]);
+//        lightVertices[li].reversePDF = evaluatePDF(cameraVertices[ci], cameraVertices[cip], lightVertices[li]);
+        lightVertices[li].delta = false;
+//        DEBUG("li . %f", lightVertices[li].reversePDF);
+
+//        if (lightVertices[li].reversePDF < 0)
+//            DEBUG("li . %f", lightVertices[li].reversePDF);
+
+    }
+    
+    if (lip >= 0) {
+        lightVertices[lip].reversePDF = lightVertices[li].PDF(cameraVertices[ci], lightVertices[lip]);
+//        lightVertices[lip].reversePDF = evaluatePDF(lightVertices[li], cameraVertices[ci], lightVertices[lip]);
+//        DEBUG("lip. %f", lightVertices[lip].reversePDF);
+
+//        if (lightVertices[li].reversePDF < 0)
+//            DEBUG("lip negative. %f", lightVertices[lip].reversePDF);
+    }
+    
+    float sum = 0.0f;
+    float r = 1.0f;
+
+    for (int i = ci; i > 1; i--) { // WE DONT COUNT C = 1 strategy so we dont include it in MIS
+        r *= remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF);
+//        DEBUG("camera - r: %f, rev: %f, fwd: %f, ratio: %f", r, remap0(cameraVertices[i].reversePDF), remap0(cameraVertices[i].forwardPDF), remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF));
+        if (!cameraVertices[i].delta && !cameraVertices[i - 1].delta)
+            sum += r;
+    }
+
+    r = 1.0f;
+    
+    for (int i = li; i >= 0; i--) {
+        
+        r *= remap0(lightVertices[i].reversePDF) / remap0(lightVertices[i].forwardPDF);
+        bool prevDelta = (i > 0) ? lightVertices[i - 1].delta : lightVertices[0].ei.light->delta;
+
+        if (!lightVertices[i].delta && !prevDelta)
+            sum += r;
+    }
+        
+    cameraVertices[ci].reversePDF = originalCameraReverse;
+    cameraVertices[ci].delta   = origCamDelta;
+    if (cip >= 0) {
+        cameraVertices[cip].reversePDF = origCamPrevRev;
+        cameraVertices[cip].delta   = origCamPrevDel;
+    }
+
+    lightVertices[li].reversePDF = origLgtRev;
+    lightVertices[li].delta = origLgtDelta;
+    if (lip >= 0) {
+        lightVertices[lip].reversePDF = origLgtPrevRev;
+        lightVertices[lip].delta   = origLgtPrevDel;
+    }
+    
+    if (l == 1) {
+        lightVertices[0] = origVx;
+    }
+    if (c == 1) {
+        cameraVertices[0] = origVx;
+    }
+    
+//    debug(sum);
+
+    return 1.0f / (1.0f + sum);
+}
+
+float3 connectVertices(constant Uniforms& uniforms,
+                       constant unsigned int& resourceStride,
+                       device void *resources,
+                       device MTLAccelerationStructureInstanceDescriptor *instances,
+                       instance_acceleration_structure accelerationStructure,
+                       constant Light *lights,
+                       constant LightTriangle *lightTriangles,
+                       constant int *lightIndices,
+                       texture2d<float> environmentMapTexture,
+                       constant float *environmentMapCDF,
+                       array<texture2d<float>, MAX_TEXTURES> textureArray,
+                       thread HaltonSampler& haltonSampler,
+                       thread PathVertex *cameraVertices,
+                       thread PathVertex *lightVertices,
+                       int c, int l
+                       )
+{
+    
+//    if (lightVertices[l - 1].type == CAMERA_VERTEX) {
+//        DEBUG("eded, %d", l);
+//    }
+//    if (lightVertices[0].type == LIGHT_VERTEX) {
+//        DEBUG("!!!!");
+//    }
+//
+    float3 contribution = float3(0.0f);
+    PathVertex sampled;
+    
+    if (l == 0) { // l == 0 , l == 1 cases wrong in MIS likely light issue.
+//        return contribution;
+        thread PathVertex& cameraVertex = cameraVertices[c - 1];
+        if (cameraVertex.isLight()) {
+            contribution = lights[cameraVertex.si.lightIndex].color * cameraVertex.throughput;
+        } else {
+            return contribution;
+        }
+    } else if (c == 1) {
+        return contribution;
+//        thread PathVertex& lightVertex = lightVertices[l - 1];
+//        
+//        if (lightVertex.isConnectible()) {
+//            camera
+//        }
+    } else if (l == 1) {
+        thread PathVertex& cameraVertex = cameraVertices[c - 1];
+//        return contribution;
+        if (cameraVertex.isConnectible()) {
+            float selectionPDF;
+            constant Light& light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
+            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
+//            debug(cameraVertex.position(), lightSample.position);
+            sampled = createLightVertex(light, lightSample.position, lightSample.normal, lightSample.emission / (selectionPDF * lightSample.PDF), selectionPDF * lightSample.PDF);
+            
+//            float3 condir = normalize(sampled.position() - cameraVertex.position());
+//
+//            if (dot(condir, cameraVertex.normal()) < 0.0f || dot(-condir, sampled.normal()) < 0.0f) { // FIXME: needs to be fixed for transmission
+//                return float3(0.0f);
+//            }
+            
+            contribution = 1 * cameraVertex.throughput * cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), sampled) * sampled.throughput * cameraVertex.si.textureColor;
+            
+            if (any(contribution < 0.0f)) {
+                DEBUG("negative contributon");
+            }
+            
+            if (any(contribution > 1e-10f))
+                contribution *= calculateGeometricTerm(cameraVertex, sampled, resources, instances, accelerationStructure);
+            
+//            debug(contribution);
+        }
+    
+    } else {
+        thread PathVertex& cameraVertex = cameraVertices[c - 1];
+        thread PathVertex& lightVertex = lightVertices[l - 1];
+//        return contribution;
+        if (cameraVertex.isConnectible() && lightVertex.isConnectible()) {
+            if (cameraVertex.type == CAMERA_VERTEX) DEBUG("camera: camera");
+            if (cameraVertex.type == LIGHT_VERTEX) DEBUG("camera: light");
+            //        if (cameraVertex.type == SURFACE_VERTEX) DEBUG("camera: surface");
+            if (lightVertex.type == LIGHT_VERTEX) DEBUG("light: light, %d", l);
+            //        if (lightVertex.type == SURFACE_VERTEX) DEBUG("light: surface, %d", l);
+            if (lightVertex.type == CAMERA_VERTEX) DEBUG("light: camera, %d", l);
+            
+//            float3 condir = normalize(lightVertex.position() - cameraVertex.position());
+//            if (dot(condir, cameraVertex.normal()) < 0.0f || dot(-condir, lightVertex.normal()) < 0.0f) { // FIXME: needs to be fixed for transmission
+//                return float3(0.0f);
+//            }
+            
+            float3 cameraBSDF = cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), lightVertex) * cameraVertex.si.textureColor;
+            //        getBXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), connectionDirection, cameraVertex.normal(),                                      cameraVertex.getSurfaceInteraction().material) * cameraVertex.getSurfaceInteraction().textureColor;
+            
+            //        debug(cameraVertex.getSurfaceInteraction().material.BXDFs);
+            //        debug(dot(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), connectionDirection));
+            //        if (cameraVertex.getSurfaceInteraction().hitLight) {
+            //            DEBUG("hti ligt");
+            //        }
+            
+            //        if (length(cameraVertex.getSurfaceInteraction().textureColor) < 0.1)
+            //            debug(cameraVertex.getSurfaceInteraction().textureColor);
+            
+            float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex) * lightVertex.si.textureColor;
+            //        getBXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), -connectionDirection, lightVertex.normal(),                                      lightVertex.getSurfaceInteraction().material) * lightVertex.getSurfaceInteraction().textureColor; // fix for point lights
+            //        debug(cameraBSDF);
+            contribution = cameraVertex.throughput * lightVertex.throughput * cameraBSDF * lightBSDF;
+//            debug(contribution);
+//            DEBUG("c: %d, l: %d, mag: %f", c, l, length(contribution));
+            if (any(contribution < 0.0f)) {
+                DEBUG("negative contributon");
+            }
+            
+            if (any(contribution > 1e-10f))
+                contribution *= calculateGeometricTerm(cameraVertex, lightVertex, resources, instances, accelerationStructure);
+        }
+    }
+    
+    float MISWeight = isBlack(contribution) ? calculateMISWeight(uniforms, lights, cameraVertices, lightVertices, c, l, sampled) : 0.0f;
+    contribution *= (MISWeight);
+    
+    return contribution;
+}
+
+float3 bidirectionalPathIntegrator(float2 pixel,
+                                   constant Uniforms& uniforms,
+                                   constant unsigned int& resourceStride,
+                                   device void *resources,
+                                   device MTLAccelerationStructureInstanceDescriptor *instances,
+                                   instance_acceleration_structure accelerationStructure,
+                                   constant Light *lights,
+                                   constant LightTriangle *lightTriangles,
+                                   constant int *lightIndices,
+                                   texture2d<float> environmentMapTexture,
+                                   constant float *environmentMapCDF,
+                                   array<texture2d<float>, MAX_TEXTURES> textureArray,
+                                   HaltonSampler haltonSampler
+                                   )
+{
+    PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
+    PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
+    
+    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, cameraVertices);
+    
+    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, lightVertices);
+//    debug(cameraVertices[1].getSurfaceInteraction().material.BXDFs);
+
+//    if (lightPathLength >= 2 && lightVertices[1])
+//    DEBUG("cam path length: %d, light path length: %d", cameraPathLength, lightPathLength);
+    float3 totalContribution = float3(0.0f);
+    
+    for (int c = 1; c <= cameraPathLength; c++) {
+        for (int l = 0; l <= lightPathLength; l++) {
+            int depth = c + l - 2;
+            if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
+                continue;
+            
+            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, cameraVertices, lightVertices, c, l);
+                        
+            if (c == 1) {
+                continue; // splatting
+            } else {
+                totalContribution += contribution;
+            }
+        }
+    }
+    
+    return totalContribution;
 }

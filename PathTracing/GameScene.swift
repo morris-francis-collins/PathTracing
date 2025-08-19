@@ -46,7 +46,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createWhiteFurnaceScene()
+        createScene()
     }
     
     func clear() {
@@ -116,11 +116,11 @@ class GameScene: ObservableObject {
     }
     
     func buildColorfulBox() { // x coordinates are flipped; left is positive, right is negative
-        let wallGeometry = ObjGeometry(device: device, objURL: cubeURL, textureURL: checkerBoardURL)
+        let wallGeometry = ObjGeometry(device: device, objURL: cubeURL, textureURL: checkerBoardURL, material: PLASTIC)
         wallGeometry.uploadToBuffers()
         addGeometry(wallGeometry)
         
-        let whiteCubeGeometry = ObjGeometry(device: device, objURL: cubeURL)
+        let whiteCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: PLASTIC)
         whiteCubeGeometry.uploadToBuffers()
         addGeometry(whiteCubeGeometry)
         
@@ -146,19 +146,20 @@ class GameScene: ObservableObject {
         
         let backWallInstance = GeometryInstance(
             geometry: wallGeometry,
+//            geometry: whiteCubeGeometry,
             translation: SIMD3<Float>(0.0, 1.8, 2.2),
             rotation: SIMD3<Float>(0, 0, .pi/2),
             scale: SIMD3<Float>(4.0, 4.0, 0.4),
             mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
         )
         
-        let frontWallInstance = GeometryInstance(
-            geometry: wallGeometry,
-            translation: SIMD3<Float>(0.0, 1.8, -2.2),
-            rotation: SIMD3<Float>(0, 0, .pi/2),
-            scale: SIMD3<Float>(4.0, 4.0, 0.4),
-            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
-        )
+//        let frontWallInstance = GeometryInstance(
+//            geometry: wallGeometry,
+//            translation: SIMD3<Float>(0.0, 1.8, -2.2),
+//            rotation: SIMD3<Float>(0, 0, .pi/2),
+//            scale: SIMD3<Float>(4.0, 4.0, 0.4),
+//            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
+//        )
         
         let leftWallInstance = GeometryInstance(
             geometry: redCubeGeometry,
@@ -178,6 +179,7 @@ class GameScene: ObservableObject {
         
         let ceilingInstance = GeometryInstance(
             geometry: wallGeometry,
+//            geometry: whiteCubeGeometry,
             translation: SIMD3<Float>(0, 3.6, 0.0),
             rotation: SIMD3<Float>(0, 0, 0),
             scale: SIMD3<Float>(4.0, 0.4, 4.0),
@@ -598,7 +600,7 @@ class GameScene: ObservableObject {
         
         var GOLD = MIRROR
         GOLD.color = SIMD3<Float>(1.0, 0.84, 0.6)
-        GOLD.roughness = 0.45
+        GOLD.roughness = 0.3
         let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GOLD)
         let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
         let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
@@ -632,25 +634,39 @@ class GameScene: ObservableObject {
 //        addEnvironmentMap(textureURL: duskURL)
         
         let lightGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), emissionColor: 10 * SIMD3<Float>(1.0, 0.8, 0.4), material: GLASS)
-        
+//
         addInstance(with: lightGeometry,
-                    translation: SIMD3<Float>(0.0, 3.399, -1.0),
-                    scale: SIMD3<Float>(4.0, 0.00001, 0.8))
+                    translation: SIMD3<Float>(0.0, 3.35, -1.0),
+                    scale: SIMD3<Float>(3.99, 0.01, 0.8))
     
             addInstance(with: lightGeometry,
-                        translation: SIMD3<Float>(0.0, 3.399, 1.0),
-                        scale: SIMD3<Float>(4.0, 0.00001, 0.8))
+                        translation: SIMD3<Float>(0.0, 3.35, 1.0),
+                        scale: SIMD3<Float>(3.99, 0.01, 0.8))
         
+//        let lightPlaneGeometry = ObjGeometry(device: device, objURL: singleSidedPlaneURL, color: SIMD3<Float>(1, 1, 1), emissionColor: 10 * SIMD3<Float>(1.0, 0.8, 0.4))
+//        
+//        addInstance(with: lightPlaneGeometry,
+//                    translation: SIMD3<Float>(0.0, 3.35, -1.0),
+//                    rotation: SIMD3<Float>(.pi, 0, 0),
+//                    scale: SIMD3<Float>(4.0, 1.0, 0.8)
+//        )
+//        
+//        addInstance(with: lightPlaneGeometry,
+//                    translation: SIMD3<Float>(0.0, 3.35, 1.0),
+//                    rotation: SIMD3<Float>(.pi, 0, 0),
+//                    scale: SIMD3<Float>(4.0, 1.0, 0.8)
+//        )
+
 //                addPointLight(position: SIMD3<Float>(-1.0, 2.5, 0.0), color: 10 * .one)
         
         //        addDirectionalLight(direction: SIMD3<Float>(0.0, 0.0, 1.0), color: 10 * .one)
         
-//        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, emissionColor: 10 * .one)
+//        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: GLASS, emissionColor: 10 * .one)
 //        
-//                addInstance(with: lightBallGeometry,
-//                            translation: SIMD3<Float>(-1.0, 2.5, 0.0),
-//                            scale: 1 * SIMD3<Float>(1.0, 1.0, 1.0)
-//                            )
+//        addInstance(with: lightBallGeometry,
+//                    translation: SIMD3<Float>(-1.0, 2.5, 0.0),
+//                    scale: 1 * SIMD3<Float>(1.0, 1.0, 1.0)
+//                    )
     }
     
     func createLivelyScene() {
@@ -1375,7 +1391,7 @@ class GameScene: ObservableObject {
             lightGeometry.lightAmplifier = lightAmplifier
             lightGeometry.uploadToBuffers()
             addGeometry(lightGeometry)
-            
+            print("LIGHT")
             let lightInstance = GeometryInstance(geometry: lightGeometry,
                                                  translation: translation,
                                                  rotation: rotation,

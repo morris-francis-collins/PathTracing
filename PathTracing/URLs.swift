@@ -47,3 +47,4 @@ let saintURL = Bundle.main.url(forResource: "saint", withExtension: "obj")!
 let bathroomURL = Bundle.main.url(forResource: "Modern_Bathroom", withExtension: "usdz")!
 let fluorescentURL = Bundle.main.url(forResource: "Fluorescent_light", withExtension: "usdz")!
 let orbURL = Bundle.main.url(forResource: "mitsuba-sphere", withExtension: "obj")!
+let singleSidedPlaneURL = Bundle.main.url(forResource: "single_sided_plane", withExtension: "obj")!

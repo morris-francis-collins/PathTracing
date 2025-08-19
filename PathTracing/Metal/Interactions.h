@@ -23,6 +23,19 @@ struct SurfaceInteraction {
     float3 textureColor;
     bool hitLight;
     int lightIndex;
+    
+    SurfaceInteraction() {
+        
+    }
+    
+    SurfaceInteraction(float3 _position, float3 _normal, Material _material, float3 _textureColor = float3(0.0f), bool _hitLight = false, int _lightIndex = -1) {
+        position = _position;
+        normal = _normal;
+        material = _material;
+        textureColor = _textureColor;
+        hitLight = _hitLight;
+        lightIndex = _lightIndex;
+    }
 };
 
 typedef intersector<triangle_data, instancing, world_space_data>::result_type IntersectionResult;
@@ -39,7 +52,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
-                                         device int *lightIndices,
+                                         constant int *lightIndices,
                                          int resourcesStride,
                                          array<texture2d<float>, MAX_TEXTURES> textureArray
                                          );
@@ -62,32 +75,10 @@ inline T interpolateVertexAttribute(device T *attributes, unsigned int primitive
     return (1.0f - uv.x - uv.y) * T0 + uv.x * T1 + uv.y * T2;
 }
 
-inline bool isVisible(float3 pos1, float3 pos2,
-                      device void *resources,
-                      device MTLAccelerationStructureInstanceDescriptor *instances,
-                      instance_acceleration_structure accelerationStructure
-                      )
-{
-    float epsilon = calculateEpsilon(pos1);
-    float3 w = pos2 - pos1;
-    float dist = length(w);
-    w /= dist;
-    
-    ray shadowRay;
-    shadowRay.direction = w;
-    shadowRay.origin = pos1 + w * 0.1; // needs offset here
-    shadowRay.min_distance = epsilon;
-    shadowRay.max_distance = dist - epsilon;
-    
-    IntersectionResult intersection = intersect(shadowRay,
-                                                RAY_MASK_SHADOW,
-                                                resources,
-                                                instances,
-                                                accelerationStructure,
-                                                true
-                                                );
-
-    return intersection.type == intersection_type::none;
-}
+bool isVisible(float3 pos1, float3 normal1,
+               float3 pos2, float3 normal2,
+               device void *resources,
+               device MTLAccelerationStructureInstanceDescriptor *instances,
+               instance_acceleration_structure accelerationStructure);
 
 #endif
