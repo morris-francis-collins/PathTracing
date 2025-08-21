@@ -11,9 +11,10 @@
 using namespace metal;
 using namespace raytracing;
 
-void cameraRayPDF(const constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF) {
+void cameraRayPDF(constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF) {
     positionPDF = 1.0f;
-    directionPDF = 1.0f / (A * pow(dot(w, camera.forward), 3.0f));
+    float cosCamera = 1.0f; // i believe this should be 1.0 for pinhole cameras
+    directionPDF = 1.0f / (A * pow(cosCamera, 3.0f));
 }
 
 ray generateRay(float2 pixel, const constant Uniforms& uniforms) {
@@ -22,7 +23,7 @@ ray generateRay(float2 pixel, const constant Uniforms& uniforms) {
     uv = uv * 2.0f - 1.0f;
 
     ray ray;
-    ray.origin = camera.position + camera.forward * 1e-4f;
+    ray.origin = camera.position;
     ray.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);
     ray.min_distance = 1e-6f;
     ray.max_distance = INFINITY;

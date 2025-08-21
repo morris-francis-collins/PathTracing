@@ -113,10 +113,6 @@ bool isVisible(float3 pos1, float3 normal1,
     float dist = length(w);
     w /= dist;
     
-//    if (dot(normal1, w) < 0.0f || dot(normal2, -w) < 0.0f) {
-//        return false;
-//    }
-    
     float epsilon1 = calculateEpsilon(pos1);
     float epsilon2 = calculateEpsilon(pos2);
     

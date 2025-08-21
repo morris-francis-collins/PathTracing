@@ -339,7 +339,7 @@ class Renderer: NSObject, MTKViewDelegate {
         #endif
         
         randomTexture = device.makeTexture(descriptor: textureDescriptor)
-        
+
         // random texture data
         let pixelCount = Int(size.width * size.height)
         var randomValues = [UInt32](repeating: 0, count: pixelCount)

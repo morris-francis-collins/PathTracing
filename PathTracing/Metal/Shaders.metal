@@ -62,9 +62,9 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     
     HaltonSampler sampler = HaltonSampler(offset, uniforms.frameIndex);
     
-    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
+//    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
     
-//    float3 contribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
+    float3 contribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, splatTex, splatBuffer);
     
     float3 totalSplat = splatTex.read(tid).xyz;
     
@@ -83,7 +83,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
 
     dstTex.write(float4(contribution, 1.0f), tid);
     splatTex.write(float4(totalSplat, 1.0f), tid);
-    finalImage.write(float4(contribution, 1.0f), tid);
+    finalImage.write(float4(contribution + totalSplat, 1.0f), tid);
 }
 
 kernel void clearAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],

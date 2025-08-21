@@ -600,7 +600,7 @@ class GameScene: ObservableObject {
         
         var GOLD = MIRROR
         GOLD.color = SIMD3<Float>(1.0, 0.84, 0.6)
-        GOLD.roughness = 0.3
+        GOLD.roughness = 0.35
         let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GOLD)
         let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
         let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
@@ -617,13 +617,13 @@ class GameScene: ObservableObject {
         //                    scale: SIMD3<Float>(0.03, 0.03, 0.03)
         //        )
         
-        
+//
         addInstance(with: dragonGeometry,
                     translation: SIMD3<Float>(0.0, -0.5, 0.0),
                     rotation: SIMD3<Float>(0, .pi + 0.5, 0),
                     scale: SIMD3<Float>(0.15, 0.15, 0.15)
         )
-        
+//        
         //        addInstance(cubeInstance)
         //        addInstance(ballInstance)
         //        addInstance(rightBallInstance)
@@ -661,11 +661,12 @@ class GameScene: ObservableObject {
         
         //        addDirectionalLight(direction: SIMD3<Float>(0.0, 0.0, 1.0), color: 10 * .one)
         
-//        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: GLASS, emissionColor: 10 * .one)
+//        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: GLASS, emissionColor: 1000 * .one)
 //        
 //        addInstance(with: lightBallGeometry,
-//                    translation: SIMD3<Float>(-1.0, 2.5, 0.0),
-//                    scale: 1 * SIMD3<Float>(1.0, 1.0, 1.0)
+////                    translation: SIMD3<Float>(-1.0, 2.5, 0.0),
+//                    translation: SIMD3<Float>(-1.8, 0.5, -1.8),
+//                    scale: 0.1 * SIMD3<Float>(1.0, 1.0, 1.0)
 //                    )
     }
     
@@ -1224,13 +1225,13 @@ class GameScene: ObservableObject {
                     scale: SIMD3<Float>(1.55, 3.5, 1.55)
         )
         
-        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, emissionColor: SIMD3<Float>(repeating: 0.1))
+        let lightBallGeometry = ModelIOGeometry(device: device, modelURL: ballURL, emissionColor: SIMD3<Float>(repeating: 10000000))
         addInstance(with: lightBallGeometry,
-                    translation: SIMD3<Float>(-0.0, 3.39, 0.0),
-                    scale: 0.1 * SIMD3<Float>(0.5, 0.001, 0.5)
+                    translation: SIMD3<Float>(0.0, 5.0, 0.0),
+                    scale: 0.001 * SIMD3<Float>(1, 1, 1)
         )
         
-        addEnvironmentMap(textureURL: skyURL)
+//        addEnvironmentMap(textureURL: skyURL)
     }
     
     func createWindowScene() {

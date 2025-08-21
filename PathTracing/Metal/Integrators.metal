@@ -24,7 +24,7 @@ float3 pathIntegrator(float2 pixel,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
-                      HaltonSampler haltonSampler
+                      thread HaltonSampler& haltonSampler
                       )
 {
     constant Camera& camera = uniforms.camera;
@@ -169,7 +169,7 @@ int tracePath(float2 pixel,
               texture2d<float> environmentMapTexture,
               constant float *environmentMapCDF,
               array<texture2d<float>, MAX_TEXTURES> textureArray,
-              HaltonSampler haltonSampler,
+              thread HaltonSampler& haltonSampler,
               ray ray,
               int maxDepth,
               thread PathVertex *vertices,
@@ -181,6 +181,9 @@ int tracePath(float2 pixel,
     int bounces = 1;
     
     for (int bounce = 1; bounce < maxDepth; bounce++) {
+        if (all(throughput < 1e-10f))
+            break;
+        
         thread PathVertex& vx = vertices[bounces];
         thread PathVertex& prev = vertices[bounces - 1];
         
@@ -233,13 +236,15 @@ int tracePath(float2 pixel,
         }
         
         prev.reversePDF = convertDensity(reversePDF, vx, prev);
-        
-        if (all(throughput < 1e-10f)) break;
-        if (bounce > 4) {
-            float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
-            if (haltonSampler.r() > q) break;
-            throughput /= q;
-        }
+//        if (type == CAMERA_VERTEX && bounces == 1) {
+//            DEBUG("camera surface?: %d, rev pdf: %f", prev.isOnSurface(), prev.reversePDF);
+//        }
+
+//        if (bounce > 4) {
+//            float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
+//            if (haltonSampler.r() > q) break;
+//            throughput /= q;
+//        }
 
         ray.origin = surfaceInteraction.position + calculateOffset(wo, n, epsilon);
         ray.direction = wo;
@@ -261,20 +266,24 @@ int traceCameraPath(float2 pixel,
                     texture2d<float> environmentMapTexture,
                     constant float *environmentMapCDF,
                     array<texture2d<float>, MAX_TEXTURES> textureArray,
-                    HaltonSampler haltonSampler,
+                    thread HaltonSampler& haltonSampler,
                     thread PathVertex *cameraVertices
                     )
 {
     constant Camera& camera = uniforms.camera;
     ray ray = generateRay(pixel, uniforms);
     
-    float3 throughput = float3(1.0f);
     float positionPDF, directionPDF;
     cameraRayPDF(camera, ray.direction, positionPDF, directionPDF);
     
-    cameraVertices[0] = createCameraVertex(camera, camera.position, camera.forward, directionPDF); // directionPDF?
-    
-    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, 1);
+    cameraVertices[0] = createCameraVertex(camera, camera.position, camera.forward, float3(1.0f));
+    cameraVertices[0].forwardPDF = positionPDF;
+    float3 throughput = float3(1.0f);
+//    if (pixel.x < 405.0f && pixel.x > 395.0f && pixel.y > 295.0f && pixel.y < 305.0f)
+//    if (dot(camera.forward, ray.direction) >= 0.95f)
+//        DEBUG("pixel xy: %f %f, cos: %f, dirpdf: %f", pixel.x, pixel.y, dot(camera.forward, ray.direction), directionPDF);
+
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
 }
 
 int traceLightPath(float2 pixel,
@@ -289,7 +298,7 @@ int traceLightPath(float2 pixel,
                    texture2d<float> environmentMapTexture,
                    constant float *environmentMapCDF,
                    array<texture2d<float>, MAX_TEXTURES> textureArray,
-                   HaltonSampler haltonSampler,
+                   thread HaltonSampler& haltonSampler,
                    thread PathVertex *lightVertices
                    )
 {
@@ -379,10 +388,10 @@ float calculateMISWeight(constant Uniforms& uniforms,
         origVx = lightVertices[0];
         lightVertices[0] = sampled;
     }
-    if (c == 1) {
-        origVx = cameraVertices[0];
-        cameraVertices[0] = sampled;
-    }
+//    if (c == 1) {
+//        origVx = cameraVertices[0];
+//        cameraVertices[0] = sampled;
+//    }
     
     float originalCameraReverse = cameraVertices[ci].reversePDF;
     bool  origCamDelta   = cameraVertices[ci].delta;
@@ -416,6 +425,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
     }
     
     if (cip >= 0) {
+//        DEBUG("ci: c: %d, l: %d", c, l);
         if (li >= 0) {
             cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip]);
 //            cameraVertices[cip].reversePDF = evaluatePDF(cameraVertices[ci], lightVertices[li], cameraVertices[cip]);
@@ -460,9 +470,10 @@ float calculateMISWeight(constant Uniforms& uniforms,
     float sum = 0.0f;
     float r = 1.0f;
 
-    for (int i = ci; i > 1; i--) { // WE DONT COUNT C = 1 strategy so we dont include it in MIS
+    for (int i = ci; i > 0; i--) { // IF NO C = 1, i > 1 SINCE WE DONT COUNT C = 1 strategy so we dont include it in MIS
         r *= remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF);
 //        DEBUG("camera - r: %f, rev: %f, fwd: %f, ratio: %f", r, remap0(cameraVertices[i].reversePDF), remap0(cameraVertices[i].forwardPDF), remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF));
+//        if (i == 1) debug(cameraVertices[i].delta);
         if (!cameraVertices[i].delta && !cameraVertices[i - 1].delta)
             sum += r;
     }
@@ -495,13 +506,64 @@ float calculateMISWeight(constant Uniforms& uniforms,
     if (l == 1) {
         lightVertices[0] = origVx;
     }
-    if (c == 1) {
-        cameraVertices[0] = origVx;
-    }
+//    if (c == 1) {
+//        cameraVertices[0] = origVx;
+//    }
     
 //    debug(sum);
 
     return 1.0f / (1.0f + sum);
+}
+
+uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
+{
+    float3 toPoint = worldPos - uniforms.camera.position;
+    float zCam = dot(toPoint, uniforms.camera.forward);
+    if (zCam <= 0.0f)
+        return uint2(UINT_MAX, UINT_MAX);
+
+    float3 normalizedRight = normalize(uniforms.camera.right);
+    float3 normalizedUp = normalize(uniforms.camera.up);
+
+    float fieldOfView = CAMERA_FOV_ANGLE * (M_PI_F / 180.0f);
+    float imagePlaneHeight = tan(fieldOfView / 2.0f);
+    float imagePlaneWidth = imagePlaneHeight * float(uniforms.width) / float(uniforms.height);
+
+    float xProj = dot(toPoint, normalizedRight) / (zCam * imagePlaneWidth);
+    float yProj = dot(toPoint, normalizedUp) / (zCam * imagePlaneHeight);
+    
+    float2 uv;
+    uv.x = 0.5f + 0.5f * xProj;
+    uv.y = 0.5f + 0.5f * yProj;
+    
+    if (uv.x < 0.0f || uv.x > 1.0f ||
+        uv.y < 0.0f || uv.y > 1.0f)
+    {
+        return uint2(UINT_MAX, UINT_MAX);
+    }
+
+    uint px = min(uint(uv.x * float(uniforms.width)), uniforms.width - 1);
+    uint py = min(uint(uv.y * float(uniforms.height)), uniforms.height - 1);
+    return uint2(px, py);
+}
+
+void splat(texture2d<float, access::read_write> splatTex,
+           constant Uniforms& uniforms,
+           uint2 pixelCoordinate,
+           float3 color,
+           device atomic_float* splatBuffer
+)
+{
+    if (pixelCoordinate.x >= uniforms.width || pixelCoordinate.y >= uniforms.height) {
+        return;
+    }
+    
+    uint width = uniforms.width;
+    uint pixelIndex = (pixelCoordinate.y * width + pixelCoordinate.x) * 3;
+        
+    atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 0], color.r, memory_order_relaxed);
+    atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 1], color.g, memory_order_relaxed);
+    atomic_fetch_add_explicit(&splatBuffer[pixelIndex + 2], color.b, memory_order_relaxed);
 }
 
 float3 connectVertices(constant Uniforms& uniforms,
@@ -541,12 +603,52 @@ float3 connectVertices(constant Uniforms& uniforms,
             return contribution;
         }
     } else if (c == 1) {
-        return contribution;
-//        thread PathVertex& lightVertex = lightVertices[l - 1];
-//        
-//        if (lightVertex.isConnectible()) {
-//            camera
-//        }
+        thread PathVertex& cameraVertex = cameraVertices[c - 1];
+        thread PathVertex& lightVertex = lightVertices[l - 1];
+        constant Camera& camera = uniforms.camera;
+//        return contribution;
+        if (lightVertex.isConnectible()) {
+            float3 condir = normalize(lightVertex.position() - cameraVertex.position());
+            float d2 = length_squared(lightVertex.position() - cameraVertex.position());
+//            sampled = createCameraVertex(camera, camera.position, camera.forward, float3(1.0f));
+//            sampled.forwardPDF = 1.0f;
+//            sampled.reversePDF = 0.0f;
+//            float pdf = 1 / dot(condir, uniforms.camera.forward);
+//            if (dot(uniforms.camera.forward, condir) < 0.0f) return float3(0.0f);
+            float cameracos = dot(condir, camera.forward);
+            float lightcos = dot(-condir, lightVertex.normal());
+//            float fixedcos = cos(CAMERA_FOV_ANGLE * 0.5 * M_PI_F / 180.0f);
+            float3 We = 1 / (A * pow(cameracos, 4));
+            
+//            DEBUG("cos: %f, We: %f", dot(condir, uniforms.camera.forward), We.x);
+
+            We *= abs(lightcos / (d2));
+//            debug(cos(CAMERA_FOV_ANGLE * 0.5 * M_PI_F / 180.0f));
+//            if (cameracos < 0.0f || lightcos < 0.0f) {
+//                return contribution;
+//            }
+//
+            
+            float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex) * lightVertex.si.textureColor;
+            contribution = We * lightVertex.throughput * lightBSDF;
+            
+            contribution *= isVisible(cameraVertex.position(), cameraVertex.forwardPDF, lightVertex.position(), lightVertex.normal(), resources, instances, accelerationStructure);
+            
+//            if (!isBlack(contribution)) {
+//                if (cameracos < 0.0f) {
+//                    DEBUG("-cameracos %f", cameracos);
+//                }
+//                if (lightcos < 0.0f) {
+//                    DEBUG("-lightcos %f", lightcos);
+//                }
+//            }
+
+            
+//            contribution *= isVisible(cameraVertex.position(), cameraVertex.forwardPDF, lightVertex.position(), lightVertex.normal(), resources, instances, accelerationStructure);
+
+//            if (!isBlack(contribution))
+//                contribution *= calculateGeometricTerm(cameraVertex, lightVertex, resources, instances, accelerationStructure);
+        }
     } else if (l == 1) {
         thread PathVertex& cameraVertex = cameraVertices[c - 1];
 //        return contribution;
@@ -569,7 +671,7 @@ float3 connectVertices(constant Uniforms& uniforms,
                 DEBUG("negative contributon");
             }
             
-            if (any(contribution > 1e-10f))
+            if (!isBlack(contribution))
                 contribution *= calculateGeometricTerm(cameraVertex, sampled, resources, instances, accelerationStructure);
             
 //            debug(contribution);
@@ -619,7 +721,7 @@ float3 connectVertices(constant Uniforms& uniforms,
         }
     }
     
-    float MISWeight = isBlack(contribution) ? calculateMISWeight(uniforms, lights, cameraVertices, lightVertices, c, l, sampled) : 0.0f;
+    float MISWeight = !isBlack(contribution) ? calculateMISWeight(uniforms, lights, cameraVertices, lightVertices, c, l, sampled) : 0.0f;
     contribution *= (MISWeight);
     
     return contribution;
@@ -637,7 +739,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
                                    array<texture2d<float>, MAX_TEXTURES> textureArray,
-                                   HaltonSampler haltonSampler
+                                   thread HaltonSampler& haltonSampler,
+                                   texture2d<float, access::read_write> splatTex,
+                                   device atomic_float* splatBuffer
                                    )
 {
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
@@ -658,10 +762,20 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
             
+//            if (l == 1) continue;
+                    
             float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, cameraVertices, lightVertices, c, l);
-                        
+            
+//            if (any(isnan(contribution)) || any(isinf(contribution))) {
+//                DEBUG("c: %d, l: %d nan/inf", c, l);
+//                continue;
+//            }
+            
+            
+
             if (c == 1) {
-                continue; // splatting
+                uint2 pixelCoord = projectToScreen(lightVertices[l - 1].position(), uniforms);
+                splat(splatTex, uniforms, pixelCoord, contribution, splatBuffer);
             } else {
                 totalContribution += contribution;
             }

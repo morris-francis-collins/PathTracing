@@ -13,7 +13,7 @@
 #include "Interactions.h"
 #include "Materials.h"
 
-#define MAX_PATH_LENGTH 6
+#define MAX_PATH_LENGTH 10
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
@@ -40,7 +40,7 @@ float3 pathIntegrator(float2 pixel,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
-                      HaltonSampler haltonSampler
+                      thread HaltonSampler& haltonSampler
                       );
 
 float3 bidirectionalPathIntegrator(float2 pixel,
@@ -55,7 +55,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
                                    array<texture2d<float>, MAX_TEXTURES> textureArray,
-                                   HaltonSampler haltonSampler
+                                   thread HaltonSampler& haltonSampler,
+                                   texture2d<float, access::read_write> splatTex,
+                                   device atomic_float* splatBuffer
                                    );
 
 struct EndpointInteraction {
@@ -111,14 +113,18 @@ struct PathVertex {
     }
 
     PathVertex() {
-        
+        forwardPDF = 0.0f;
+        reversePDF = 0.0f;
+        delta = false;
     }
     
     float convertDensity(float PDF, thread PathVertex& nxt) {
         float3 w = nxt.position() - position();
         float d2_inv = 1.0f / length_squared(w);
-        float cosN = abs(dot(nxt.normal(), w * d2_inv));
-        return PDF * cosN * d2_inv;
+        if (nxt.isOnSurface())
+            PDF *= abs(dot(nxt.normal(), w * d2_inv));
+
+        return PDF * d2_inv;
     }
     
     float3 BXDF(float3 wi, PathVertex nxt) {
@@ -128,7 +134,7 @@ struct PathVertex {
             case SURFACE_VERTEX:
                 return getBXDF(wi, wo, normal(), si.material);
             default:
-                unimplemented();
+                DEBUG("Vertex BXDF unimplemented.");
                 return float3(0.0f);
         }
     }
@@ -142,13 +148,14 @@ struct PathVertex {
         
         float PDF, unused;
         if (type == CAMERA_VERTEX) {
-            cameraRayPDF(*ei.camera, -wo, unused, PDF);
+            cameraRayPDF(*ei.camera, wo, unused, PDF);
+//            DEBUG("camera vx in PDF PDF: %f", PDF);
         } else if (type == SURFACE_VERTEX) {
             float3 wi = normalize(position() - prev.position());
             PDF = getPDF(-wi, wo, normal(), si.material);
         } else {
-            unimplemented();
-            PDF = 0.0f;
+            DEBUG("Vertex PDF unimplemented.");
+            PDF = 1.0f;
         }
         
         return convertDensity(PDF, nxt);
@@ -175,7 +182,7 @@ struct PathVertex {
     }
     
     inline bool isOnSurface() {
-        return length(normal()) > 1e-1f;
+        return type != CAMERA_VERTEX && length_squared(normal()) > 1e-1f;
     }
     
     inline bool isConnectible() {
@@ -223,21 +230,17 @@ struct PathVertex {
                 return float3(0.0f);
         }
     }
-
-    inline thread SurfaceInteraction& getSurfaceInteraction() thread {
-        return si;
-    }
-    
-    inline thread EndpointInteraction& getEndpointInteraction() thread {
-        return ei;
-    }
 };
 
 inline float convertDensity(float PDF, PathVertex vx, PathVertex nxt) {
     float3 w = nxt.position() - vx.position();
     float d2_inv = 1.0f / length_squared(w);
-    float cosN = abs(dot(nxt.normal(), w * d2_inv));
-    return PDF * cosN * d2_inv;
+    if (nxt.isOnSurface())
+        PDF *= abs(dot(nxt.normal(), w * d2_inv));
+//    else
+//        debug(abs(dot(nxt.normal(), w * d2_inv)));
+
+    return PDF * d2_inv;
 }
 
 inline PathVertex createSurfaceVertex(SurfaceInteraction interaction, float3 throughput, float PDF, PathVertex prev) {
