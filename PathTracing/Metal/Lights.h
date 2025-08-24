@@ -12,7 +12,7 @@
 #include "Interactions.h"
 
 #define MAX_LIGHTS 16
-#define SCENE_RADIUS 8
+#define SCENE_RADIUS 4.5f
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
@@ -115,5 +115,16 @@ LightEmissionSample sampleLightEmission(constant Light& light,
                                         float3 r3
                                         );
 
-float getLightDirectionPDF(constant Light& light, float3 w, float3 n);
+float getLightDirectionPDF(constant Light& light, float3 w, float3 n, constant float* environmentMapCDF);
+
+float3 environmentMapEmission(float2 uv, texture2d<float> environmentMapTexture);
+
+inline float2 getEnvironmentMapUV(float3 w) {
+    float u = (atan2(w.z, w.x) + M_PI_F) / (2.0f * M_PI_F);
+    float v = 1.0f - (asin(clamp(w.y, -1.0f, 1.0f)) + M_PI_2_F) / M_PI_F;
+    return float2(u, v);
+}
+
+float infiniteLightDensity(float3 w, constant Light* lights, constant Uniforms& uniforms, constant float *environmentMapCDF);
+
 #endif

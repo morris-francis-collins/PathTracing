@@ -29,18 +29,13 @@
 #define PIXEL_WIDTH 800.0f
 #define PIXEL_HEIGHT 600.0f
 #define ASPECT_RATIO (PIXEL_WIDTH / PIXEL_HEIGHT)
-#define A 4 * ASPECT_RATIO * pow(tan(M_PI_F * CAMERA_FOV_ANGLE * 0.5f / 180.0f), 2.0f)
+#define A 4.0f * ASPECT_RATIO * pow(tan(M_PI_F * CAMERA_FOV_ANGLE * 0.5f / 180.0f), 2.0f)
 
 struct Camera {
     vector_float3 position;
     vector_float3 right;
     vector_float3 up;
     vector_float3 forward;
-    
-#ifdef __METAL_VERSION__
-//    void cameraRayPDF(thread metal::raytracing::ray& ray, thread float& positionPDF, thread float& directionPDF);
-//    metal::raytracing::ray generateRay(float2 pixel, unsigned int width, unsigned int height);
-#endif
 };
 
 struct Uniforms {
@@ -193,6 +188,7 @@ inline float isBlack(float3 w) {
 }
 
 void cameraRayPDF(const constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF);
+float3 cameraWe(constant Camera& camera, float3 position);
 ray generateRay(float2 pixel, const constant Uniforms& uniforms);
 
 #endif

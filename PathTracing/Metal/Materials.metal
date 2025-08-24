@@ -322,26 +322,26 @@ float3 getBXDF(float3 wi, float3 wo, float3 n, Material material) {
     } else if (material.BXDFs == SPECULAR_TRANSMISSION) {
         BXDF = dielectricBSDF(wi, wo, n, material);
     } else {
+        BXDF = 0.0f;
         DEBUG("getBXDF - BXDF not found. BXDF: %d", material.BXDFs);
-//        BXDF = float3(1.0f);
     }
 
     return max(BXDF, float3(0.0f));
 }
 
 float getPDF(float3 wi, float3 wo, float3 n, Material material) {
-    float BXDF;
+    float PDF;
     
     if (material.BXDFs == DIFFUSE) {
-        BXDF = diffusePDF(wi, wo, n);
+        PDF = diffusePDF(wi, wo, n);
     } else if (material.BXDFs == CONDUCTOR) {
-        BXDF = conductorPDF(wi, wo, n, material);
+        PDF = conductorPDF(wi, wo, n, material);
     } else if (material.BXDFs == SPECULAR_TRANSMISSION) {
-        BXDF = dielectricPDF(wi, wo, n, material);
+        PDF = dielectricPDF(wi, wo, n, material);
     } else {
-        DEBUG("getPDF - BXDF not found.");
-//        BXDF = 1.0f;
+        PDF = 0.0f;
+        DEBUG("getPDF - PDF not found.");
     }
 
-    return max(BXDF, 0.0f);
+    return max(PDF, 0.0f);
 }

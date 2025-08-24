@@ -13,8 +13,13 @@ using namespace raytracing;
 
 void cameraRayPDF(constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF) {
     positionPDF = 1.0f;
-    float cosCamera = 1.0f; // i believe this should be 1.0 for pinhole cameras
+    float cosCamera = dot(w, camera.forward);
     directionPDF = 1.0f / (A * pow(cosCamera, 3.0f));
+}
+
+float3 cameraWe(constant Camera& camera, float3 position) {
+    float3 w = normalize(position - camera.position);
+    return 1.0f / (A * pow(dot(camera.forward, w), 4.0f));
 }
 
 ray generateRay(float2 pixel, const constant Uniforms& uniforms) {

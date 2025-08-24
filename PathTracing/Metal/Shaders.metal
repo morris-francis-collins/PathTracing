@@ -55,7 +55,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
 
     unsigned int offset = randomTex.read(tid).x;
     
-    float2 pixel = (float2)tid;
+    float2 pixel = (float2) tid;
     float2 r = float2(scrambledHalton(offset, 8, uniforms.frameIndex),
                       scrambledHalton(offset, 9, uniforms.frameIndex));
     pixel += r;

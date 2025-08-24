@@ -2,7 +2,7 @@
 //  Integrators.h
 //  PathTracing
 //
-//  Created by Moritz Kohlenz on 7/19/25.
+//  Created on 7/19/25.
 //
 
 #pragma once
@@ -13,7 +13,7 @@
 #include "Interactions.h"
 #include "Materials.h"
 
-#define MAX_PATH_LENGTH 10
+#define MAX_PATH_LENGTH 5
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
@@ -119,6 +119,9 @@ struct PathVertex {
     }
     
     float convertDensity(float PDF, thread PathVertex& nxt) {
+        if (nxt.isInfiniteLight())
+            return PDF;
+        
         float3 w = nxt.position() - position();
         float d2_inv = 1.0f / length_squared(w);
         if (nxt.isOnSurface())
@@ -129,7 +132,7 @@ struct PathVertex {
     
     float3 BXDF(float3 wi, PathVertex nxt) {
         float3 wo = normalize(nxt.position() - position());
-        
+
         switch (type) {
             case SURFACE_VERTEX:
                 return getBXDF(wi, wo, normal(), si.material);
@@ -139,17 +142,18 @@ struct PathVertex {
         }
     }
     
-    float PDF(thread PathVertex& prev, thread PathVertex& nxt) {
+    float PDF(thread PathVertex& prev, thread PathVertex& nxt, constant float* environmentMapCDF) {
         if (type == LIGHT_VERTEX) {
-            return lightDirectionPDF(*ei.light, nxt);
+            if (!ei.light) DEBUG("NO LIGHT");
+            return lightDirectionPDF(*ei.light, nxt, environmentMapCDF);
         }
         
         float3 wo = normalize(nxt.position() - position());
         
         float PDF, unused;
         if (type == CAMERA_VERTEX) {
-            cameraRayPDF(*ei.camera, wo, unused, PDF);
-//            DEBUG("camera vx in PDF PDF: %f", PDF);
+            PDF = 0.0f;
+//            cameraRayPDF(*ei.camera, wo, unused, PDF);
         } else if (type == SURFACE_VERTEX) {
             float3 wi = normalize(position() - prev.position());
             PDF = getPDF(-wi, wo, normal(), si.material);
@@ -162,23 +166,51 @@ struct PathVertex {
     }
         
     
-    float lightOriginPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms) {
+    float lightOriginPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms, thread PathVertex& nxt, constant float* environmentMapCDF) {
+        float3 w = normalize(nxt.position() - position());
+        
+        if (isInfiniteLight()) {
+            return infiniteLightDensity(-w, lights, uniforms, environmentMapCDF);
+        }
+
         float selectionPDF = getLightSelectionPDF(light, lights, uniforms);
         float positionPDF = getLightSamplePDF(light);
         return selectionPDF * positionPDF;
     }
     
-    float lightDirectionPDF(constant Light& light, thread PathVertex& nxt) {
+    float lightDirectionPDF(constant Light& light, thread PathVertex& nxt, constant float* environmentMapCDF) {
         float3 wo = nxt.position() - position();
         float d2_inv = 1.0f / length_squared(wo);
         wo *= sqrt(d2_inv);
-        
-        float directionPDF = getLightDirectionPDF(light, wo, normal());
 
+        float directionPDF;
+        
+        if (isInfiniteLight()) {
+            directionPDF = 1.0f / (M_PI_F * SCENE_RADIUS * SCENE_RADIUS);
+        } else {
+            directionPDF = d2_inv * getLightDirectionPDF(light, wo, normal(), environmentMapCDF);
+        }
+                
         if (nxt.isOnSurface())
             directionPDF *= abs(dot(nxt.normal(), wo));
         
-        return directionPDF * d2_inv;
+        return directionPDF;
+    }
+    
+    float3 getLightEmission(thread PathVertex& prev, constant Light* lights, texture2d<float> environmentMapTexture) {
+        if (!isLight())
+            return float3(0.0f);
+        
+        float3 w = normalize(position() - prev.position());
+        
+        if (type == LIGHT_VERTEX) {
+            float2 uv = getEnvironmentMapUV(w);
+            return environmentMapEmission(uv, environmentMapTexture);
+        } else if (si.hitLight) {
+            return lights[si.lightIndex].color;
+        }
+        
+        return float3(0.0f);
     }
     
     inline bool isOnSurface() {
@@ -202,6 +234,14 @@ struct PathVertex {
     inline bool isLight() {
         return type == LIGHT_VERTEX || (type == SURFACE_VERTEX && si.hitLight);
     }
+    
+    inline bool isInfiniteLight() {
+        return type == LIGHT_VERTEX && (!ei.light || ei.light->type == ENVIRONMENT_MAP/* || ei.light->type == DIRECTIONAL_LIGHT*/);
+    }
+    
+    inline bool isDeltaLight() {
+        return type == LIGHT_VERTEX && (ei.light && ei.light->delta);
+    }
             
     inline float3 position() {
         switch (type) {
@@ -222,7 +262,7 @@ struct PathVertex {
             case CAMERA_VERTEX:
                 return ei.normal;
             case LIGHT_VERTEX:
-                return ei.normal;
+                return ei.light ? ei.normal : float3(0.0f);
             case SURFACE_VERTEX:
                 return si.normal;
             default:
@@ -232,29 +272,18 @@ struct PathVertex {
     }
 };
 
-inline float convertDensity(float PDF, PathVertex vx, PathVertex nxt) {
-    float3 w = nxt.position() - vx.position();
-    float d2_inv = 1.0f / length_squared(w);
-    if (nxt.isOnSurface())
-        PDF *= abs(dot(nxt.normal(), w * d2_inv));
-//    else
-//        debug(abs(dot(nxt.normal(), w * d2_inv)));
-
-    return PDF * d2_inv;
-}
-
 inline PathVertex createSurfaceVertex(SurfaceInteraction interaction, float3 throughput, float PDF, PathVertex prev) {
     PathVertex vx = PathVertex(SURFACE_VERTEX, interaction, throughput);
-    vx.forwardPDF = convertDensity(PDF, prev, vx);
+    vx.forwardPDF = prev.convertDensity(PDF, vx);
     return vx;
 }
 
-inline PathVertex createCameraVertex(constant Camera& camera, float3 position, float3 normal, float3 throughput) {
-    return PathVertex(CAMERA_VERTEX, EndpointInteraction(position, normal, &camera), throughput);
+inline PathVertex createCameraVertex(constant Camera* camera, float3 position, float3 normal, float3 throughput) {
+    return PathVertex(CAMERA_VERTEX, EndpointInteraction(position, normal, camera), throughput);
 }
 
-inline PathVertex createLightVertex(constant Light& light, float3 position, float3 normal, float3 emission, float forwardPDF) {
-    return PathVertex(LIGHT_VERTEX, EndpointInteraction(position, normal, &light), emission, forwardPDF);
+inline PathVertex createLightVertex(constant Light* light, float3 position, float3 normal, float3 emission, float forwardPDF) {
+    return PathVertex(LIGHT_VERTEX, EndpointInteraction(position, normal, light), emission, forwardPDF);
 }
 
 #endif
