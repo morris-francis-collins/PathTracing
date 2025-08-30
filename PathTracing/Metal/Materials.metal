@@ -10,14 +10,16 @@
 #include "Materials.h"
 #include "Interactions.h"
 
+// MARK: Diffuse
+
 BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, Material material, float2 r2) {
     float3 woLocal = sampleCosineWeightedHemisphere(r2);
     float3 wo = alignHemisphereWithNormal(woLocal, n);
     
     float3 BSDF = material.color / M_PI_F;
-    float PDF = dot(wo, n) / M_PI_F;
+    float PDF = max(dot(wo, n), 0.0f) / M_PI_F;
     
-    return BSDFSample(max(BSDF, float3(0.0f)), wo, max(0.01f, PDF));
+    return BSDFSample(BSDF, wo, PDF);
 }
 
 float3 diffuseBRDF(float3 wi, float3 wo, Material material) {
@@ -25,8 +27,10 @@ float3 diffuseBRDF(float3 wi, float3 wo, Material material) {
 }
 
 float diffusePDF(float3 wi, float3 wo, float3 n) {
-    return dot(wo, n) / M_PI_F;
+    return max(dot(wo, n), 0.0f) / M_PI_F;
 }
+
+// MARK: Conductor
 
 BSDFSample sampleConductorBRDF(float3 wi, float3 n, Material material, float2 r2) {
     float cosIN = dot(wi, n);
@@ -95,7 +99,7 @@ float3 conductorBSDF(float3 wi, float3 wo, float3 n, Material material) {
     float D = D_GGX(wm, alpha, alpha);
     float G = G_Smith(wiLocal, woLocal, alpha);
     
-    return (D * G * F0) / (4 * cosIN * cosON);
+    return (D * G * F0) / (4.0f * cosIN * cosON);
 }
 
 float conductorPDF(float3 wi, float3 wo, float3 n, Material material) {
@@ -120,6 +124,8 @@ float conductorPDF(float3 wi, float3 wo, float3 n, Material material) {
 
     return (D * G1) / (4.0f * cosIN);
 }
+
+// MARK: Dielectric
 
 BSDFSample sampleDielectricBSDF(float3 wi, float3 n, Material material, float r, float2 r2) {
     float cosIN = dot(wi, n);
@@ -226,14 +232,15 @@ float3 dielectricBSDF(float3 wi, float3 wo, float3 n, Material material) {
     
     float3 wiLocal = float3(dot(wi, T), dot(wi, B), dot(wi, n));
     float3 woLocal = float3(dot(wo, T), dot(wo, B), dot(wo, n));
-    float3 wm = normalize(wiLocal * eta + woLocal);
         
     float alpha = material.roughness * material.roughness;
     float3 F = dielectricFresnel(cosIN, eta);
     
     if (cosIN * cosON > 0.0f) {
+        float3 wm = normalize(wiLocal + woLocal);
         return D_GGX(wm, alpha, alpha) * G_Smith(wiLocal, woLocal, alpha) * F / abs(4.0f * cosIN * cosON);
     } else {
+        float3 wm = normalize(wiLocal * eta + woLocal);
         float cosIH = dot(wiLocal, wm);
         float cosOH = dot(woLocal, wm);
         float denom = eta * cosIH + cosOH;
@@ -259,12 +266,7 @@ float dielectricPDF(float3 wi, float3 wo, float3 n, Material material) {
     
     float3 wiLocal = float3(dot(wi, T), dot(wi, B), dot(wi, n));
     float3 woLocal = float3(dot(wo, T), dot(wo, B), dot(wo, n));
-    float3 wm = normalize(wiLocal * eta + woLocal);
     
-    if (dot(wm, wiLocal) * cosIN < 0.0f || dot(wm, woLocal) * cosON < 0.0f) {
-        return 0.0f;
-    }
-        
     float alpha = material.roughness * material.roughness;
     float3 fresnel_R = dielectricFresnel(cosIN, eta);
     float3 fresnel_T = 1.0f - fresnel_R;
@@ -272,9 +274,11 @@ float dielectricPDF(float3 wi, float3 wo, float3 n, Material material) {
     float reflectChance = fresnel_R.x / (fresnel_R.x + fresnel_T.x);
     
     if (cosIN * cosON > 0.0f) {
+        float3 wm = normalize(wiLocal + woLocal);
         float PDF = D_GGX(wm, alpha, alpha) * G1_Smith(wiLocal, alpha) / (4.0f * cosIN);
         return PDF * reflectChance;
     } else {
+        float3 wm = normalize(wiLocal * eta + woLocal);
         float cosIH = dot(wiLocal, wm);
         float cosOH = dot(woLocal, wm);
 
@@ -288,6 +292,8 @@ float dielectricPDF(float3 wi, float3 wo, float3 n, Material material) {
         return PDF * (1.0f - reflectChance);
     }
 }
+
+// MARK: Other
 
 BSDFSample sampleBXDF(float3 wi, float3 n, Material material, float3 r3) {
     BSDFSample bsdfSample;
@@ -323,7 +329,7 @@ float3 getBXDF(float3 wi, float3 wo, float3 n, Material material) {
         BXDF = dielectricBSDF(wi, wo, n, material);
     } else {
         BXDF = 0.0f;
-        DEBUG("getBXDF - BXDF not found. BXDF: %d", material.BXDFs);
+//        DEBUG("getBXDF - BXDF not found. BXDF: %d", material.BXDFs);
     }
 
     return max(BXDF, float3(0.0f));
@@ -340,7 +346,7 @@ float getPDF(float3 wi, float3 wo, float3 n, Material material) {
         PDF = dielectricPDF(wi, wo, n, material);
     } else {
         PDF = 0.0f;
-        DEBUG("getPDF - PDF not found.");
+//        DEBUG("getPDF - PDF not found.");
     }
 
     return max(PDF, 0.0f);

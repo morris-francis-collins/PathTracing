@@ -133,6 +133,7 @@ void debug(float3 w1, float3 w2);
 void unimplemented();
 
 inline float calculateEpsilon(float3 position) {
+    return 1e-4f;
     return min(1e-4f * length(position), 1e-6f);
 }
 
@@ -184,7 +185,7 @@ inline float powerHeuristic(float main, float other) {
 }
 
 inline float isBlack(float3 w) {
-    return all(w < 1e-10f);
+    return all(w < 1e-20f);
 }
 
 void cameraRayPDF(const constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF);

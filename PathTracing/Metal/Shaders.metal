@@ -50,22 +50,22 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              constant float *environmentMapCDF
                              )
 {
-    if (tid.x >= uniforms.width || tid.y >= uniforms.height)
-        return;
-
     unsigned int offset = randomTex.read(tid).x;
-    
-    float2 pixel = (float2) tid;
-    float2 r = float2(scrambledHalton(offset, 8, uniforms.frameIndex),
-                      scrambledHalton(offset, 9, uniforms.frameIndex));
-    pixel += r;
-    
     HaltonSampler sampler = HaltonSampler(offset, uniforms.frameIndex);
     
-//    float3 contribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
+    float2 pixel = (float2) tid;
+    pixel += sampler.r2() - 0.5f;
     
-    float3 contribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, splatTex, splatBuffer);
+    if (pixel.x >= uniforms.width || pixel.y >= uniforms.height)
+        return;
+
+    float3 ptContribution = float3(0.0f);
+    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
     
+    float3 bdptContribution = float3(0.0f);
+//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, splatTex, splatBuffer);
+    
+    float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;
     
     if (uniforms.frameIndex > 0) {
@@ -80,7 +80,6 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         totalSplat /= (uniforms.frameIndex + 1);
     }
     
-
     dstTex.write(float4(contribution, 1.0f), tid);
     splatTex.write(float4(totalSplat, 1.0f), tid);
     finalImage.write(float4(contribution + totalSplat, 1.0f), tid);

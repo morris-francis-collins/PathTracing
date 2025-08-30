@@ -13,7 +13,7 @@
 #include "Interactions.h"
 #include "Materials.h"
 
-#define MAX_PATH_LENGTH 5
+#define MAX_PATH_LENGTH 10
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
@@ -124,8 +124,9 @@ struct PathVertex {
         
         float3 w = nxt.position() - position();
         float d2_inv = 1.0f / length_squared(w);
+
         if (nxt.isOnSurface())
-            PDF *= abs(dot(nxt.normal(), w * d2_inv));
+            PDF *= abs(dot(nxt.normal(), w * sqrt(d2_inv)));
 
         return PDF * d2_inv;
     }
@@ -224,7 +225,7 @@ struct PathVertex {
             case LIGHT_VERTEX:
                 return ei.light->type != DIRECTIONAL_LIGHT;
             case SURFACE_VERTEX:
-                return !delta;
+                return true;
             default:
                 DEBUG("Vertex type not found.");
                 return false;

@@ -221,7 +221,7 @@ class ObjGeometry: Geometry {
                 let norm = normalsArray[vertex.n]
                 let uv = textureCoordinates[vertex.vt]
                 
-                if let lightGeo = lightGeometry, length(emissionColor) > 0.1 {
+                if let lightGeo = lightGeometry, length(emissionColor) > 1e-4 {
                     lightGeo.vertices.append(pos)
                     lightGeo.normals.append(inwardsNormals ? -norm : norm)
                     lightGeo.colors.append(color)

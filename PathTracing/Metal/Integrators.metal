@@ -27,19 +27,11 @@ float3 pathIntegrator(float2 pixel,
                       thread HaltonSampler& haltonSampler
                       )
 {
-    constant Camera& camera = uniforms.camera;
-    float2 uv = pixel / float2(uniforms.width, uniforms.height);
-    uv = uv * 2.0f - 1.0f;
-
-    ray ray;
-    ray.origin = camera.position + camera.forward * 1e-4f;
-    ray.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);
-    ray.min_distance = 1e-6f;
-    ray.max_distance = INFINITY;
+    ray ray = generateRay(pixel, uniforms);
 
     float3 contribution = float3(0.0f);
     float3 throughput = float3(1.0f);
-    float PDF = 1.0f;
+    float PDF = 0.0f;
     bool prevSpecular = true;
     
     bool inMedium = false;
@@ -73,8 +65,9 @@ float3 pathIntegrator(float2 pixel,
         
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textureArray);
         Material material = surfaceInteraction.material;
-        float3 n = surfaceInteraction.normal;
         
+        float3 n = surfaceInteraction.normal;
+
         if (surfaceInteraction.hitLight) {
             constant Light& light = lights[surfaceInteraction.lightIndex];
             float3 color = light.color;
@@ -137,8 +130,9 @@ float3 pathIntegrator(float2 pixel,
         }
                 
         throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
-        if (all(throughput < 1e-10f)) break;
         
+        if (isBlack(throughput))
+            break;
         if (bounce > 4) {
             float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
             if (haltonSampler.r() > q) break;
@@ -198,7 +192,6 @@ int tracePath(float2 pixel,
 
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textureArray);
         Material material = surfaceInteraction.material;
-        
         float3 n = surfaceInteraction.normal;
         
         vx = createSurfaceVertex(surfaceInteraction, throughput, forwardPDF, prev);
@@ -210,7 +203,7 @@ int tracePath(float2 pixel,
         if (surfaceInteraction.hitLight) { // scatter from lights?
             break;
         }
-        
+                
         BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, haltonSampler.r3());
         bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
         
@@ -273,7 +266,7 @@ int traceCameraPath(float2 pixel,
     cameraVertices[0].forwardPDF = positionPDF;
     float3 throughput = float3(1.0f);
 
-    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, 0.0f);
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
 }
 
 int traceLightPath(float2 pixel,
@@ -305,12 +298,12 @@ int traceLightPath(float2 pixel,
     ray.direction = lightEmissionSample.wo;
     ray.min_distance = epsilon;
     ray.max_distance = INFINITY;
-    
-    lightVertices[0] = createLightVertex(&light, ray.origin, normal, light.color, positionPDF * selectionPDF);
+
+    lightVertices[0] = createLightVertex(&light, lightEmissionSample.position, normal, light.color, positionPDF * selectionPDF);
     float3 throughput = light.color / (selectionPDF * positionPDF * directionPDF);
-    if (lightVertices[0].isOnSurface())
+    if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
-    
+
     int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
 
     if (lightVertices[0].isInfiniteLight()) {
@@ -332,24 +325,30 @@ float3 calculateGeometricTerm(thread PathVertex& cameraVertex,
                               instance_acceleration_structure accelerationStructure
                               )
 {
+    float3 connectionVector = lightVertex.position() - cameraVertex.position();
+    float connectionDistance = length(connectionVector);
+    float3 connectionDirection = connectionVector / connectionDistance;
+                
+    float G = (lightVertex.isInfiniteLight() || lightVertex.ei.light->type == DIRECTIONAL_LIGHT) ? 1.0f : 1.0f / max(connectionDistance * connectionDistance, 0.0f);
+
+    if (cameraVertex.isOnSurface()) {
+        float cosCamera = dot(cameraVertex.normal(), connectionDirection);
+        if (cosCamera < 0.0f)
+            return float3(0.0f);
+        G *= abs(cosCamera);
+    }
+    
+    if (lightVertex.isOnSurface()) {
+        float cosLight = dot(lightVertex.normal(), -connectionDirection);
+        if (cosLight < 0.0f)
+            return float3(0.0f);
+        G *= abs(cosLight);
+    }
+    
     if (!isVisible(cameraVertex.position(), cameraVertex.normal(), lightVertex.position(), lightVertex.normal(), resources, instances, accelerationStructure)) {
         return float3(0.0f);
     }
 
-    float3 connectionVector = lightVertex.position() - cameraVertex.position();
-    float connectionDistance = length(connectionVector);
-    float3 connectionDirection = connectionVector / connectionDistance;
-    
-    float G = (lightVertex.isInfiniteLight() || lightVertex.ei.light->type == DIRECTIONAL_LIGHT) ? 1.0f : 1.0f / (connectionDistance * connectionDistance);
-    
-    if (cameraVertex.isOnSurface()) {
-        G *= abs(dot(cameraVertex.normal(), connectionDirection));
-    }
-
-    if (lightVertex.isOnSurface()) {
-        G *= abs(dot(lightVertex.normal(), -connectionDirection));
-    }
-    
     return G;
 }
 
@@ -376,11 +375,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
         origVx = lightVertices[0];
         lightVertices[0] = sampled;
     }
-//    if (c == 1) {
-//        origVx = cameraVertices[0];
-//        cameraVertices[0] = sampled;
-//    }
-    
+
     float originalCameraReverse = cameraVertices[ci].reversePDF;
     bool  origCamDelta   = cameraVertices[ci].delta;
     float origCamPrevRev = (cip >= 0) ? cameraVertices[cip].reversePDF : 0.0f;
@@ -456,12 +451,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
     if (l == 1) {
         lightVertices[0] = origVx;
     }
-//    if (c == 1) {
-//        cameraVertices[0] = origVx;
-//    }
-    
-//    debug(sum);
-    
+        
     return 1.0f / (1.0f + sum);
 }
 
@@ -577,7 +567,7 @@ float3 connectVertices(constant Uniforms& uniforms,
             float3 cameraBSDF = cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), lightVertex) * cameraVertex.si.textureColor;
             float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex) * lightVertex.si.textureColor;
             contribution = cameraVertex.throughput * lightVertex.throughput * cameraBSDF * lightBSDF;
-            
+
             if (!isBlack(contribution))
                 contribution *= calculateGeometricTerm(cameraVertex, lightVertex, resources, instances, accelerationStructure);
         }
@@ -585,13 +575,6 @@ float3 connectVertices(constant Uniforms& uniforms,
     
     float MISWeight = !isBlack(contribution) ? calculateMISWeight(uniforms, lights, environmentMapCDF, cameraVertices, lightVertices, c, l, sampled) : 0.0f;
     contribution *= MISWeight;
-    
-    if (any(contribution < 0.0f))
-        DEBUG("Negative contribution in connectVertices");
-    if (any(isnan(contribution)))
-        DEBUG("NaN contribution in connectVertices");
-    if (any(isinf(contribution)))
-        DEBUG("Infinite contribution in connectVertices");
 
     return contribution;
 }
@@ -627,11 +610,11 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             int depth = c + l - 2;
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
-                                
+
             float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, cameraVertices, lightVertices, c, l);
             
             if (any(contribution < 0.0f) || any(isnan(contribution)) || any(isinf(contribution))) {
-//                DEBUG("invalid contribution - c: %d, l: %d", c, l);
+//                DEBUG("Invalid contribution - c: %d, l: %d, float3(%f, %f, %f)", c, l, contribution.x, contribution.y, contribution.z);
                 continue;
             }
 

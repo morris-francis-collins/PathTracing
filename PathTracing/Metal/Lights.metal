@@ -333,7 +333,7 @@ LightSample sampleLight(float3 position,
 float getLightSamplePDF(constant Light& light) {
     switch (light.type) {
         case POINT_LIGHT:
-            return 1.0f;
+            return 0.0f;
         case AREA_LIGHT:
             return 1.0f / light.totalArea;
         case DIRECTIONAL_LIGHT:

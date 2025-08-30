@@ -104,10 +104,11 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
 }
 
 bool isVisible(float3 pos1, float3 normal1,
-                     float3 pos2, float3 normal2,
-                     device void *resources,
-                     device MTLAccelerationStructureInstanceDescriptor *instances,
-                     instance_acceleration_structure accelerationStructure)
+               float3 pos2, float3 normal2,
+               device void *resources,
+               device MTLAccelerationStructureInstanceDescriptor *instances,
+               instance_acceleration_structure accelerationStructure
+               )
 {
     float3 w = pos2 - pos1;
     float dist = length(w);
@@ -127,7 +128,7 @@ bool isVisible(float3 pos1, float3 normal1,
     shadowRay.origin = offsetOrigin;
     shadowRay.direction = offsetDir;
     shadowRay.min_distance = 0.0f;
-    shadowRay.max_distance = offsetDist * (1.0f - 1e-5f);
+    shadowRay.max_distance = offsetDist * (1.0f - 1e-3f);
     
     IntersectionResult intersection = intersect(shadowRay,
                                                 RAY_MASK_SHADOW,

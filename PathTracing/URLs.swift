@@ -11,6 +11,7 @@ import Foundation
 
 let transparentURL = Bundle.main.url(forResource: "transparent", withExtension: "jpg")!
 let checkerBoardURL = Bundle.main.url(forResource: "checkerboard", withExtension: "jpg")!
+let clothURL = Bundle.main.url(forResource: "greycloth", withExtension: "jpg")!
 let skyURL = Bundle.main.url(forResource: "qwantani_puresky_4k", withExtension: "exr")!
 let duskURL = Bundle.main.url(forResource: "qwantani_dusk_2_puresky_4k", withExtension: "exr")!
 let metroURL = Bundle.main.url(forResource: "metro_noord_4k", withExtension: "exr")!
@@ -48,3 +49,4 @@ let bathroomURL = Bundle.main.url(forResource: "Modern_Bathroom", withExtension:
 let fluorescentURL = Bundle.main.url(forResource: "Fluorescent_light", withExtension: "usdz")!
 let orbURL = Bundle.main.url(forResource: "mitsuba-sphere", withExtension: "obj")!
 let singleSidedPlaneURL = Bundle.main.url(forResource: "single_sided_plane", withExtension: "obj")!
+let industrialTableURL = Bundle.main.url(forResource: "Industrial_Table", withExtension: "usdz")!
