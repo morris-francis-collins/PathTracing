@@ -157,16 +157,25 @@ inline float3 sampleGGXNormal(float3 wi, float alpha_x, float alpha_y, float2 r)
     return H;
 }
 
-inline float3 dielectricFresnel(float cosIN, float eta) {
-    float sin2t = eta * eta * (1.0f - cosIN * cosIN);
+inline float3 conductorFresnel(float cosI, thread Material& material) {
+    float3 F0 = material.color;
+    return F0 + (1.0f - F0) * pow(1.0f - cosI, 5.0f);
+}
+
+
+inline float dielectricFresnel(float cosI, float eta) {
+    float sinI2 = 1.0f - cosI * cosI;
+    float sinT2 = eta * eta * sinI2;
     
-    if (sin2t > 1.0f) {
-        return float3(1.0f);
-    }
+    if (sinT2 >= 1.0f)
+        return 1.0f;
     
-    float F0 = pow((eta - 1.0f) / (eta + 1.0f), 2.0f);
-    float fresnel = F0 + (1.0f - F0) * pow(1.0f - cosIN, 5.0f);
-    return float3(fresnel);
+    float cosT = sqrt(1.0f - sinT2);
+    
+    float Rs = pow((cosI - eta * cosT) / (cosI + eta * cosT), 2.0f);
+    float Rp = pow((eta * cosI - cosT) / (eta * cosI + cosT), 2.0f);
+    
+    return 0.5f * (Rs + Rp);
 }
 
 #endif

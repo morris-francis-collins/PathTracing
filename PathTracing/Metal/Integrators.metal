@@ -217,8 +217,8 @@ int tracePath(float2 pixel,
         
         if (bsdfSample.delta) {
             vx.delta = true;
-            vx.forwardPDF = 0.0f;
-            vx.reversePDF = 0.0f;
+            forwardPDF = 0.0f;
+            reversePDF = 0.0f;
         }
         
         prev.reversePDF = vx.convertDensity(reversePDF, prev);
