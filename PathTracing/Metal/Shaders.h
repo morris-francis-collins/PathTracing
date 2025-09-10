@@ -13,3 +13,4 @@
 #include "Interactions.h"
 #include "Integrators.h"
 #include "Materials.h"
+#include "Samplers.h"

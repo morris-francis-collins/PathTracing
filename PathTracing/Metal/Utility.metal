@@ -11,6 +11,8 @@
 using namespace metal;
 using namespace raytracing;
 
+// MARK: Cameras
+
 void cameraRayPDF(constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF) {
     positionPDF = 1.0f;
     float cosCamera = dot(w, camera.forward);
@@ -26,7 +28,7 @@ ray generateRay(float2 pixel, const constant Uniforms& uniforms) {
     constant Camera& camera = uniforms.camera;
     float2 uv = pixel / float2(uniforms.width, uniforms.height);
     uv = uv * 2.0f - 1.0f;
-
+    
     ray ray;
     ray.origin = camera.position;
     ray.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);

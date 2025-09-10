@@ -12,8 +12,9 @@
 #include "Lights.h"
 #include "Interactions.h"
 #include "Materials.h"
+#include "Samplers.h"
 
-#define MAX_PATH_LENGTH 10
+#define MAX_PATH_LENGTH 5
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
@@ -40,7 +41,7 @@ float3 pathIntegrator(float2 pixel,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
-                      thread HaltonSampler& haltonSampler
+                      thread Sampler& sampler
                       );
 
 float3 bidirectionalPathIntegrator(float2 pixel,
@@ -55,7 +56,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
                                    array<texture2d<float>, MAX_TEXTURES> textureArray,
-                                   thread HaltonSampler& haltonSampler,
+                                   thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer
                                    );

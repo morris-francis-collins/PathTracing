@@ -24,7 +24,7 @@ float3 pathIntegrator(float2 pixel,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       array<texture2d<float>, MAX_TEXTURES> textureArray,
-                      thread HaltonSampler& haltonSampler
+                      thread Sampler& sampler
                       )
 {
     ray ray = generateRay(pixel, uniforms);
@@ -83,7 +83,7 @@ float3 pathIntegrator(float2 pixel,
             break;
         }
         
-        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, haltonSampler.r3());
+        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
         bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
         
         PDF = bsdfSample.PDF;
@@ -102,8 +102,8 @@ float3 pathIntegrator(float2 pixel,
                         
         if (!bsdfSample.delta) {
             float selectionPDF;
-            constant Light& light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
+            constant Light& light = selectLight(lights, lightTriangles, uniforms, sampler.r(), selectionPDF);
+            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r3());
             
             float3 wi = -ray.direction, wo = lightSample.wo;
             float3 pos1 = surfaceInteraction.position, pos2 = lightSample.position;
@@ -135,7 +135,7 @@ float3 pathIntegrator(float2 pixel,
             break;
         if (bounce > 4) {
             float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
-            if (haltonSampler.r() > q) break;
+            if (sampler.r() > q) break;
             throughput /= q;
         }
         
@@ -159,7 +159,7 @@ int tracePath(float2 pixel,
               texture2d<float> environmentMapTexture,
               constant float *environmentMapCDF,
               array<texture2d<float>, MAX_TEXTURES> textureArray,
-              thread HaltonSampler& haltonSampler,
+              thread Sampler& sampler,
               ray ray,
               int maxDepth,
               thread PathVertex *vertices,
@@ -204,7 +204,7 @@ int tracePath(float2 pixel,
             break;
         }
                 
-        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, haltonSampler.r3());
+        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
         bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
         
         float3 wo = bsdfSample.wo;
@@ -227,7 +227,7 @@ int tracePath(float2 pixel,
             break;
         if (bounce > 4) {
             float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
-            if (haltonSampler.r() > q) break;
+            if (sampler.r() > q) break;
             throughput /= q;
         }
 
@@ -251,7 +251,7 @@ int traceCameraPath(float2 pixel,
                     texture2d<float> environmentMapTexture,
                     constant float *environmentMapCDF,
                     array<texture2d<float>, MAX_TEXTURES> textureArray,
-                    thread HaltonSampler& haltonSampler,
+                    thread Sampler& sampler,
                     thread PathVertex *cameraVertices
                     )
 {
@@ -266,7 +266,7 @@ int traceCameraPath(float2 pixel,
     cameraVertices[0].forwardPDF = positionPDF;
     float3 throughput = float3(1.0f);
 
-    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
 }
 
 int traceLightPath(float2 pixel,
@@ -281,13 +281,13 @@ int traceLightPath(float2 pixel,
                    texture2d<float> environmentMapTexture,
                    constant float *environmentMapCDF,
                    array<texture2d<float>, MAX_TEXTURES> textureArray,
-                   thread HaltonSampler& haltonSampler,
+                   thread Sampler& sampler,
                    thread PathVertex *lightVertices
                    )
 {
     float selectionPDF;
-    constant Light& light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
-    LightEmissionSample lightEmissionSample = sampleLightEmission(light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r2(), haltonSampler.r3());
+    constant Light& light = selectLight(lights, lightTriangles, uniforms, sampler.r(), selectionPDF);
+    LightEmissionSample lightEmissionSample = sampleLightEmission(light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r2(), sampler.r3());
     float positionPDF = lightEmissionSample.positionPDF;
     float directionPDF = lightEmissionSample.directionPDF;
     float3 normal = lightEmissionSample.normal;
@@ -304,7 +304,7 @@ int traceLightPath(float2 pixel,
     if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
 
-    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
+    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
 
     if (lightVertices[0].isInfiniteLight()) {
         if (numVertices > 0) {
@@ -515,7 +515,7 @@ float3 connectVertices(constant Uniforms& uniforms,
                        texture2d<float> environmentMapTexture,
                        constant float *environmentMapCDF,
                        array<texture2d<float>, MAX_TEXTURES> textureArray,
-                       thread HaltonSampler& haltonSampler,
+                       thread Sampler& sampler,
                        thread PathVertex *cameraVertices,
                        thread PathVertex *lightVertices,
                        int c, int l
@@ -550,8 +550,8 @@ float3 connectVertices(constant Uniforms& uniforms,
 //        return contribution;
         if (cameraVertex.isConnectible()) {
             float selectionPDF;
-            constant Light& light = selectLight(lights, lightTriangles, uniforms, haltonSampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, environmentMapTexture, environmentMapCDF, haltonSampler.r3());
+            constant Light& light = selectLight(lights, lightTriangles, uniforms, sampler.r(), selectionPDF);
+            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r3());
             sampled = createLightVertex(&light, lightSample.position, lightSample.normal, lightSample.emission / (selectionPDF * lightSample.PDF), selectionPDF * lightSample.PDF);
 
             contribution = cameraVertex.throughput * cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), sampled) * sampled.throughput * cameraVertex.si.textureColor;
@@ -591,7 +591,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
                                    array<texture2d<float>, MAX_TEXTURES> textureArray,
-                                   thread HaltonSampler& haltonSampler,
+                                   thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer
                                    )
@@ -599,9 +599,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
     PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
     
-    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, cameraVertices);
+    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, cameraVertices);
     
-    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, lightVertices);
+    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, lightVertices);
 
     float3 totalContribution = float3(0.0f);
     
@@ -611,7 +611,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
 
-            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, haltonSampler, cameraVertices, lightVertices, c, l);
+            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, cameraVertices, lightVertices, c, l);
             
             if (any(contribution < 0.0f) || any(isnan(contribution)) || any(isinf(contribution))) {
 //                DEBUG("Invalid contribution - c: %d, l: %d, float3(%f, %f, %f)", c, l, contribution.x, contribution.y, contribution.z);

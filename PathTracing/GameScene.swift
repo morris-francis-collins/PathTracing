@@ -46,7 +46,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createMaterialScene()
+        createLivelyScene()
     }
     
     func clear() {
@@ -209,7 +209,7 @@ class GameScene: ObservableObject {
         addGeometry(checkerWallGeometry)
         
         var roughGlass = GLASS
-        roughGlass.roughness = 0.1
+        roughGlass.roughness = 0.0
         let glassWallGeometry = ObjGeometry(device: device, objURL: cubeURL, color: .one, material: roughGlass)
         glassWallGeometry.uploadToBuffers()
         addGeometry(glassWallGeometry)
@@ -296,7 +296,7 @@ class GameScene: ObservableObject {
         addInstance(backWallInstance)
         addInstance(frontWallInstance)
         addInstance(ceilingInstance)
-//        addInstance(middleWallInstance)
+        addInstance(middleWallInstance)
 //        addInstance(rightMirrorInstance)
 //        addInstance(leftMirrorInstance)
         
@@ -801,19 +801,19 @@ class GameScene: ObservableObject {
         )
         
         
-//        addInstance(with: industrialTableGeometry,
-//                    translation: SIMD3<Float>(2.5, 0.0, -1.5),
-//                    rotation: SIMD3<Float>(0, .pi/2, 0),
-//                    scale: 0.02 * SIMD3<Float>(1.5, 1, 1.25),
-//                    mask: GEOMETRY_MASK_OPAQUE
-//        )
+        addInstance(with: industrialTableGeometry,
+                    translation: SIMD3<Float>(2.5, 0.0, -1.5),
+                    rotation: SIMD3<Float>(0, .pi/2, 0),
+                    scale: 0.02 * SIMD3<Float>(1.5, 1, 1.25),
+                    mask: GEOMETRY_MASK_OPAQUE
+        )
         
-//                addInstance(with: hangingLightGeometry,
-//                            translation: SIMD3<Float>(-0.5, -0.25, 2.0),
-//                            rotation: SIMD3<Float>(0, .pi/2, 0),
-//                            scale: SIMD3<Float>(0.005, 0.005, 0.005),
-//                            lightAmplifier: 20.0,
-//                            mask: GEOMETRY_MASK_OPAQUE)
+                addInstance(with: hangingLightGeometry,
+                            translation: SIMD3<Float>(-0.5, -0.25, 2.0),
+                            rotation: SIMD3<Float>(0, .pi/2, 0),
+                            scale: SIMD3<Float>(0.005, 0.005, 0.005),
+                            lightAmplifier: 20.0,
+                            mask: GEOMETRY_MASK_OPAQUE)
 //        
 //                addInstance(with: wallLightGeometry,
 //                            translation: SIMD3<Float>(1.25, 2.5, 0.0),
@@ -822,12 +822,12 @@ class GameScene: ObservableObject {
 //                            lightAmplifier: 3.0,
 //                            mask: GEOMETRY_MASK_OPAQUE)
         
-//                addInstance(with: floorLampGeometry,
-//                            translation: SIMD3<Float>(-3.5, 0.0, -3.5),
-//                            rotation: SIMD3<Float>(0, 0, 0),
-//                            scale: SIMD3<Float>(0.015, 0.015, 0.015),
-//                            lightAmplifier: 7.5,
-//                            mask: GEOMETRY_MASK_OPAQUE)
+                addInstance(with: floorLampGeometry,
+                            translation: SIMD3<Float>(-3.5, 0.0, -3.5),
+                            rotation: SIMD3<Float>(0, 0, 0),
+                            scale: SIMD3<Float>(0.015, 0.015, 0.015),
+                            lightAmplifier: 7.5,
+                            mask: GEOMETRY_MASK_OPAQUE)
         
 //                addInstance(with: fluorescentLampGeometry,
 //                            translation: SIMD3<Float>(2.25, 5.45, -2.0),
@@ -850,13 +850,13 @@ class GameScene: ObservableObject {
 //        addPointLight(position: SIMD3<Float>(-0.5, 1.75, -2.75), color: 8 * .one)
 //        addPointLight(position: SIMD3<Float>(2.5, 3.5, -1.0), color: 8 * .one)
         
-//        addInstance(with: lightBallGeometry,
-//                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
-//                    scale: 1 * SIMD3<Float>(0.5, 0.5, 0.5))
+        addInstance(with: lightBallGeometry,
+                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
+                    scale: 1 * SIMD3<Float>(0.5, 0.5, 0.5))
         
-//        addInstance(with: lightBallGeometry,
-//                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
-//                    scale: 0.001 * SIMD3<Float>(0.5, 0.5, 0.5))
+        addInstance(with: lightBallGeometry,
+                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
+                    scale: 0.001 * SIMD3<Float>(0.5, 0.5, 0.5))
 
 //
 //        addInstance(with: cubeGeometry,
@@ -867,12 +867,12 @@ class GameScene: ObservableObject {
 //        )
         
 //        addInstance(tableInstance)
-//        addInstance(glassBallInstance)
-//        addInstance(glassrightBallInstance)
-//        addInstance(mirrorBallInstance)
+        addInstance(glassBallInstance)
+        addInstance(glassrightBallInstance)
+        addInstance(mirrorBallInstance)
         addInstance(mirrorInstance)
-//        addInstance(teaTableInstance)
-//        addInstance(couchInstance)
+        addInstance(teaTableInstance)
+        addInstance(couchInstance)
     }
     
     func createDifficultScene() {

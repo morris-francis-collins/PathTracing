@@ -9,7 +9,7 @@ import MetalKit
 import simd
 import SwiftUI
 
-let maxFramesInFlight: Int = 3
+let maxFramesInFlight: Int = 1
 let alignedUniformsSize: Int = (MemoryLayout<Uniforms>.size + 255) & ~255
 
 class Renderer: NSObject, MTKViewDelegate {
@@ -273,7 +273,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 geometryDescriptor.intersectionFunctionTableOffset = i
                 let accelDescriptor = MTLPrimitiveAccelerationStructureDescriptor()
                 accelDescriptor.geometryDescriptors = [geometryDescriptor]
-                accelDescriptor.usage = .extendedLimits
+//                accelDescriptor.usage = .extendedLimits
                 let accelStructure = newAccelerationStructure(descriptor: accelDescriptor)
                 primitiveAccelerationStructures.append(accelStructure)
             } else {
@@ -414,24 +414,23 @@ class Renderer: NSObject, MTKViewDelegate {
         let width = Int(drawableSize.width)
         let height = Int(drawableSize.height)
         
-        guard let clearEncoder = commandBuffer.makeComputeCommandEncoder() else { return }
-        clearEncoder.setComputePipelineState(clearBufferPipeline)
-        clearEncoder.setBuffer(atomicSplatBuffer, offset: 0, index: 0)
-        clearEncoder.setTexture(splatTargets[1], index: 0)
-
-        
-        let clearThreadsPerGroup = MTLSize(width: 32, height: 32, depth: 1)
-        let clearThreadgroups = MTLSize(width: (width + clearThreadsPerGroup.width - 1) / clearThreadsPerGroup.width,
-                                        height: (height + clearThreadsPerGroup.height - 1) / clearThreadsPerGroup.height,
-                                        depth: 1)
-        clearEncoder.dispatchThreadgroups(clearThreadgroups, threadsPerThreadgroup: clearThreadsPerGroup)
-        clearEncoder.endEncoding()
-        
         let threadsPerThreadgroup = MTLSize(width: 32, height: 32, depth: 1)
         let threadgroups = MTLSize(width: (width + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
                                    height: (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
                                    depth: 1)
-                
+        
+        // clearAtomicBuffer
+        guard let clearEncoder = commandBuffer.makeComputeCommandEncoder() else {
+            return
+        }
+        
+        clearEncoder.setComputePipelineState(clearBufferPipeline)
+        clearEncoder.setBuffer(atomicSplatBuffer, offset: 0, index: 0)
+        clearEncoder.setBytes([UInt32(width), UInt32(height)], length: 8, index: 1)
+        clearEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        clearEncoder.endEncoding()
+               
+        // raytracingKernel
         guard let computeEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return
         }
@@ -473,16 +472,21 @@ class Renderer: NSObject, MTKViewDelegate {
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
         
-        guard let finalizeEncoder = commandBuffer.makeComputeCommandEncoder() else { return }
+        // finalizeAtomicBuffer
+        guard let finalizeEncoder = commandBuffer.makeComputeCommandEncoder() else {
+            return
+        }
+        
         finalizeEncoder.setComputePipelineState(finalizePipeline)
         finalizeEncoder.setBuffer(atomicSplatBuffer, offset: 0, index: 0)
+        finalizeEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
         finalizeEncoder.setTexture(splatTargets[1], index: 0)
         finalizeEncoder.setTexture(splatTargets[0], index: 1)
-        finalizeEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 2)
         finalizeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         finalizeEncoder.endEncoding()
         
-        (accumulationTargets[0], accumulationTargets[1]) = (accumulationTargets[1], accumulationTargets[0])
+        // prepare for next frame
+        (accumulationTargets[0], accumulationTargets[1]) = (accumulationTargets[1], accumulationTargets[0]) // swap prev and current
         (splatTargets[0], splatTargets[1]) = (splatTargets[1], splatTargets[0])
         
         if let currentDrawable = view.currentDrawable {

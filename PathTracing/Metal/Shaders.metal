@@ -51,7 +51,7 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              )
 {
     unsigned int offset = randomTex.read(tid).x;
-    HaltonSampler sampler = HaltonSampler(offset, uniforms.frameIndex);
+    Sampler sampler = Sampler(HALTON, offset, uniforms.frameIndex);
     
     float2 pixel = (float2) tid;
     pixel += sampler.r2() - 0.5f;
@@ -60,10 +60,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         return;
 
     float3 ptContribution = float3(0.0f);
-    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
+//    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
     
     float3 bdptContribution = float3(0.0f);
-//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, splatTex, splatBuffer);
+    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, splatTex, splatBuffer);
     
     float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;
@@ -73,11 +73,6 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         prevColor *= uniforms.frameIndex;
         contribution += prevColor;
         contribution /= (uniforms.frameIndex + 1);
-        
-        float3 previousSplat = prevSplat.read(tid).xyz;
-        previousSplat *= uniforms.frameIndex;
-        totalSplat += previousSplat;
-        totalSplat /= (uniforms.frameIndex + 1);
     }
     
     dstTex.write(float4(contribution, 1.0f), tid);
@@ -85,35 +80,34 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
     finalImage.write(float4(contribution + totalSplat, 1.0f), tid);
 }
 
-kernel void clearAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],
-                              uint2 gid [[thread_position_in_grid]],
-                              texture2d<float, access::write> outputTexture [[texture(0)]],
-                              uint2 gridSize [[threads_per_grid]]) {
-    
-    if (gid.x >= outputTexture.get_width() || gid.y >= outputTexture.get_height())
+kernel void clearAtomicBuffer(uint2 gid [[thread_position_in_grid]],
+                              device atomic_float* atomicBuffer [[buffer(0)]],
+                              constant uint2& dimensions [[buffer(1)]]
+                              )
+{
+    uint width = dimensions.x, height = dimensions.y;
+    if (gid.x >= width || gid.y >= height)
         return;
 
-    uint width = outputTexture.get_width();
-    uint index = gid.y * width + gid.x;
+    uint index = 3 * (gid.y * width + gid.x);
     
-    if (index < width * outputTexture.get_height()) {
-        uint bufferIndex = index;
-        atomic_store_explicit(&atomicBuffer[bufferIndex * 3], 0.0f, memory_order_relaxed);
-        atomic_store_explicit(&atomicBuffer[bufferIndex * 3 + 1], 0.0f, memory_order_relaxed);
-        atomic_store_explicit(&atomicBuffer[bufferIndex * 3 + 2], 0.0f, memory_order_relaxed);
-    }
+    atomic_store_explicit(&atomicBuffer[index + 0], 0.0f, memory_order_relaxed);
+    atomic_store_explicit(&atomicBuffer[index + 1], 0.0f, memory_order_relaxed);
+    atomic_store_explicit(&atomicBuffer[index + 2], 0.0f, memory_order_relaxed);
 }
 
-kernel void finalizeAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]],
-                                texture2d<float, access::write> currentSplatTexture [[texture(0)]],
-                                 texture2d<float, access::read> previousSplatTexture [[texture(1)]],
-                                constant Uniforms &uniforms [[buffer(2)]],
-                                uint2 gid [[thread_position_in_grid]]) {
-    if (gid.x >= currentSplatTexture.get_width() || gid.y >= currentSplatTexture.get_height())
+kernel void finalizeAtomicBuffer(uint2 gid [[thread_position_in_grid]],
+                                 device atomic_float* atomicBuffer [[buffer(0)]],
+                                 constant Uniforms &uniforms [[buffer(1)]],
+                                 texture2d<float, access::write> currentSplatTexture [[texture(0)]],
+                                 texture2d<float, access::read> previousSplatTexture [[texture(1)]]
+                                 )
+{
+    uint width = currentSplatTexture.get_width(), height = currentSplatTexture.get_height();
+    if (gid.x >= width || gid.y >= height)
         return;
     
-    uint width = currentSplatTexture.get_width();
-    uint index = (gid.y * width + gid.x) * 3;
+    uint index = 3 * (gid.y * width + gid.x);
     
     float3 currentFrameContribution = float3(
         atomic_load_explicit(&atomicBuffer[index + 0], memory_order_relaxed),
@@ -122,8 +116,8 @@ kernel void finalizeAtomicBuffer(device atomic_float* atomicBuffer [[buffer(0)]]
     );
     
     float3 previousAccumulation = previousSplatTexture.read(gid).xyz;
-    
     float3 newAccumulation;
+    
     if (uniforms.frameIndex > 0) {
         previousAccumulation *= uniforms.frameIndex;
         newAccumulation = previousAccumulation + currentFrameContribution;
