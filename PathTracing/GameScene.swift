@@ -46,7 +46,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createLivelyScene()
+        createMaterialScene()
     }
     
     func clear() {
@@ -296,7 +296,7 @@ class GameScene: ObservableObject {
         addInstance(backWallInstance)
         addInstance(frontWallInstance)
         addInstance(ceilingInstance)
-        addInstance(middleWallInstance)
+//        addInstance(middleWallInstance)
 //        addInstance(rightMirrorInstance)
 //        addInstance(leftMirrorInstance)
         
@@ -850,13 +850,13 @@ class GameScene: ObservableObject {
 //        addPointLight(position: SIMD3<Float>(-0.5, 1.75, -2.75), color: 8 * .one)
 //        addPointLight(position: SIMD3<Float>(2.5, 3.5, -1.0), color: 8 * .one)
         
-        addInstance(with: lightBallGeometry,
-                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
-                    scale: 1 * SIMD3<Float>(0.5, 0.5, 0.5))
+//        addInstance(with: lightBallGeometry,
+//                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
+//                    scale: 1 * SIMD3<Float>(0.5, 0.5, 0.5))
         
-        addInstance(with: lightBallGeometry,
-                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
-                    scale: 0.001 * SIMD3<Float>(0.5, 0.5, 0.5))
+//        addInstance(with: lightBallGeometry,
+//                    translation: SIMD3<Float>(-0.5, 1.75, 1.0),
+//                    scale: 0.001 * SIMD3<Float>(0.5, 0.5, 0.5))
 
 //
 //        addInstance(with: cubeGeometry,

@@ -306,6 +306,11 @@ BSDFSample sampleBXDF(float3 wi, float3 n, Material material, float3 r3) {
     }
     
     bsdfSample.BSDF = max(bsdfSample.BSDF, float3(0.0f));
+    if (bsdfSample.PDF <= 0.0f) {
+        bsdfSample.BSDF = float3(0.0f);
+        bsdfSample.PDF = 1.0f;
+    }
+        
     return bsdfSample;
 }
 

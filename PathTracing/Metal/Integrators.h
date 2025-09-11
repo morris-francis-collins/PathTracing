@@ -14,7 +14,7 @@
 #include "Materials.h"
 #include "Samplers.h"
 
-#define MAX_PATH_LENGTH 5
+#define MAX_PATH_LENGTH 10
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
