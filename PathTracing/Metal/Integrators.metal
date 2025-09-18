@@ -79,8 +79,6 @@ float3 pathIntegrator(float2 pixel,
                 float weight = powerHeuristic(PDF, lightPDF);
                 contribution += throughput * color * weight;
             }
-
-            break;
         }
         
         BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
@@ -200,9 +198,9 @@ int tracePath(float2 pixel,
             break;
         }
 
-        if (surfaceInteraction.hitLight) { // scatter from lights?
-            break;
-        }
+//        if (surfaceInteraction.hitLight) { // scatter from lights?
+//            break;
+//        }
                 
         BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
         bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
@@ -300,7 +298,8 @@ int traceLightPath(float2 pixel,
     ray.max_distance = INFINITY;
 
     lightVertices[0] = createLightVertex(&light, lightEmissionSample.position, normal, light.color, positionPDF * selectionPDF);
-    float3 throughput = light.color / (selectionPDF * positionPDF * directionPDF);
+    float3 throughput = lightEmissionSample.emission / (selectionPDF * positionPDF * directionPDF);
+
     if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
 
@@ -312,7 +311,7 @@ int traceLightPath(float2 pixel,
             if (lightVertices[1].isOnSurface())
                 lightVertices[1].forwardPDF *= abs(dot(ray.direction, lightVertices[1].normal()));
         }
-        lightVertices[0].forwardPDF = infiniteLightDensity(ray.direction, lights, uniforms, environmentMapCDF);
+        lightVertices[0].forwardPDF = infiniteLightDensity(-ray.direction, lights, uniforms, environmentMapCDF);
     }
     
     return numVertices;
@@ -421,7 +420,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
         r *= remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF);
 
         if (!cameraVertices[i].delta && !cameraVertices[i - 1].delta)
-            sum += r;
+            sum += r * r;
     }
 
     r = 1.0f;
@@ -431,7 +430,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
         bool prevDelta = (i > 0) ? lightVertices[i - 1].delta : lightVertices[0].isDeltaLight();
 
         if (!lightVertices[i].delta && !prevDelta)
-            sum += r;
+            sum += r * r;
     }
         
     cameraVertices[ci].reversePDF = originalCameraReverse;

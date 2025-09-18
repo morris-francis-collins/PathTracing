@@ -182,7 +182,7 @@ float environmentLightSamplePDF(float2 uv, constant float *environmentMapCDF) {
     
     float pixelPDF = environmentMapCDF[i] - (i > 0 ? environmentMapCDF[i - 1] : 0.0f);
     
-    return max(pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sin(uv.y * M_PI_F)), 1e-20f);
+    return max(pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sin(uv.y * M_PI_F)), 1e-30f);
 }
 
 LightEmissionSample sampleEnvironmentMapEmission(constant Light& environmentMap,
@@ -233,11 +233,7 @@ LightEmissionSample sampleEnvironmentMapEmission(constant Light& environmentMap,
     float pixelPDF = environmentMapCDF[l] - (l > 0 ? environmentMapCDF[l - 1] : 0.0f);
     float directionPDF = pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sinTheta);
     
-    directionPDF = max(directionPDF, 1e-20f);
-    wo = -wo;
-//    debug(wo);
-//    DEBUG("sampleEnvironmentMapEmission -- pos y: %f, dir y: %f, emission mag: %f", position.y, wo.y, length(emission));
-    return LightEmissionSample(position, float3(0.0f), wo, emission, positionPDF, directionPDF);
+    return LightEmissionSample(position, float3(0.0f), -wo, emission, positionPDF, max(1e-30f, directionPDF));
 }
 
 // MARK: Other

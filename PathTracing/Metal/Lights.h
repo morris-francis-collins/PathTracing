@@ -12,7 +12,7 @@
 #include "Interactions.h"
 
 #define MAX_LIGHTS 16
-#define SCENE_RADIUS 4.5f
+#define SCENE_RADIUS 10.0f
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
