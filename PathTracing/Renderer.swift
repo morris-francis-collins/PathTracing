@@ -33,6 +33,9 @@ class Renderer: NSObject, MTKViewDelegate {
     var randomTexture: MTLTexture!
     
     var atomicSplatBuffer: MTLBuffer!
+    var textureArgumentBuffer: MTLBuffer!
+    var textureCount: Int = 0
+    var textureArray: MTLTexture!
     
     var resourceBuffer: MTLBuffer!
     var instanceBuffer: MTLBuffer!
@@ -218,12 +221,57 @@ class Renderer: NSObject, MTKViewDelegate {
         atomicSplatBuffer = device.makeBuffer(length: bufferSize,
                                               options: .storageModeManaged)
         
-        #if !os(iOS)
+        createTextureArgumentBuffer()
+
+#if !os(iOS)
         resourceBuffer.didModifyRange(0..<resourceBuffer.length)
         atomicSplatBuffer.didModifyRange(0..<atomicSplatBuffer.length)
+#endif
+    }
+    
+    func createTextureArgumentBuffer() {
+        let textures = TextureRegistry.shared.getTextures()
+        textureCount = textures.count
+        
+        // Match your shader struct exactly
+        var argumentDescriptors: [MTLArgumentDescriptor] = []
+        
+        // Single descriptor for the array
+        let desc = MTLArgumentDescriptor()
+        desc.index = 0
+        desc.dataType = .texture
+        desc.textureType = .type2D
+        desc.arrayLength = Int(MAX_TEXTURES)  // Must match shader struct
+        desc.access = .readOnly
+        argumentDescriptors.append(desc)
+        
+        guard let encoder = device.makeArgumentEncoder(arguments: argumentDescriptors) else {
+            fatalError("Failed to create texture argument encoder")
+        }
+        
+        // Create buffer with proper alignment
+        let length = encoder.encodedLength
+        textureArgumentBuffer = device.makeBuffer(
+            length: length,
+            options: .storageModeManaged
+        )
+        
+        encoder.setArgumentBuffer(textureArgumentBuffer, offset: 0)
+        
+        // Set textures, padding with nil if needed
+        for i in 0..<Int(MAX_TEXTURES) {
+            if i < textures.count {
+                encoder.setTexture(textures[i], index: i)
+            } else {
+                encoder.setTexture(nil, index: i)  // Pad with nil
+            }
+        }
+        
+        #if !os(iOS)
+        textureArgumentBuffer.didModifyRange(0..<length)
         #endif
     }
- 
+        
     func newAccelerationStructure(descriptor: MTLAccelerationStructureDescriptor) -> MTLAccelerationStructure {
         let accelSizes = device.accelerationStructureSizes(descriptor: descriptor)
         let accelerationStructure = device.makeAccelerationStructure(size: accelSizes.accelerationStructureSize)!
@@ -452,11 +500,15 @@ class Renderer: NSObject, MTKViewDelegate {
         computeEncoder.setBuffer(scene.lightTriangleBuffer, offset: 0, index: 7)
         computeEncoder.setBuffer(scene.lightIndicesBuffer, offset: 0, index: 8)
         computeEncoder.setBuffer(scene.environmentMapCDFBuffer, offset: 0, index: 9)
+        computeEncoder.setBuffer(textureArgumentBuffer, offset: 0, index: 10)
 
-        let allTextures = TextureRegistry.shared.getTextures()
-        for (index, texture) in allTextures.enumerated() {
-            computeEncoder.setTexture(texture, index: 8 + index)
-        }
+        let textures = TextureRegistry.shared.getTextures()
+        computeEncoder.useResources(textures, usage: .read)
+
+//        let allTextures = TextureRegistry.shared.getTextures()
+//        for (index, texture) in allTextures.enumerated() {
+//            computeEncoder.setTexture(texture, index: 8 + index)
+//        }
 
         for geometry in scene.geometries {
             for resource in geometry.resources() {

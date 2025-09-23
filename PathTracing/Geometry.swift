@@ -210,7 +210,7 @@ class ObjGeometry: Geometry {
         do {
             texture = try textureLoader.newTexture(URL: textureURL, options: options)
             let index = TextureRegistry.shared.addTexture(texture!, identifier: textureURL.path)
-            self.material?.textureIndex = Int32(index)
+            self.material?.color.textureIndex = Int32(index)
         } catch {
             fatalError("Couldn't load texture: \(error)")
         }
@@ -289,12 +289,12 @@ class GeometryInstance {
     }
     
     func getPackedTransform() -> MTLPackedFloat4x3 {
-        return MTLPackedFloat4x3(columns: (
+        return MTLPackedFloat4x3(
             MTLPackedFloat3Make(transform[0][0], transform[0][1], transform[0][2]),
             MTLPackedFloat3Make(transform[1][0], transform[1][1], transform[1][2]),
             MTLPackedFloat3Make(transform[2][0], transform[2][1], transform[2][2]),
             MTLPackedFloat3Make(transform[3][0], transform[3][1], transform[3][2])
-        ))
+        )
     }
     
     func getLightTriangles() -> ([LightTriangle], Float, SIMD3<Float>) {

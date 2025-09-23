@@ -126,12 +126,12 @@ class GameScene: ObservableObject {
         
         var wallMaterial = PLASTIC
         
-        wallMaterial.color = 0.7 * SIMD3<Float>(1.0, 0.0, 0.0);
+        wallMaterial.color.value = 0.7 * SIMD3<Float>(1.0, 0.0, 0.0);
         let redCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: wallMaterial)
         redCubeGeometry.uploadToBuffers()
         addGeometry(redCubeGeometry)
         
-        wallMaterial.color = 0.7 * SIMD3<Float>(0.0, 1.0, 0.0);
+        wallMaterial.color.value = 0.7 * SIMD3<Float>(0.0, 1.0, 0.0);
         let greenCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: wallMaterial)
         greenCubeGeometry.uploadToBuffers()
         addGeometry(greenCubeGeometry)
@@ -209,7 +209,7 @@ class GameScene: ObservableObject {
         addGeometry(checkerWallGeometry)
         
         var roughGlass = GLASS
-        roughGlass.roughness = 0.0
+        roughGlass.roughness.value = 0.0
         let glassWallGeometry = ObjGeometry(device: device, objURL: cubeURL, color: .one, material: roughGlass)
         glassWallGeometry.uploadToBuffers()
         addGeometry(glassWallGeometry)
@@ -329,8 +329,8 @@ class GameScene: ObservableObject {
     func buildBox(width: Float = 6.0, height: Float = 4.0, depth: Float = 6.0) {
         let epsilon: Float = 1e-3
         
-        let wallGeometry = ModelIOGeometry(device: device, modelURL: cubeURL, defaultColor: 0.5 * .one, defaultMaterial: PLASTIC)
-        let checkeredWallGeometry = ModelIOGeometry(device: device, modelURL: cubeURL, textureURL: checkerBoardURL, defaultMaterial: PLASTIC)
+        let wallGeometry = ObjGeometry(device: device, objURL: cubeURL, material: PLASTIC)
+        let checkeredWallGeometry = ObjGeometry(device: device, objURL: cubeURL, textureURL: checkerBoardURL, material: PLASTIC)
         
         addInstance(
             with: wallGeometry,
@@ -503,17 +503,17 @@ class GameScene: ObservableObject {
         let epsilon: Float = 1e-3
         var coloredPlastic = PLASTIC
 
-        coloredPlastic.color = 0.7 * .one
+        coloredPlastic.color.value = 0.7 * .one
         let whiteCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: coloredPlastic)
         whiteCubeGeometry.uploadToBuffers()
         addGeometry(whiteCubeGeometry)
         
-        coloredPlastic.color = 0.7 * SIMD3<Float>(1, 0, 0)
+        coloredPlastic.color.value = 0.7 * SIMD3<Float>(1, 0, 0)
         let redCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: coloredPlastic)
         redCubeGeometry.uploadToBuffers()
         addGeometry(redCubeGeometry)
 
-        coloredPlastic.color = 0.7 * SIMD3<Float>(0, 1, 0)
+        coloredPlastic.color.value = 0.7 * SIMD3<Float>(0, 1, 0)
         let greenCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: coloredPlastic)
         greenCubeGeometry.uploadToBuffers()
         addGeometry(greenCubeGeometry)
@@ -531,33 +531,33 @@ class GameScene: ObservableObject {
             scale: SIMD3<Float>(width, epsilon, depth)
         )
         
-        addInstance( // left wall
-            with: redCubeGeometry,
-            translation: SIMD3<Float>(-width / 2, height / 2, 0.0),
-            rotation: SIMD3<Float>(0, 0, 0),
-            scale: SIMD3<Float>(epsilon, height, depth)
-        )
-        
-        addInstance( // right wall
-            with: greenCubeGeometry,
-            translation: SIMD3<Float>(width / 2, height / 2, 0.0),
-            rotation: SIMD3<Float>(0, 0, 0),
-            scale: SIMD3<Float>(epsilon, height, depth)
-        )
-        
-        addInstance( // back wall
-            with: whiteCubeGeometry,
-            translation: SIMD3<Float>(0.0, height / 2, -depth / 2),
-            rotation: SIMD3<Float>(0, 0, 0),
-            scale: SIMD3<Float>(width, height, epsilon)
-        )
-        
-        addInstance( // ceiling
-            with: whiteCubeGeometry,
-            translation: SIMD3<Float>(0.0, height, 0.0),
-            rotation: SIMD3<Float>(0, 0, 0),
-            scale: SIMD3<Float>(width, epsilon, depth)
-        )
+//        addInstance( // left wall
+//            with: redCubeGeometry,
+//            translation: SIMD3<Float>(-width / 2, height / 2, 0.0),
+//            rotation: SIMD3<Float>(0, 0, 0),
+//            scale: SIMD3<Float>(epsilon, height, depth)
+//        )
+//        
+//        addInstance( // right wall
+//            with: greenCubeGeometry,
+//            translation: SIMD3<Float>(width / 2, height / 2, 0.0),
+//            rotation: SIMD3<Float>(0, 0, 0),
+//            scale: SIMD3<Float>(epsilon, height, depth)
+//        )
+//        
+//        addInstance( // back wall
+//            with: whiteCubeGeometry,
+//            translation: SIMD3<Float>(0.0, height / 2, -depth / 2),
+//            rotation: SIMD3<Float>(0, 0, 0),
+//            scale: SIMD3<Float>(width, height, epsilon)
+//        )
+//        
+//        addInstance( // ceiling
+//            with: whiteCubeGeometry,
+//            translation: SIMD3<Float>(0.0, height, 0.0),
+//            rotation: SIMD3<Float>(0, 0, 0),
+//            scale: SIMD3<Float>(width, epsilon, depth)
+//        )
     }
     
     func createScene() { // x coordinates are flipped; left is positive, right is negative
@@ -640,8 +640,8 @@ class GameScene: ObservableObject {
         )
         
         var GOLD = MIRROR
-        GOLD.color = SIMD3<Float>(1.0, 0.84, 0.6)
-        GOLD.roughness = 0.35
+        GOLD.color.value = SIMD3<Float>(1.0, 0.84, 0.6)
+        GOLD.roughness.value = 0.35
         let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GOLD)
         let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
         let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
@@ -1122,11 +1122,11 @@ class GameScene: ObservableObject {
         
         buildBox(width: 6.0, height: 4.0, depth: 6.0)
         
-        let mirrorWallGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), material: MIRROR)
-        let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GLASS)
-        let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
-        let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
-        
+//        let mirrorWallGeometry = ObjGeometry(device: device, objURL: cubeURL, color: SIMD3<Float>(1, 1, 1), material: MIRROR)
+//        let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GLASS)
+//        let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
+//        let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
+//        
         
 //        addInstance(with: mirrorWallGeometry,
 //                    translation: SIMD3<Float>(-1.0, 1.5, -2.95),
@@ -1175,9 +1175,9 @@ class GameScene: ObservableObject {
         var plasticMaterial = PLASTIC
         
         for i in 0...10 {
-            plasticMaterial.roughness = Float(i) * 0.1
+            plasticMaterial.roughness.value = Float(i) * 0.1
             
-            let scalingPlasticGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: plasticMaterial)
+            let scalingPlasticGeometry = ObjGeometry(device: device, objURL: ballURL, material: plasticMaterial)
             
             addInstance(with: scalingPlasticGeometry,
                         translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.2, -1.5),
@@ -1188,10 +1188,10 @@ class GameScene: ObservableObject {
         var mirrorMaterial = MIRROR
         
         for i in 0...10 {
-            mirrorMaterial.roughness = Float(i) * 0.1
+            mirrorMaterial.roughness.value = Float(i) * 0.1
             //            mirrorMaterial.color = (1.0 - colors[i])
             
-            let scalingMirrorGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: mirrorMaterial)
+            let scalingMirrorGeometry = ObjGeometry(device: device, objURL: ballURL, material: mirrorMaterial)
             
             addInstance(with: scalingMirrorGeometry,
                         translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.2, 0.0),
@@ -1202,9 +1202,9 @@ class GameScene: ObservableObject {
         var glassMaterial = GLASS
         
         for i in 0...10 {
-            glassMaterial.roughness = Float(i) * 0.1
+            glassMaterial.roughness.value = Float(i) * 0.1
             
-            let scalingGlassGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: glassMaterial)
+            let scalingGlassGeometry = ObjGeometry(device: device, objURL: ballURL, material: glassMaterial)
             
             addInstance(with: scalingGlassGeometry,
                         translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.2, 1.5),
@@ -1227,7 +1227,7 @@ class GameScene: ObservableObject {
         
         
         let lightBallGeometry = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(repeating: 20.0))
-        let lightStripGeometry = ModelIOGeometry(device: device, modelURL: cubeURL, emissionColor: SIMD3<Float>(repeating: 5.0))
+//        let lightStripGeometry = ModelIOGeometry(device: device, modelURL: cubeURL, emissionColor: SIMD3<Float>(repeating: 5.0))
         
 //                addInstance(with: lightStripGeometry,
 //                            translation: SIMD3<Float>(0.0, 3.99, 0.0),
@@ -1275,7 +1275,7 @@ class GameScene: ObservableObject {
         let rotations: [Float] = [.pi/24, .pi/12, .pi/6, .pi/3.1]
 
         for i in 0..<4 {
-            mirrorMaterial.roughness = roughnesses[i]
+            mirrorMaterial.roughness.value = roughnesses[i]
 
             let mirrorSlabGeometry = ObjGeometry(device: device, objURL: cubeURL, material: mirrorMaterial)
 
@@ -1307,10 +1307,13 @@ class GameScene: ObservableObject {
     }
     
     func createCornellScene() {
-        cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0))
+        cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
+                           (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
+                           (SIMD3<Float>(0.17440492, 0.8747897, -0.7373735), SIMD3<Float>(2.29272, -2.6299663, 7.276931)),
+                           (SIMD3<Float>(-14.601961, 3.1426682, -1.5453186), SIMD3<Float>(-5.979579, 1.3546469, 0.31400716))
         ]
         
-        (cameraPosition, cameraTarget) = cameraLocations[0]
+        (cameraPosition, cameraTarget) = cameraLocations[3]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
 
         buildCornellBox()
@@ -1319,6 +1322,150 @@ class GameScene: ObservableObject {
         whiteCubeGeometry.uploadToBuffers()
         addGeometry(whiteCubeGeometry)
         
+        // Option A: File directly in main bundle
+//        if let modelPath = Bundle.main.path(forResource: "ball", ofType: "obj") {
+//            let ballGeometry = AssimpGeometry(device: device, modelPath: modelPath, defaultMaterial: PLASTIC)
+//            ballGeometry.uploadToBuffers()
+//            addGeometry(ballGeometry)
+//            
+//            addInstance(with: ballGeometry,
+//                        translation: SIMD3<Float>(0, 2, 0),
+//                        scale: .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("1")
+//        }
+//        
+//        if let modelPath = Bundle.main.path(forResource: "glasstable", ofType: "gltf") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(0, 0, 0),
+//                        scale: .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("2")
+//        }
+        
+//        if let modelPath = Bundle.main.path(forResource: "dinin", ofType: "glb") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(0, 0, 0),
+//                        scale: 0.003 * .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("3")
+//        }
+        
+//        if let modelPath = Bundle.main.path(forResource: "bed", ofType: "glb") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(5, 0, 0),
+//                        scale: 0.02 * .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("123123123")
+//        }
+        
+//        if let modelPath = Bundle.main.path(forResource: "japanese-ish_room", ofType: "glb") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(-5, 0, 0),
+//                        scale: 1 * .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("123123123")
+//        }
+//
+
+
+//        if let modelPath = Bundle.main.path(forResource: "porsche", ofType: "gltf") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(2.5, 0.15, 0),
+//                        scale: 1 * .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("33333")
+//        }
+        
+//        if let modelPath = Bundle.main.path(forResource: "m4a1printstream", ofType: "glb") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(0, 4, 0),
+//                        scale: 0.001 * .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("3e3e3e3e")
+//        }
+
+//
+//
+//        if let modelPath = Bundle.main.path(forResource: "robot", ofType: "obj") {
+//            let tableGeometry = AssimpGeometry(device: device, modelPath: modelPath)
+//            tableGeometry.uploadToBuffers()
+//            addGeometry(tableGeometry)
+//            
+//            addInstance(with: tableGeometry,
+//                        translation: SIMD3<Float>(-5, 0, 0),
+//                        scale: .one
+//            )
+//            
+//            print("success")
+//
+//        } else {
+//            print("4")
+//        }
+        
+//
+        addAssimpInstance(fileName: "koenigsegg_one_pro", fileExtension: "glb",
+                          translation: .zero,
+                          scale: 10 * .one)
+////        
+//        addAssimpInstance(fileName: "BistroExterior", fileExtension: "fbx",
+//                          translation: .zero,
+//                          scale: 1 * .one)
+//
+
+        
 //        var roughMetal = MIRROR
 //        roughMetal.roughness = 0.3
 //        let mirrorCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: roughMetal)
@@ -1326,17 +1473,17 @@ class GameScene: ObservableObject {
 //        addGeometry(mirrorCubeGeometry)
 
         
-        addInstance(with: whiteCubeGeometry,
-                    translation: SIMD3<Float>(-1.4, 0.75, 0),
-                    rotation: SIMD3<Float>(0, -.pi/8, 0),
-                    scale: SIMD3<Float>(1.5, 1.5, 1.5))
+//        addInstance(with: whiteCubeGeometry,
+//                    translation: SIMD3<Float>(-1.4, 0.75, 0),
+//                    rotation: SIMD3<Float>(0, -.pi/8, 0),
+//                    scale: SIMD3<Float>(1.5, 1.5, 1.5))
+//        
+//        addInstance(with: whiteCubeGeometry,
+//                    translation: SIMD3<Float>(1.5, 1.25, 0),
+//                    rotation: SIMD3<Float>(0, .pi/8, 0),
+//                    scale: SIMD3<Float>(1.25, 2.5, 1.25))
         
-        addInstance(with: whiteCubeGeometry,
-                    translation: SIMD3<Float>(1.5, 1.25, 0),
-                    rotation: SIMD3<Float>(0, .pi/8, 0),
-                    scale: SIMD3<Float>(1.25, 2.5, 1.25))
-        
-        addEnvironmentMap(textureURL: skyURL)
+        addEnvironmentMap(textureURL: duskURL)
         
         let lightBallGeometry = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(repeating: 0.01))
         addInstance(with: lightBallGeometry,
@@ -1451,43 +1598,43 @@ class GameScene: ObservableObject {
         
         var plasticMaterial = PLASTIC
         
-        for i in 0...10 {
-            plasticMaterial.color = 0.45 * colors[i]
-
-            let scalingPlasticGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: plasticMaterial)
-
-            addInstance(with: scalingPlasticGeometry,
-                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.25, -1.5),
-                        scale: 0.5 * SIMD3<Float>(1, 1, 1)
-            )
-        }
-
-        var mirrorMaterial = MIRROR
-
-        for i in 0...10 {
-            mirrorMaterial.roughness = Float(i) * 0.1
-
-            let scalingMirrorGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: mirrorMaterial)
-
-            addInstance(with: scalingMirrorGeometry,
-                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.15, 0.0),
-                        scale: 0.3 * SIMD3<Float>(1, 1, 1)
-            )
-        }
+//        for i in 0...10 {
+//            plasticMaterial.color = 0.45 * colors[i]
+//
+//            let scalingPlasticGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: plasticMaterial)
+//
+//            addInstance(with: scalingPlasticGeometry,
+//                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.25, -1.5),
+//                        scale: 0.5 * SIMD3<Float>(1, 1, 1)
+//            )
+//        }
+//
+//        var mirrorMaterial = MIRROR
+//
+//        for i in 0...10 {
+//            mirrorMaterial.roughness = Float(i) * 0.1
+//
+//            let scalingMirrorGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: mirrorMaterial)
+//
+//            addInstance(with: scalingMirrorGeometry,
+//                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.15, 0.0),
+//                        scale: 0.3 * SIMD3<Float>(1, 1, 1)
+//            )
+//        }
 ////
 ////        
-        var glassMaterial = GLASS
-
-        for i in 0...10 {
-            glassMaterial.roughness = Float(i) * 0.1
-
-            let scalingGlassGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: glassMaterial)
-
-            addInstance(with: scalingGlassGeometry,
-                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.15, 1.5),
-                        scale: 0.3 * SIMD3<Float>(1, 1, 1)
-            )
-        }
+//        var glassMaterial = GLASS
+//
+//        for i in 0...10 {
+//            glassMaterial.roughness = Float(i) * 0.1
+//
+//            let scalingGlassGeometry = ModelIOGeometry(device: device, modelURL: ballURL, defaultMaterial: glassMaterial)
+//
+//            addInstance(with: scalingGlassGeometry,
+//                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 0.15, 1.5),
+//                        scale: 0.3 * SIMD3<Float>(1, 1, 1)
+//            )
+//        }
         
 //        var metal = MIRROR
 //        metal.roughness = 0.5
@@ -1511,21 +1658,21 @@ class GameScene: ObservableObject {
 //                    scale: SIMD3<Float>(0.15, 0.15, 0.15)
 //        )
 //        
-//        let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GLASS)
-//
-//        addInstance(with: dragonGeometry,
-//                    translation: SIMD3<Float>(1, -0.3, 0),
-//                    rotation: SIMD3<Float>(0, .pi, 0),
-//                    scale: SIMD3<Float>(0.1, 0.1, 0.1)
-//        )
+        let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GLASS)
+
+        addInstance(with: dragonGeometry,
+                    translation: SIMD3<Float>(1, -0.3, 0),
+                    rotation: SIMD3<Float>(0, .pi, 0),
+                    scale: SIMD3<Float>(0.1, 0.1, 0.1)
+        )
 //        
-//        let glassBallGeometry = ModelIOGeometry(device: device, modelURL: torusURL, defaultColor: .one, defaultMaterial: GLASS)
-//
-//        addInstance(with: glassBallGeometry,
-//                    translation: SIMD3<Float>(-1.25, 0.5, -0.5),
-//                    rotation: SIMD3<Float>(0.1, 0, 0),
-//                    scale: SIMD3<Float>(2, 0.2, 2)
-//        )
+        let glassBallGeometry = ModelIOGeometry(device: device, modelURL: torusURL, defaultColor: .one, defaultMaterial: GLASS)
+
+        addInstance(with: glassBallGeometry,
+                    translation: SIMD3<Float>(-1.25, 0.5, -0.5),
+                    rotation: SIMD3<Float>(0.1, 0, 0),
+                    scale: SIMD3<Float>(2, 0.2, 2)
+        )
         
 //        let whiteCubeGeometry = ObjGeometry(device: device, objURL: cubeURL, material: PLASTIC)
 //        whiteCubeGeometry.uploadToBuffers()
@@ -1713,5 +1860,19 @@ class GameScene: ObservableObject {
         print(CDF[height * width - 1])
 
         return (CDF, averageRGB)
+    }
+    
+    func addAssimpInstance(fileName: String, fileExtension: String, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one) {
+        if let modelPath = Bundle.main.path(forResource: fileName, ofType: fileExtension) {
+            let geometry = AssimpGeometry(device: device, modelPath: modelPath)
+            
+            addInstance(with: geometry,
+                        translation: translation,
+                        rotation: rotation,
+                        scale: scale
+            )
+        } else {
+            print("Failed to find resource ", fileName)
+        }
     }
 }

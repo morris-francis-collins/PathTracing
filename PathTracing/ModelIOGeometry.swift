@@ -97,7 +97,7 @@ class ModelIOGeometry: Geometry {
             let indexType = submesh.indexType
             
             var submeshMaterial = Material()
-            submeshMaterial.textureIndex = -1
+            submeshMaterial.color.textureIndex = -1
             var currentColor = defaultColor
         
             if let mdlMaterial = submesh.material {
@@ -120,26 +120,26 @@ class ModelIOGeometry: Geometry {
                 
                 if let refractionProperty = mdlMaterial.property(with: MDLMaterialSemantic.materialIndexOfRefraction) {
                     if refractionProperty.type == .float {
-                        submeshMaterial.refraction = refractionProperty.floatValue
+                        submeshMaterial.refraction.value = refractionProperty.floatValue
                     }
                 } else {
-                    submeshMaterial.refraction = 1.5
+                    submeshMaterial.refraction.value = 1.5
                 }
 
                 if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
                     if roughnessProperty.type == .float {
-                        submeshMaterial.roughness = roughnessProperty.floatValue
+                        submeshMaterial.roughness.value = roughnessProperty.floatValue
                     }
                 } else {
-                    submeshMaterial.roughness = 0.0
+                    submeshMaterial.roughness.value = 0.0
                 }
                 
                 if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
                     if metallicProperty.type == .float {
-                        submeshMaterial.metallic = metallicProperty.floatValue
+                        submeshMaterial.metallic.value = metallicProperty.floatValue
                     }
                 } else {
-                    submeshMaterial.metallic = 0.0
+                    submeshMaterial.metallic.value = 0.0
                 }
                 
                 if let defaultMaterial = self.defaultMaterial {
@@ -154,7 +154,7 @@ class ModelIOGeometry: Geometry {
                     do {
                         let texture = try textureLoader.newTexture(URL: texURL, options: [.SRGB: false])
                         let index = TextureRegistry.shared.addTexture(texture, identifier: texURL.path)
-                        submeshMaterial.textureIndex = Int32(index)
+                        submeshMaterial.color.textureIndex = Int32(index)
 
                     } catch {
                         fatalError("Couldn't load texture: \(error)")
@@ -166,7 +166,7 @@ class ModelIOGeometry: Geometry {
                         let mtlTexture = try textureLoader.newTexture(cgImage: cgImage.takeRetainedValue())
                         let identifier = "\(submesh.hashValue)\(mdlTexture.hashValue)"
                         let index = TextureRegistry.shared.addTexture(mtlTexture, identifier: identifier)
-                        submeshMaterial.textureIndex = Int32(index)
+                        submeshMaterial.color.textureIndex = Int32(index)
                     }
                 } catch {
                     print("Failed to convert textures: \(error)")
@@ -219,13 +219,13 @@ class ModelIOGeometry: Geometry {
                                                 
                         if let roughnessProperty = mdlMaterial.property(with: MDLMaterialSemantic.roughness) {
                             if let roughnessMaterialData, roughnessProperty.type == .texture {
-                                currentMaterial.roughness = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
+                                currentMaterial.roughness.value = averageMaterialValue(from: roughnessMaterialData, t0: t0, t1: t1, t2: t2).x
                             }
                         }
                         
                         if let metallicProperty = mdlMaterial.property(with: MDLMaterialSemantic.metallic) {
                             if let metallicMaterialData, metallicProperty.type == .texture {
-                                currentMaterial.metallic = averageMaterialValue(from: metallicMaterialData, t0: t0, t1: t1, t2: t2).x
+                                currentMaterial.metallic.value = averageMaterialValue(from: metallicMaterialData, t0: t0, t1: t1, t2: t2).x
                             }
                         }
                         

@@ -40,8 +40,8 @@ float3 pathIntegrator(float2 pixel,
                       constant int *lightIndices,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
-                      array<texture2d<float>, MAX_TEXTURES> textureArray,
-                      thread Sampler& sampler
+                      thread Sampler& sampler,
+                      constant Textures* textures
                       );
 
 float3 bidirectionalPathIntegrator(float2 pixel,
@@ -55,7 +55,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant int *lightIndices,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
-                                   array<texture2d<float>, MAX_TEXTURES> textureArray,
+                                   constant Textures* textures,
                                    thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer
@@ -167,7 +167,6 @@ struct PathVertex {
         return convertDensity(PDF, nxt);
     }
         
-    
     float lightOriginPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms, thread PathVertex& nxt, constant float* environmentMapCDF) {
         float3 w = normalize(nxt.position() - position());
         

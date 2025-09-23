@@ -16,10 +16,14 @@
 using namespace metal;
 using namespace raytracing;
 
+struct Textures {
+    array<texture2d<float>, MAX_TEXTURES> textures;
+};
+
 struct SurfaceInteraction {
     float3 position;
     float3 normal;
-    Material material;
+    SampledMaterial material;
     float3 textureColor;
     bool hitLight;
     int lightIndex;
@@ -28,7 +32,7 @@ struct SurfaceInteraction {
         
     }
     
-    SurfaceInteraction(float3 _position, float3 _normal, Material _material, float3 _textureColor = float3(0.0f), bool _hitLight = false, int _lightIndex = -1) {
+    SurfaceInteraction(float3 _position, float3 _normal, SampledMaterial _material, float3 _textureColor = float3(1.0f), bool _hitLight = false, int _lightIndex = -1) {
         position = _position;
         normal = _normal;
         material = _material;
@@ -54,7 +58,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          instance_acceleration_structure accelerationStructure,
                                          constant int *lightIndices,
                                          int resourcesStride,
-                                         array<texture2d<float>, MAX_TEXTURES> textureArray
+                                         constant Textures* textures
                                          );
 
 inline float3 transformPoint(float3 p, float4x3 transform) {

@@ -11,8 +11,7 @@
 using namespace metal;
 using namespace raytracing;
 
-struct TriangleResources
-{
+struct TriangleResources {
     device float3 *vertexNormals;
     device float3 *vertexColors;
     device Material *vertexMaterials;
@@ -52,6 +51,56 @@ IntersectionResult intersect(ray ray,
     return intersection;
 }
 
+void sampleBXDF(thread SampledMaterial& material) {
+    if (material.refraction > 1.01f) {
+        material.BXDFs = SPECULAR_TRANSMISSION;
+    } else if (material.metallic > 0.5f) {
+        material.BXDFs = CONDUCTOR;
+    } else {
+        material.BXDFs = DIFFUSE;
+    }
+}
+
+SampledMaterial sampleMaterial(Material material, float2 uv, constant Textures* textures) {
+    SampledMaterial sampledMaterial;
+    constexpr sampler textureSampler(address::repeat, filter::linear);
+    bool transparent = false;
+    
+    if (material.color.textureIndex >= 0) {
+        float4 texColor = textures->textures[material.color.textureIndex].sample(textureSampler, uv);
+        transparent = texColor.a < 0.8f; // cutoff seems to work
+        sampledMaterial.color = material.color.value * (transparent ? 1.0f : texColor.rgb);
+    } else {
+        sampledMaterial.color = material.color.value;
+    }
+        
+    if (material.roughness.textureIndex >= 0) {
+        float4 texValue = textures->textures[material.roughness.textureIndex].sample(textureSampler, uv);
+        sampledMaterial.roughness = texValue.g;
+    } else {
+        sampledMaterial.roughness = material.roughness.value;
+    }
+    
+    if (material.metallic.textureIndex >= 0) {
+        float4 texValue = textures->textures[material.metallic.textureIndex].sample(textureSampler, uv);
+        sampledMaterial.metallic = texValue.b;
+    } else {
+        sampledMaterial.metallic = material.metallic.value;
+    }
+    
+    sampledMaterial.refraction = material.refraction.value;
+    sampleBXDF(sampledMaterial);
+    
+    if (transparent) {
+        sampledMaterial.BXDFs = SPECULAR_TRANSMISSION;
+        sampledMaterial.roughness = 0.0f;
+        sampledMaterial.color = 1.0f - sampledMaterial.color;
+        sampledMaterial.refraction = 1.0f;
+    }
+    
+    return sampledMaterial;
+}
+
 SurfaceInteraction getSurfaceInteraction(ray ray,
                                          IntersectionResult intersection,
                                          device void *resources,
@@ -59,7 +108,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          instance_acceleration_structure accelerationStructure,
                                          constant int *lightIndices,
                                          int resourcesStride,
-                                         array<texture2d<float>, MAX_TEXTURES> textureArray
+                                         constant Textures* textures
                                          )
 {
     SurfaceInteraction surfaceInteraction;
@@ -81,24 +130,14 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     surfaceInteraction.normal = worldNormal;
     
     Material material = triangleResources.vertexMaterials[primitiveIndex];
-    surfaceInteraction.material = material;
     
     surfaceInteraction.hitLight = mask & GEOMETRY_MASK_LIGHT;
     surfaceInteraction.lightIndex = lightIndices[instanceIndex];
     
     float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
-    uv.y = 1 - uv.y;
     
-    constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
-
-    if (material.textureIndex != -1) {
-        texture2d<float> texture = textureArray[material.textureIndex];
-        float4 textureValue = texture.sample(textureSampler, uv);
-        float3 textureColor = textureValue.w > 0.0f ? textureValue.xyz : 1.0f;
-        surfaceInteraction.textureColor = textureColor;
-    } else {
-        surfaceInteraction.textureColor = float3(1.0f);
-    }
+    surfaceInteraction.material = sampleMaterial(material, uv, textures);
+    surfaceInteraction.textureColor = float3(1.0f);
 
     return surfaceInteraction;
 }

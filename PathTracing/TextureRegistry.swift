@@ -17,12 +17,7 @@ class TextureRegistry {
         if let index = textureMap[identifier] {
             return index;
         }
-        
-        if textures.count >= MAX_TEXTURES {
-            print("Max texture count reached")
-            return 0
-        }
-        
+                
         let index = textures.count
         textureMap[identifier] = index
         textures.append(texture)

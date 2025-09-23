@@ -14,13 +14,30 @@
 #define CONDUCTOR 1 << 1
 #define SPECULAR_TRANSMISSION 1 << 2
 
+struct VectorParameter {
+    vector_float3 value;
+    int textureIndex;
+};
+
+struct ScalarParameter {
+    float value;
+    int textureIndex;
+};
+
 struct Material {
+    VectorParameter color;
+    ScalarParameter refraction;
+    ScalarParameter roughness;
+    ScalarParameter metallic;
+    int BXDFs;
+};
+
+struct SampledMaterial {
     vector_float3 color;
     float refraction;
     float roughness;
     float metallic;
     int BXDFs;
-    int textureIndex;
 };
 
 #ifdef __METAL_VERSION__
@@ -49,21 +66,21 @@ struct BSDFSample {
     }
 };
 
-BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, Material material, float2 r2);
-float3 diffuseBRDF(Material material);
+BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, SampledMaterial material, float2 r2);
+float3 diffuseBRDF(SampledMaterial material);
 float diffusePDF(float3 wi, float3 wo, float3 n);
 
-BSDFSample sampleConductorBRDF(float3 wi, float3 n, Material material, float2 r2);
-float3 conductorBSDF(float3 wi, float3 wo, float3 n, Material material);
-float conductorPDF(float3 wi, float3 wo, float3 n, Material material);
+BSDFSample sampleConductorBRDF(float3 wi, float3 n, SampledMaterial material, float2 r2);
+float3 conductorBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
+float conductorPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
 
-BSDFSample sampleDielectricBSDF(float3 wi, float3 n, Material material, float r, float2 r2);
-float3 dielectricBSDF(float3 wi, float3 wo, float3 n, Material material);
-float dielectricPDF(float3 wi, float3 wo, float3 n, Material material);
+BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, float r, float2 r2);
+float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
+float dielectricPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
 
-BSDFSample sampleBXDF(float3 wi, float3 n, Material material, float3 r3);
-float3 getBXDF(float3 wi, float3 wo, float3 n, Material material);
-float getPDF(float3 wi, float3 wo, float3 n, Material material);
+BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, float3 r3);
+float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
+float getPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
 
 
 inline float3 sampleCosineWeightedHemisphere(float2 u) {
@@ -157,7 +174,7 @@ inline float3 sampleGGXNormal(float3 wi, float alpha_x, float alpha_y, float2 r)
     return H;
 }
 
-inline float3 conductorFresnel(float cosI, thread Material& material) {
+inline float3 conductorFresnel(float cosI, thread SampledMaterial& material) {
     float3 F0 = material.color;
     return F0 + (1.0f - F0) * pow(1.0f - cosI, 5.0f);
 }

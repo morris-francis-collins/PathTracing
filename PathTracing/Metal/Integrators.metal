@@ -23,8 +23,8 @@ float3 pathIntegrator(float2 pixel,
                       constant int *lightIndices,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
-                      array<texture2d<float>, MAX_TEXTURES> textureArray,
-                      thread Sampler& sampler
+                      thread Sampler& sampler,
+                      constant Textures* textures
                       )
 {
     ray ray = generateRay(pixel, uniforms);
@@ -63,8 +63,8 @@ float3 pathIntegrator(float2 pixel,
             break;
         }
         
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textureArray);
-        Material material = surfaceInteraction.material;
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textures);
+        SampledMaterial material = surfaceInteraction.material;
         
         float3 n = surfaceInteraction.normal;
 
@@ -93,7 +93,7 @@ float3 pathIntegrator(float2 pixel,
         if (inMedium) {
             attenuationDistance += length(surfaceInteraction.position - ray.origin);
         } else if (bsdfSample.transmitted) {
-            float3 absorption = log(material.color);
+            float3 absorption = log(1 - material.color);
             throughput *= exp(absorption * attenuationDistance);
             attenuationDistance = 0.0f;
         }
@@ -156,7 +156,7 @@ int tracePath(float2 pixel,
               constant int *lightIndices,
               texture2d<float> environmentMapTexture,
               constant float *environmentMapCDF,
-              array<texture2d<float>, MAX_TEXTURES> textureArray,
+              constant Textures* textures,
               thread Sampler& sampler,
               ray ray,
               int maxDepth,
@@ -188,8 +188,8 @@ int tracePath(float2 pixel,
             break;
         }
 
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textureArray);
-        Material material = surfaceInteraction.material;
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textures);
+        SampledMaterial material = surfaceInteraction.material;
         float3 n = surfaceInteraction.normal;
         
         vx = createSurfaceVertex(surfaceInteraction, throughput, forwardPDF, prev);
@@ -248,7 +248,7 @@ int traceCameraPath(float2 pixel,
                     constant int *lightIndices,
                     texture2d<float> environmentMapTexture,
                     constant float *environmentMapCDF,
-                    array<texture2d<float>, MAX_TEXTURES> textureArray,
+                    constant Textures* textures,
                     thread Sampler& sampler,
                     thread PathVertex *cameraVertices
                     )
@@ -264,7 +264,7 @@ int traceCameraPath(float2 pixel,
     cameraVertices[0].forwardPDF = positionPDF;
     float3 throughput = float3(1.0f);
 
-    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
 }
 
 int traceLightPath(float2 pixel,
@@ -278,7 +278,7 @@ int traceLightPath(float2 pixel,
                    constant int *lightIndices,
                    texture2d<float> environmentMapTexture,
                    constant float *environmentMapCDF,
-                   array<texture2d<float>, MAX_TEXTURES> textureArray,
+                   constant Textures* textures,
                    thread Sampler& sampler,
                    thread PathVertex *lightVertices
                    )
@@ -303,7 +303,7 @@ int traceLightPath(float2 pixel,
     if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
 
-    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
+    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
 
     if (lightVertices[0].isInfiniteLight()) {
         if (numVertices > 0) {
@@ -513,7 +513,7 @@ float3 connectVertices(constant Uniforms& uniforms,
                        constant int *lightIndices,
                        texture2d<float> environmentMapTexture,
                        constant float *environmentMapCDF,
-                       array<texture2d<float>, MAX_TEXTURES> textureArray,
+                       constant Textures *textures,
                        thread Sampler& sampler,
                        thread PathVertex *cameraVertices,
                        thread PathVertex *lightVertices,
@@ -589,7 +589,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant int *lightIndices,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
-                                   array<texture2d<float>, MAX_TEXTURES> textureArray,
+                                   constant Textures* textures,
                                    thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer
@@ -598,9 +598,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
     PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
     
-    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, cameraVertices);
+    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices);
     
-    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, lightVertices);
+    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, lightVertices);
 
     float3 totalContribution = float3(0.0f);
     
@@ -610,7 +610,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
 
-            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, cameraVertices, lightVertices, c, l);
+            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, lightVertices, c, l);
             
             if (any(contribution < 0.0f) || any(isnan(contribution)) || any(isinf(contribution))) {
 //                DEBUG("Invalid contribution - c: %d, l: %d, float3(%f, %f, %f)", c, l, contribution.x, contribution.y, contribution.z);

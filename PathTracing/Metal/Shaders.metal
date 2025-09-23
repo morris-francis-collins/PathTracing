@@ -45,9 +45,9 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float, access::write> finalImage,
                              texture2d<float> environmentMapTexture,
                              constant LightTriangle *lightTriangles,
-                             array<texture2d<float>, MAX_TEXTURES> textureArray [[texture(8)]],
                              constant int *lightIndices,
-                             constant float *environmentMapCDF
+                             constant float *environmentMapCDF,
+                             constant Textures* textures
                              )
 {
     unsigned int offset = randomTex.read(tid).x;
@@ -60,10 +60,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         return;
 
     float3 ptContribution = float3(0.0f);
-    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler);
+    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, sampler, textures);
     
     float3 bdptContribution = float3(0.0f);
-//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textureArray, sampler, splatTex, splatBuffer);
+//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer);
     
     float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;
