@@ -13,9 +13,11 @@ class AssimpGeometry: Geometry {
     private var sceneData: UnsafeMutablePointer<SceneData>?
     private var textureLoader: MTKTextureLoader?
     private var modelName: String
+    private var emissionAmplifier: Float
     
-    init(device: MTLDevice, modelPath: String, defaultMaterial: Material? = nil) {
+    init(device: MTLDevice, modelPath: String, defaultMaterial: Material? = nil, emissionAmplifier: Float = 1.0) {
         modelName = URL(fileURLWithPath: modelPath).lastPathComponent
+        self.emissionAmplifier = emissionAmplifier
         super.init(device: device)
         textureLoader = MTKTextureLoader(device: device)
         lightGeometry = LightGeometry(device: device)
@@ -32,29 +34,42 @@ class AssimpGeometry: Geometry {
         for m in 0..<Int(scene.meshCount) {
             let mesh = scene.meshes[m]
             let material = loadMaterialWithTextures(mesh: mesh, defaultMaterial: defaultMaterial)
-    
+            let isEmissive = length_squared(material.emission.value) > 1e-4 || material.emission.textureIndex != -1
+            let primitiveLightIndex = isEmissive ? areaLights.count : -1
+            
+//            if (!isEmissive) {
+//                continue
+//            }
+            
             for i in stride(from: 0, to: Int(mesh.indexCount), by: 3) {
                 let i0 = Int(mesh.indices[i + 0])
                 let i1 = Int(mesh.indices[i + 1])
                 let i2 = Int(mesh.indices[i + 2])
                 
-                vertices.append(SIMD3<Float>(mesh.positions[i0].x, mesh.positions[i0].y, mesh.positions[i0].z))
-                vertices.append(SIMD3<Float>(mesh.positions[i1].x, mesh.positions[i1].y, mesh.positions[i1].z))
-                vertices.append(SIMD3<Float>(mesh.positions[i2].x, mesh.positions[i2].y, mesh.positions[i2].z))
+                vertices.append(mesh.positions[i0])
+                vertices.append(mesh.positions[i1])
+                vertices.append(mesh.positions[i2])
                 
-                normals.append(normalize(SIMD3<Float>(mesh.normals[i0].x, mesh.normals[i0].y, mesh.normals[i0].z)))
-                normals.append(normalize(SIMD3<Float>(mesh.normals[i1].x, mesh.normals[i1].y, mesh.normals[i1].z)))
-                normals.append(normalize(SIMD3<Float>(mesh.normals[i2].x, mesh.normals[i2].y, mesh.normals[i2].z)))
+                normals.append(normalize(mesh.normals[i0]))
+                normals.append(normalize(mesh.normals[i1]))
+                normals.append(normalize(mesh.normals[i2]))
                 
-                texCoords.append(SIMD2<Float>(mesh.texCoords[i0].x, mesh.texCoords[i0].y))
-                texCoords.append(SIMD2<Float>(mesh.texCoords[i1].x, mesh.texCoords[i1].y))
-                texCoords.append(SIMD2<Float>(mesh.texCoords[i2].x, mesh.texCoords[i2].y))
+                texCoords.append(mesh.texCoords[i0])
+                texCoords.append(mesh.texCoords[i1])
+                texCoords.append(mesh.texCoords[i2])
                 
                 materials.append(material)
+                
+                primitiveLightIndices.append(Int32(primitiveLightIndex))
+            }
 
-                colors.append(contentsOf: [material.color.value,
-                                          material.color.value,
-                                          material.color.value])
+            if isEmissive {
+                let averageEmission = material.emission.value // FIXME: get avg texture
+                areaLights.append(AreaLight(emission: material.emission,
+                                            averageEmission: averageEmission,
+                                            vertices: vertices.suffix(Int(mesh.indexCount)),
+                                            UVs: texCoords.suffix(Int(mesh.indexCount)))
+                )
             }
         }
         
@@ -67,6 +82,7 @@ class AssimpGeometry: Geometry {
             refraction: mesh.material.refraction.value,
             roughness: mesh.material.roughness.value,
             metallic: mesh.material.metallic.value,
+            emission: emissionAmplifier * mesh.material.emission.value,
             BXDFs: mesh.material.BXDFs
         )
         
@@ -80,6 +96,10 @@ class AssimpGeometry: Geometry {
         
         if let metallicIndex = loadEmbeddedTexture(mesh.embeddedMetallicTexture, type: "metallic", pixelFormat: .r8Unorm, sRGB: false, bytesPerPixel: 1) {
             material.metallic.textureIndex = Int32(metallicIndex)
+        }
+        
+        if let emissiveIndex = loadEmbeddedTexture(mesh.embeddedEmissiveTexture, type: "emission", pixelFormat: .rgba8Unorm_srgb, sRGB: true, bytesPerPixel: 4) {
+            material.emission.textureIndex = Int32(emissiveIndex)
         }
         
         return material
@@ -146,9 +166,9 @@ class AssimpGeometry: Geometry {
         var resourceArray: [MTLResource] = []
         
         if let nb = vertexNormalBuffer { resourceArray.append(nb) }
-        if let cb = vertexColorBuffer { resourceArray.append(cb) }
         if let mb = materialBuffer { resourceArray.append(mb) }
         if let tx = textureCoordinatesBuffer { resourceArray.append(tx) }
+        if let pi = primitiveLightIndicesBuffer { resourceArray.append(pi) }
 
         return resourceArray
     }

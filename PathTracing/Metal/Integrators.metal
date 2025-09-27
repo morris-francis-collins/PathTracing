@@ -20,7 +20,7 @@ float3 pathIntegrator(float2 pixel,
                       instance_acceleration_structure accelerationStructure,
                       constant Light *lights,
                       constant LightTriangle *lightTriangles,
-                      constant int *lightIndices,
+                      constant int* instanceLightIndices,
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       thread Sampler& sampler,
@@ -48,7 +48,7 @@ float3 pathIntegrator(float2 pixel,
         if (intersection.type == intersection_type::none) {
             float2 uv = getEnvironmentMapUV(ray.direction);
             float3 emission = environmentMapEmission(uv, environmentMapTexture);
-            
+
             if (all(emission < 1e-10f))
                 break;
 
@@ -63,14 +63,14 @@ float3 pathIntegrator(float2 pixel,
             break;
         }
         
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textures);
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, instanceLightIndices, resourceStride, textures);
         SampledMaterial material = surfaceInteraction.material;
         
         float3 n = surfaceInteraction.normal;
 
-        if (surfaceInteraction.hitLight) {
+        if (surfaceInteraction.hitLight()) {
             constant Light& light = lights[surfaceInteraction.lightIndex];
-            float3 color = light.color;
+            float3 color = surfaceInteraction.emission;
 
             if (prevSpecular) {
                 contribution += throughput * color;
@@ -82,7 +82,6 @@ float3 pathIntegrator(float2 pixel,
         }
         
         BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
-        bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
         
         PDF = bsdfSample.PDF;
         float3 wo = bsdfSample.wo;
@@ -100,8 +99,8 @@ float3 pathIntegrator(float2 pixel,
                         
         if (!bsdfSample.delta) {
             float selectionPDF;
-            constant Light& light = selectLight(lights, lightTriangles, uniforms, sampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r3());
+            constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
+            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, textures, environmentMapTexture, environmentMapCDF, sampler.r3());
             
             float3 wi = -ray.direction, wo = lightSample.wo;
             float3 pos1 = surfaceInteraction.position, pos2 = lightSample.position;
@@ -112,7 +111,6 @@ float3 pathIntegrator(float2 pixel,
         
             if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, resources, instances, accelerationStructure)) {
                 float3 BSDF = getBXDF(wi, wo, n, material);
-                BSDF *= surfaceInteraction.textureColor; // ensure
 
                 float G = cosCamera * cosLight / (distance * distance);
                 float lightPDF = selectionPDF * lightSample.PDF;
@@ -153,7 +151,7 @@ int tracePath(float2 pixel,
               instance_acceleration_structure accelerationStructure,
               constant Light *lights,
               constant LightTriangle *lightTriangles,
-              constant int *lightIndices,
+              constant int* instanceLightIndices,
               texture2d<float> environmentMapTexture,
               constant float *environmentMapCDF,
               constant Textures* textures,
@@ -188,7 +186,7 @@ int tracePath(float2 pixel,
             break;
         }
 
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, lightIndices, resourceStride, textures);
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, instanceLightIndices, resourceStride, textures);
         SampledMaterial material = surfaceInteraction.material;
         float3 n = surfaceInteraction.normal;
         
@@ -197,13 +195,8 @@ int tracePath(float2 pixel,
         if (++bounces >= maxDepth) {
             break;
         }
-
-//        if (surfaceInteraction.hitLight) { // scatter from lights?
-//            break;
-//        }
                 
         BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
-        bsdfSample.BSDF *= surfaceInteraction.textureColor; // ensure to multiply by this
         
         float3 wo = bsdfSample.wo;
         float epsilon = calculateEpsilon(surfaceInteraction.position);
@@ -245,7 +238,7 @@ int traceCameraPath(float2 pixel,
                     instance_acceleration_structure accelerationStructure,
                     constant Light *lights,
                     constant LightTriangle *lightTriangles,
-                    constant int *lightIndices,
+                    constant int* instanceLightIndices,
                     texture2d<float> environmentMapTexture,
                     constant float *environmentMapCDF,
                     constant Textures* textures,
@@ -264,7 +257,7 @@ int traceCameraPath(float2 pixel,
     cameraVertices[0].forwardPDF = positionPDF;
     float3 throughput = float3(1.0f);
 
-    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
+    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF);
 }
 
 int traceLightPath(float2 pixel,
@@ -275,7 +268,7 @@ int traceLightPath(float2 pixel,
                    instance_acceleration_structure accelerationStructure,
                    constant Light *lights,
                    constant LightTriangle *lightTriangles,
-                   constant int *lightIndices,
+                   constant int* instanceLightIndices,
                    texture2d<float> environmentMapTexture,
                    constant float *environmentMapCDF,
                    constant Textures* textures,
@@ -284,7 +277,7 @@ int traceLightPath(float2 pixel,
                    )
 {
     float selectionPDF;
-    constant Light& light = selectLight(lights, lightTriangles, uniforms, sampler.r(), selectionPDF);
+    constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
     LightEmissionSample lightEmissionSample = sampleLightEmission(light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r2(), sampler.r3());
     float positionPDF = lightEmissionSample.positionPDF;
     float directionPDF = lightEmissionSample.directionPDF;
@@ -303,7 +296,7 @@ int traceLightPath(float2 pixel,
     if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
 
-    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
+    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF);
 
     if (lightVertices[0].isInfiniteLight()) {
         if (numVertices > 0) {
@@ -538,7 +531,7 @@ float3 connectVertices(constant Uniforms& uniforms,
 //        return contribution;
         if (lightVertex.isConnectible()) {
             float3 We = cameraWe(uniforms.camera, lightVertex.position());
-            float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex) * lightVertex.si.textureColor;
+            float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex);
             contribution = We * lightVertex.throughput * lightBSDF;
             
             if (!isBlack(contribution))
@@ -549,11 +542,11 @@ float3 connectVertices(constant Uniforms& uniforms,
 //        return contribution;
         if (cameraVertex.isConnectible()) {
             float selectionPDF;
-            constant Light& light = selectLight(lights, lightTriangles, uniforms, sampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r3());
+            constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
+            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, textures, environmentMapTexture, environmentMapCDF, sampler.r3());
             sampled = createLightVertex(&light, lightSample.position, lightSample.normal, lightSample.emission / (selectionPDF * lightSample.PDF), selectionPDF * lightSample.PDF);
 
-            contribution = cameraVertex.throughput * cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), sampled) * sampled.throughput * cameraVertex.si.textureColor;
+            contribution = cameraVertex.throughput * cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), sampled) * sampled.throughput;
                         
             if (!isBlack(contribution))
                 contribution *= calculateGeometricTerm(cameraVertex, sampled, resources, instances, accelerationStructure);
@@ -563,8 +556,8 @@ float3 connectVertices(constant Uniforms& uniforms,
         thread PathVertex& lightVertex = lightVertices[l - 1];
 //        return contribution;
         if (cameraVertex.isConnectible() && lightVertex.isConnectible()) {
-            float3 cameraBSDF = cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), lightVertex) * cameraVertex.si.textureColor;
-            float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex) * lightVertex.si.textureColor;
+            float3 cameraBSDF = cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), lightVertex);
+            float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex);
             contribution = cameraVertex.throughput * lightVertex.throughput * cameraBSDF * lightBSDF;
 
             if (!isBlack(contribution))
@@ -586,7 +579,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    instance_acceleration_structure accelerationStructure,
                                    constant Light *lights,
                                    constant LightTriangle *lightTriangles,
-                                   constant int *lightIndices,
+                                   constant int* instanceLightIndices,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
                                    constant Textures* textures,
@@ -598,9 +591,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
     PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
     
-    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices);
+    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices);
     
-    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, lightVertices);
+    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, lightVertices);
 
     float3 totalContribution = float3(0.0f);
     
@@ -610,7 +603,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
 
-            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, lightVertices, c, l);
+            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, lightVertices, c, l);
             
             if (any(contribution < 0.0f) || any(isnan(contribution)) || any(isinf(contribution))) {
 //                DEBUG("Invalid contribution - c: %d, l: %d, float3(%f, %f, %f)", c, l, contribution.x, contribution.y, contribution.z);

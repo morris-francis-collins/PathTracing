@@ -29,6 +29,7 @@ struct Material {
     ScalarParameter refraction;
     ScalarParameter roughness;
     ScalarParameter metallic;
+    VectorParameter emission;
     int BXDFs;
 };
 

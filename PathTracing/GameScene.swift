@@ -25,15 +25,19 @@ class GameScene: ObservableObject {
     var geometries: [Geometry] = []
     var instances: [GeometryInstance] = []
     var lights: [Light] = []
-    var lightBuffer: MTLBuffer?
     var lightTriangles: [LightTriangle] = []
-    var lightTriangleBuffer: MTLBuffer?
-    var textures: [MTLTexture] = []
+    var instanceLightIndices: [Int32] = []
     var lightIndices: [Int32] = []
-    var lightIndicesBuffer: MTLBuffer?
     var environmentMapTexture: MTLTexture?
     var environmentMapCDF: [Float] = []
+    var areaLightCDFs: [Float] = []
+    
+    var lightBuffer: MTLBuffer?
+    var lightTriangleBuffer: MTLBuffer?
+    var lightIndicesBuffer: MTLBuffer?
     var environmentMapCDFBuffer: MTLBuffer?
+    var instanceLightIndicesBuffer: MTLBuffer?
+    var areaLightCDFBuffer: MTLBuffer?
     
     var cameraPosition: SIMD3<Float> = SIMD3<Float>(0, 0, -1)
     var cameraTarget: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
@@ -46,16 +50,11 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createCornellScene()
+        createMISScene()
     }
-    
-    func clear() {
-        geometries.removeAll()
-        instances.removeAll()
-        lights.removeAll()
-    }
-    
+        
     func addGeometry(_ mesh: Geometry) {
+        mesh.uploadToBuffers()
         geometries.append(mesh)
     }
     
@@ -91,7 +90,7 @@ class GameScene: ObservableObject {
 
             let newEnvironmentLight = Light(type: ENVIRONMENT_MAP,
                                             index: UInt32(lights.count),
-                                            delta: 0,
+                                            delta: false,
                                             position: .zero,
                                             color: .zero,
                                             firstTriangleIndex: 0,
@@ -101,17 +100,20 @@ class GameScene: ObservableObject {
 
             lights.append(newEnvironmentLight)
         }
-        
+        print(instanceLightIndices)
         lightBuffer = device.makeBuffer(bytes: lights, length: lights.count * MemoryLayout<Light>.size, options: options)
         lightTriangleBuffer = device.makeBuffer(bytes: lightTriangles, length: lightTriangles.count * MemoryLayout<LightTriangle>.size, options: options)
         lightIndicesBuffer = device.makeBuffer(bytes: lightIndices, length: lightIndices.count * MemoryLayout<Int32>.size, options: options)
         environmentMapCDFBuffer = device.makeBuffer(bytes: environmentMapCDF, length: environmentMapCDF.count * MemoryLayout<Float>.size, options: options)
+        instanceLightIndicesBuffer = device.makeBuffer(bytes: instanceLightIndices, length: instanceLightIndices.count * MemoryLayout<Int32>.size, options: options)
+//        areaLightCDFBuffer = device.makeBuffer(bytes: areaLightCDFs, length: areaLightCDFs.count * MemoryLayout<Float>.size, options: options)
         
 #if !os(iOS)
         lightBuffer?.didModifyRange(0..<lightBuffer!.length)
         lightTriangleBuffer?.didModifyRange(0..<lightTriangleBuffer!.length)
         lightIndicesBuffer?.didModifyRange(0..<lightIndicesBuffer!.length)
         environmentMapCDFBuffer?.didModifyRange(0..<environmentMapCDFBuffer!.length)
+//        areaLightCDFBuffer?.didModifyRange(0..<areaLightCDFBuffer!.length)
 #endif
     }
     
@@ -643,8 +645,8 @@ class GameScene: ObservableObject {
         GOLD.color.value = SIMD3<Float>(1.0, 0.84, 0.6)
         GOLD.roughness.value = 0.35
         let dragonGeometry = ModelIOGeometry(device: device, modelURL: dragonURL, defaultColor: .one, defaultMaterial: GOLD)
-        let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
-        let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
+//        let angelGeometry = ObjGeometry(device: device, objURL: angelURL, color: .one, material: GLASS)
+//        let saintGeometry = ModelIOGeometry(device: device, modelURL: saintURL, defaultColor: .one, defaultMaterial: GLASS)
         
         //        addInstance(with: angelGeometry,
         //                    translation: SIMD3<Float>(0, 0, 0),
@@ -1310,7 +1312,8 @@ class GameScene: ObservableObject {
         cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
                            (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
                            (SIMD3<Float>(0.17440492, 0.8747897, -0.7373735), SIMD3<Float>(2.29272, -2.6299663, 7.276931)),
-                           (SIMD3<Float>(-14.601961, 3.1426682, -1.5453186), SIMD3<Float>(-5.979579, 1.3546469, 0.31400716))
+                           (SIMD3<Float>(-14.601961, 3.1426682, -1.5453186), SIMD3<Float>(-5.979579, 1.3546469, 0.31400716)),
+                           (SIMD3<Float>(0.17043182, 0.72948277, -0.16555624), SIMD3<Float>(0.6853374, -1.058545, 8.639974))
         ]
         
         (cameraPosition, cameraTarget) = cameraLocations[3]
@@ -1456,14 +1459,11 @@ class GameScene: ObservableObject {
 //        }
         
 //
-        addAssimpInstance(fileName: "koenigsegg_one_pro", fileExtension: "glb",
-                          translation: .zero,
-                          scale: 10 * .one)
-////        
-//        addAssimpInstance(fileName: "BistroExterior", fileExtension: "fbx",
-//                          translation: .zero,
-//                          scale: 1 * .one)
-//
+//        let koenigseggGeometry = addAssimpGeometry(fileName: "koenigsegg_one_pro", fileExtension: "glb", emissionAmplifier: 2.0)
+//        addInstance(with: koenigseggGeometry, scale: 10 * .one)
+        
+        let bistroGeometry = addAssimpGeometry(fileName: "BistroExterior", fileExtension: "fbx", emissionAmplifier: 200.0)
+        addInstance(with: bistroGeometry)
 
         
 //        var roughMetal = MIRROR
@@ -1685,7 +1685,7 @@ class GameScene: ObservableObject {
 //        
 //
         
-        let lightBallGeometry = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(0.01, 0.0, 0.0))
+        let lightBallGeometry = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(0.1, 0.0, 0.0))
         let lightBallGeometry2 = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(0.0, 0.0, 10.0))
         
         addInstance(with: lightBallGeometry,
@@ -1710,57 +1710,73 @@ class GameScene: ObservableObject {
         
         guard let lightGeometry = geometry.getLightGeometry() else { fatalError("Could not find light geometry") }
         
-        if !geometry.vertices.isEmpty {
-            geometry.uploadToBuffers()
-            addGeometry(geometry)
-            
-            let opaqueInstance = GeometryInstance(geometry: geometry,
-                                                  translation: translation,
-                                                  rotation: rotation,
-                                                  scale: scale,
-                                                  mask: GEOMETRY_MASK_TRIANGLE | mask)
-            addInstance(opaqueInstance)
-        }
+        geometry.uploadToBuffers()
+        addGeometry(geometry)
         
-        if !lightGeometry.vertices.isEmpty {
-            lightGeometry.lightAmplifier = lightAmplifier
-            lightGeometry.uploadToBuffers()
-            addGeometry(lightGeometry)
-            print("LIGHT")
-            let lightInstance = GeometryInstance(geometry: lightGeometry,
-                                                 translation: translation,
-                                                 rotation: rotation,
-                                                 scale: scale,
-                                                 mask: GEOMETRY_MASK_LIGHT)
-            
-            addLight(lightInstance: lightInstance)
-            instances.append(lightInstance)
+        let opaqueInstance = GeometryInstance(geometry: geometry,
+                                              translation: translation,
+                                              rotation: rotation,
+                                              scale: scale,
+                                              mask: GEOMETRY_MASK_TRIANGLE | mask)
+        addInstance(opaqueInstance)
+        
+        instanceLightIndices.append(Int32(lights.count))
+        
+        for light in geometry.areaLights {
+            let (instanceLightTriangles, totalArea) = getLightTriangles(areaLight: light, transform: opaqueInstance.transform)
+
+            let areaLight = Light(type: AREA_LIGHT,
+                                  index: UInt32(instances.count - 1),
+                                  delta: false,
+                                  position: .zero,
+                                  color: light.averageEmission,
+                                  firstTriangleIndex: UInt32(lightTriangles.count),
+                                  triangleCount: UInt32(instanceLightTriangles.count),
+                                  totalArea: totalArea,
+                                  direction: .zero
+            )
+
+            lightTriangles.append(contentsOf: instanceLightTriangles)
+            lights.append(areaLight)
         }
     }
     
-    func addLight(lightInstance: GeometryInstance) {
-        let (newLightTriangles, newLightArea, averageColor) = lightInstance.getLightTriangles()
+    func getLightTriangles(areaLight: AreaLight, transform: simd_float4x4) -> ([LightTriangle], Float) {
+        let vertices = areaLight.vertices
+        let UVs = areaLight.UVs
+        var instanceLightTriangles: [LightTriangle] = []
+        var totalArea: Float = 0
+
+        for i in 0..<vertices.count / 3 {
+            let v0World = transform * SIMD4<Float>(vertices[3 * i + 0], 1.0)
+            let v1World = transform * SIMD4<Float>(vertices[3 * i + 1], 1.0)
+            let v2World = transform * SIMD4<Float>(vertices[3 * i + 2], 1.0)
+            
+            let v0 = SIMD3<Float>(v0World.x, v0World.y, v0World.z)
+            let v1 = SIMD3<Float>(v1World.x, v1World.y, v1World.z)
+            let v2 = SIMD3<Float>(v2World.x, v2World.y, v2World.z)
+            
+            let area = 0.5 * length(cross(v1 - v0, v2 - v0))
+            totalArea += area
+            
+            instanceLightTriangles.append(LightTriangle(v0: v0, v1: v1, v2: v2,
+                                                        uv0: UVs[3 * i + 0], uv1: UVs[3 * i + 1], uv2: UVs[3 * i + 2],
+                                                        emission: areaLight.emission,
+                                                        CDF: totalArea)
+            )
+        }
         
-        let newLight = Light(type: AREA_LIGHT,
-                             index: UInt32(lights.count),
-                             delta: 0,
-                             position: lightInstance.translation,
-                             color: averageColor,
-                             firstTriangleIndex: UInt32(lightTriangles.count),
-                             triangleCount: UInt32(newLightTriangles.count),
-                             totalArea: newLightArea,
-                             direction: .zero
-        )
+        for i in 0..<instanceLightTriangles.count {
+            instanceLightTriangles[i].CDF /= totalArea
+        }
         
-        lightIndices.append(Int32(lights.count))
-        lightTriangles += newLightTriangles
-        lights.append(newLight)
+        return (instanceLightTriangles, totalArea)
     }
-    
+            
     func addPointLight(position: SIMD3<Float>, color: SIMD3<Float>) {
         let newPointLight = Light(type: POINT_LIGHT,
                                   index: UInt32(lights.count),
-                                  delta: 1,
+                                  delta: true,
                                   position: position,
                                   color: color,
                                   firstTriangleIndex: 0,
@@ -1775,7 +1791,7 @@ class GameScene: ObservableObject {
     func addDirectionalLight(direction: SIMD3<Float>, color: SIMD3<Float>) {
         let newDirectionalLight = Light(type: DIRECTIONAL_LIGHT,
                                         index: UInt32(lights.count),
-                                        delta: 1,
+                                        delta: true,
                                         position: .zero,
                                         color: color,
                                         firstTriangleIndex: 0,
@@ -1788,9 +1804,7 @@ class GameScene: ObservableObject {
     
     func addEnvironmentMap(textureURL: URL) {
         let textureLoader = MTKTextureLoader(device: device)
-        let options: [MTKTextureLoader.Option: Any] = [
-            .SRGB: false
-        ]
+        let options: [MTKTextureLoader.Option: Any] = [.SRGB: false]
         
         do {
             environmentMapTexture = try textureLoader.newTexture(URL: textureURL, options: options)
@@ -1803,14 +1817,14 @@ class GameScene: ObservableObject {
         environmentMapCDF = CDF
         
         let newEnvironmentLight = Light(type: ENVIRONMENT_MAP,
-                                      index: UInt32(lights.count),
-                                      delta: 0,
-                                      position: .zero,
-                                      color: averageColor,
-                                      firstTriangleIndex: 0,
-                                      triangleCount: 0,
-                                      totalArea: 0,
-                                      direction: .zero)
+                                        index: UInt32(lights.count),
+                                        delta: false,
+                                        position: .zero,
+                                        color: averageColor,
+                                        firstTriangleIndex: 0,
+                                        triangleCount: 0,
+                                        totalArea: 0,
+                                        direction: .zero)
 
         lights.append(newEnvironmentLight)
     }
@@ -1857,22 +1871,16 @@ class GameScene: ObservableObject {
             CDF[i] /= totalLuminance
         }
         
-        print(CDF[height * width - 1])
-
         return (CDF, averageRGB)
     }
     
-    func addAssimpInstance(fileName: String, fileExtension: String, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one) {
+    func addAssimpGeometry(fileName: String, fileExtension: String, defaultMaterial: Material? = nil, emissionAmplifier: Float = 1.0) -> AssimpGeometry {
         if let modelPath = Bundle.main.path(forResource: fileName, ofType: fileExtension) {
-            let geometry = AssimpGeometry(device: device, modelPath: modelPath)
-            
-            addInstance(with: geometry,
-                        translation: translation,
-                        rotation: rotation,
-                        scale: scale
-            )
+            let geometry = AssimpGeometry(device: device, modelPath: modelPath, defaultMaterial: defaultMaterial, emissionAmplifier: emissionAmplifier)
+            addGeometry(geometry)
+            return geometry
         } else {
-            print("Failed to find resource ", fileName)
+            fatalError("Failed to find resource \(fileName)")
         }
     }
 }

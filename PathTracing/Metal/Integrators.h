@@ -36,8 +36,13 @@ float3 pathIntegrator(float2 pixel,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure,
                       constant Light *lights,
+                      
                       constant LightTriangle *lightTriangles,
-                      constant int *lightIndices,
+//                      constant int *lightIndices,
+                      
+//                      constant float* areaLightCDFs,
+                      constant int* instanceLightIndices,
+                      
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       thread Sampler& sampler,
@@ -52,7 +57,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    instance_acceleration_structure accelerationStructure,
                                    constant Light *lights,
                                    constant LightTriangle *lightTriangles,
-                                   constant int *lightIndices,
+                                   constant int* instanceLightIndices,
                                    texture2d<float> environmentMapTexture,
                                    constant float *environmentMapCDF,
                                    constant Textures* textures,
@@ -207,7 +212,7 @@ struct PathVertex {
         if (type == LIGHT_VERTEX) {
             float2 uv = getEnvironmentMapUV(w);
             return environmentMapEmission(uv, environmentMapTexture);
-        } else if (si.hitLight) {
+        } else if (si.hitLight()) {
             return lights[si.lightIndex].color;
         }
         
@@ -233,7 +238,7 @@ struct PathVertex {
     }
     
     inline bool isLight() {
-        return type == LIGHT_VERTEX || (type == SURFACE_VERTEX && si.hitLight);
+        return type == LIGHT_VERTEX || (type == SURFACE_VERTEX && si.hitLight());
     }
     
     inline bool isInfiniteLight() {

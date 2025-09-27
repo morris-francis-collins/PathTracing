@@ -24,21 +24,23 @@ struct SurfaceInteraction {
     float3 position;
     float3 normal;
     SampledMaterial material;
-    float3 textureColor;
-    bool hitLight;
     int lightIndex;
+    float3 emission;
     
     SurfaceInteraction() {
         
     }
     
-    SurfaceInteraction(float3 _position, float3 _normal, SampledMaterial _material, float3 _textureColor = float3(1.0f), bool _hitLight = false, int _lightIndex = -1) {
+    SurfaceInteraction(float3 _position, float3 _normal, SampledMaterial _material, int _lightIndex, float3 _emission) {
         position = _position;
         normal = _normal;
         material = _material;
-        textureColor = _textureColor;
-        hitLight = _hitLight;
         lightIndex = _lightIndex;
+        emission = _emission;
+    }
+    
+    bool hitLight() {
+        return lightIndex != -1;
     }
 };
 
@@ -56,7 +58,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
-                                         constant int *lightIndices,
+                                         constant int* instanceLightIndices,
                                          int resourcesStride,
                                          constant Textures* textures
                                          );

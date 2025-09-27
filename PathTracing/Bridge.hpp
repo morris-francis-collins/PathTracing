@@ -2,7 +2,7 @@
 //  Bridge.hpp
 //  PathTracing
 //
-//  Created by Moritz Kohlenz on 9/18/25.
+//  Created on 9/18/25.
 //
 
 #import "Metal/Utility.h"

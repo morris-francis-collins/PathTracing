@@ -44,8 +44,12 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float, access::read_write> splatTex,
                              texture2d<float, access::write> finalImage,
                              texture2d<float> environmentMapTexture,
+                             
                              constant LightTriangle *lightTriangles,
-                             constant int *lightIndices,
+//                             constant int *lightIndices,
+//                             constant float* areaLightCDFs,
+                             constant int* instanceLightIndices,
+                             
                              constant float *environmentMapCDF,
                              constant Textures* textures
                              )
@@ -60,10 +64,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         return;
 
     float3 ptContribution = float3(0.0f);
-    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, sampler, textures);
+    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, sampler, textures);
     
     float3 bdptContribution = float3(0.0f);
-//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, lightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer);
+//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer);
     
     float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;

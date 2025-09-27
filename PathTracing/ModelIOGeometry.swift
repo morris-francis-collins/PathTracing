@@ -438,7 +438,7 @@ class ModelIOGeometry: Geometry {
         var resourceArray: [MTLResource] = []
         
         if let nb = vertexNormalBuffer { resourceArray.append(nb) }
-        if let cb = vertexColorBuffer { resourceArray.append(cb) }
+//        if let cb = vertexColorBuffer { resourceArray.append(cb) }
         if let mb = materialBuffer { resourceArray.append(mb) }
         if let tx = textureCoordinatesBuffer { resourceArray.append(tx) }
         

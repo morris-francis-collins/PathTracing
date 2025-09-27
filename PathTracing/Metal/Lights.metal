@@ -39,7 +39,7 @@ LightTriangle getLightTriangle(constant Light& areaLight, constant LightTriangle
     while (left < right) {
         int mid = (left + right) / 2;
 
-        if (r < lightTriangles[mid].cdf) {
+        if (r < lightTriangles[mid].CDF) {
             right = mid;
         } else {
             left = mid + 1;
@@ -52,6 +52,7 @@ LightTriangle getLightTriangle(constant Light& areaLight, constant LightTriangle
 LightSample sampleAreaLight(float3 position,
                             constant Light& areaLight,
                             constant LightTriangle *lightTriangles,
+                            constant Textures* textures,
                             float3 r3
                             )
 {
@@ -69,13 +70,20 @@ LightSample sampleAreaLight(float3 position,
     float3 edge1 = triangle.v1 - triangle.v0;
     float3 edge2 = triangle.v2 - triangle.v0;
     float3 lightPosition = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
+    float2 lightUV = triangle.uv0 + v * triangle.uv1 + w * triangle.uv2;
     float3 normal = normalize(cross(edge1, edge2));
         
     float3 wo = lightPosition - position;
     float d = length(wo);
     wo /= d;
     
-    return LightSample(lightPosition, normal, wo, areaLight.color, d, 1.0f / areaLight.totalArea);
+    float3 emission = triangle.emission.value;
+    constexpr sampler textureSampler(address::repeat, filter::linear);
+    if (triangle.emission.textureIndex != -1) {
+        emission *= textures->textures[triangle.emission.textureIndex].sample(textureSampler, lightUV).rgb;
+    }
+
+    return LightSample(lightPosition, normal, wo, triangle.emission.value, d, 1.0f / areaLight.totalArea);
 }
 
 LightEmissionSample sampleAreaLightEmission(constant Light& areaLight, constant LightTriangle *lightTriangles, float2 r2, float3 r3) {
@@ -254,10 +262,9 @@ float getLightPower(constant Light& light) {
 }
 
 constant Light& selectLight(constant Light *lights,
-                  constant LightTriangle *lightTriangles,
-                  constant Uniforms& uniforms,
-                  float r,
-                  thread float& selectionPDF
+                            constant Uniforms& uniforms,
+                            float r,
+                            thread float& selectionPDF
                   )
 {
     float weights[MAX_LIGHTS];
@@ -307,6 +314,7 @@ float getLightSelectionPDF(constant Light& light, constant Light *lights, consta
 LightSample sampleLight(float3 position,
                         constant Light& light,
                         constant LightTriangle *lightTriangles,
+                        constant Textures* textures,
                         texture2d<float> environmentMapTexture,
                         constant float *environmentMapCDF,
                         float3 r3
@@ -316,7 +324,7 @@ LightSample sampleLight(float3 position,
         case POINT_LIGHT:
             return samplePointLight(position, light);
         case AREA_LIGHT:
-            return sampleAreaLight(position, light, lightTriangles, r3);
+            return sampleAreaLight(position, light, lightTriangles, textures, r3);
         case DIRECTIONAL_LIGHT:
             return sampleDirectionalLight(position, light);
         case ENVIRONMENT_MAP:

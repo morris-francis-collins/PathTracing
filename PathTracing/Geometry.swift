@@ -7,6 +7,14 @@
 
 import ModelIO
 import MetalKit
+import Foundation
+
+struct AreaLight {
+    let emission: VectorParameter
+    let averageEmission: SIMD3<Float>
+    let vertices: [SIMD3<Float>]
+    let UVs: [SIMD2<Float>]
+}
 
 class Geometry {
     let device: MTLDevice
@@ -18,6 +26,7 @@ class Geometry {
     var materialBuffer: MTLBuffer?
     var vertexTangentBuffer: MTLBuffer?
     var vertexBitangentBuffer: MTLBuffer?
+    var primitiveLightIndicesBuffer: MTLBuffer?
 
     var vertices: [SIMD3<Float>] = []
     var normals: [SIMD3<Float>] = []
@@ -26,7 +35,9 @@ class Geometry {
     var materials: [Material] = []
     var tangents: [SIMD3<Float>] = []
     var bitangents: [SIMD3<Float>] = []
+    var primitiveLightIndices: [Int32] = []
     
+    var areaLights: [AreaLight] = []
     var lightGeometry: LightGeometry?
     var inwardsNormals: Bool = false
         
@@ -81,6 +92,13 @@ class Geometry {
                                               options: options)
             
         }
+        
+        if !primitiveLightIndices.isEmpty {
+            primitiveLightIndicesBuffer = device.makeBuffer(bytes: primitiveLightIndices,
+                                              length: primitiveLightIndices.count * MemoryLayout<Int32>.stride,
+                                              options: options)
+    
+        }
 
         #if !os(iOS)
         if let buffer = vertexPositionBuffer {
@@ -110,6 +128,11 @@ class Geometry {
         if let buffer = vertexBitangentBuffer {
             buffer.didModifyRange(0..<buffer.length)
         }
+        
+        if let buffer = primitiveLightIndicesBuffer {
+            buffer.didModifyRange(0..<buffer.length)
+        }
+
         #endif
     }
 
@@ -140,6 +163,7 @@ class ObjGeometry: Geometry {
         
         self.inwardsNormals = inwardsNormals
         self.material = material
+        self.material?.emission = VectorParameter(value: emissionColor, textureIndex: -1)
         
         guard let fileContent = try? String(contentsOf: objURL, encoding: .utf8) else {
             print("Failed to read OBJ file from \(objURL)")
@@ -215,29 +239,53 @@ class ObjGeometry: Geometry {
             fatalError("Couldn't load texture: \(error)")
         }
         
+        let isEmissive = simd_length_squared(emissionColor) > 1e-4
+        let primitiveLightIndex = Int32(isEmissive ? 0 : -1)
+//        print("Primitive light index", primitiveLightIndex)
+        var totalArea: Float = 0.0
+        var lightTriangles: [LightTriangle] = []
+        
         for face in faces {
             for vertex in face {
                 let pos = positions[vertex.v]
                 let norm = normalsArray[vertex.n]
                 let uv = textureCoordinates[vertex.vt]
                 
-                if let lightGeo = lightGeometry, length(emissionColor) > 1e-4 {
-                    lightGeo.vertices.append(pos)
-                    lightGeo.normals.append(inwardsNormals ? -norm : norm)
-                    lightGeo.colors.append(color)
-                    lightGeo.texCoords.append(uv)
-                    lightGeo.materials.append(self.material!)
-                    lightGeo.lightColors.append(emissionColor)
-                } else {
-                    vertices.append(pos)
-                    normals.append(inwardsNormals ? -norm : norm)
-                    colors.append(color)
-                    texCoords.append(uv)
-                    materials.append(self.material!)
-                }                
+                vertices.append(pos)
+                normals.append(inwardsNormals ? -norm : norm)
+                texCoords.append(uv)
+                materials.append(self.material!)
+                primitiveLightIndices.append(primitiveLightIndex)
+            }
+            
+            if isEmissive {
+                let i0 = vertices.count - 1
+                let i1 = vertices.count - 2
+                let i2 = vertices.count - 3
+
+                let v0 = vertices[i0]
+                let v1 = vertices[i1]
+                let v2 = vertices[i2]
+                let e0 = v1 - v0
+                let e1 = v2 - v0
+
+                let area = 0.5 * length(simd_cross(e0, e1))
+                totalArea += area
+                lightTriangles.append(LightTriangle(v0: v0, v1: v1, v2: v2,
+                                                    uv0: texCoords[i0], uv1: texCoords[i1], uv2: texCoords[i2],
+                                                    emission: self.material!.emission,
+                                                    CDF: totalArea)
+                )
             }
         }
 
+        if isEmissive {
+            for i in 0..<lightTriangles.count {
+                lightTriangles[i].CDF /= totalArea
+            }
+            areaLights.append(AreaLight(emission: self.material!.emission, averageEmission: emissionColor, vertices: vertices, UVs: texCoords))
+        }
+        
         uploadToBuffers()
     }
         
@@ -253,9 +301,9 @@ class ObjGeometry: Geometry {
         var resourceArray: [MTLResource] = []
         
         if let nb = vertexNormalBuffer { resourceArray.append(nb) }
-        if let cb = vertexColorBuffer { resourceArray.append(cb) }
         if let mb = materialBuffer { resourceArray.append(mb) }
         if let tx = textureCoordinatesBuffer { resourceArray.append(tx) }
+        if let pi = primitiveLightIndicesBuffer { resourceArray.append(pi) }
 
         return resourceArray
     }
@@ -295,53 +343,5 @@ class GeometryInstance {
             MTLPackedFloat3Make(transform[2][0], transform[2][1], transform[2][2]),
             MTLPackedFloat3Make(transform[3][0], transform[3][1], transform[3][2])
         )
-    }
-    
-    func getLightTriangles() -> ([LightTriangle], Float, SIMD3<Float>) {
-        var lightTriangles: [LightTriangle] = []
-        var totalArea: Float = 0.0
-        var averageEmission = SIMD3<Float>(0.0, 0.0, 0.0)
-        
-        let vertices = geometry.vertices
-        guard let lightColors = (geometry as? LightGeometry)?.lightColors,
-              let lightAmplifier = (geometry as? LightGeometry)?.lightAmplifier else { fatalError("Could not get light geometry") }
-        
-        for i in stride(from: 0, to: vertices.count, by: 3) {
-            if i + 2 < vertices.count {
-                let worldV0 = transform * SIMD4<Float>(vertices[i], 1.0)
-                let worldV1 = transform * SIMD4<Float>(vertices[i + 1], 1.0)
-                let worldV2 = transform * SIMD4<Float>(vertices[i + 2], 1.0)
-                
-                let v0 = SIMD3<Float>(worldV0.x, worldV0.y, worldV0.z)
-                let v1 = SIMD3<Float>(worldV1.x, worldV1.y, worldV1.z)
-                let v2 = SIMD3<Float>(worldV2.x, worldV2.y, worldV2.z)
-                
-                let edge1 = v1 - v0
-                let edge2 = v2 - v0
-                
-                let area = 0.5 * simd_length(cross(edge1, edge2))
-                totalArea += area
-                
-                let emission0 = lightColors[i] * lightAmplifier
-                let emission1 = lightColors[i + 1] * lightAmplifier
-                let emission2 = lightColors[i + 2] * lightAmplifier
-                
-                averageEmission += emission0 + emission1 + emission2
-                
-                let triangle = LightTriangle(v0: v0, v1: v1, v2: v2,
-                                             emission0: emission0, emission1: emission1, emission2: emission2,
-                                             area: area, cdf: 0.0)
-                
-                lightTriangles.append(triangle)
-            }
-        }
-        
-        var cumulativeArea: Float = 0.0
-        for i in 0..<lightTriangles.count {
-            cumulativeArea += lightTriangles[i].area
-            lightTriangles[i].cdf = cumulativeArea / totalArea
-        }
-        print(totalArea)
-        return (lightTriangles, totalArea, averageEmission / Float(lightColors.count))
     }
 }

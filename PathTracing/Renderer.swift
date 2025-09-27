@@ -321,7 +321,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 geometryDescriptor.intersectionFunctionTableOffset = i
                 let accelDescriptor = MTLPrimitiveAccelerationStructureDescriptor()
                 accelDescriptor.geometryDescriptors = [geometryDescriptor]
-//                accelDescriptor.usage = .extendedLimits
+//                accelDescriptor.usage =
                 let accelStructure = newAccelerationStructure(descriptor: accelDescriptor)
                 primitiveAccelerationStructures.append(accelStructure)
             } else {
@@ -498,17 +498,12 @@ class Renderer: NSObject, MTKViewDelegate {
         computeEncoder.setTexture(finalImage, index: 5)
         computeEncoder.setTexture(scene.environmentMapTexture, index: 6)
         computeEncoder.setBuffer(scene.lightTriangleBuffer, offset: 0, index: 7)
-        computeEncoder.setBuffer(scene.lightIndicesBuffer, offset: 0, index: 8)
+        computeEncoder.setBuffer(scene.instanceLightIndicesBuffer, offset: 0, index: 8)
         computeEncoder.setBuffer(scene.environmentMapCDFBuffer, offset: 0, index: 9)
         computeEncoder.setBuffer(textureArgumentBuffer, offset: 0, index: 10)
 
         let textures = TextureRegistry.shared.getTextures()
         computeEncoder.useResources(textures, usage: .read)
-
-//        let allTextures = TextureRegistry.shared.getTextures()
-//        for (index, texture) in allTextures.enumerated() {
-//            computeEncoder.setTexture(texture, index: 8 + index)
-//        }
 
         for geometry in scene.geometries {
             for resource in geometry.resources() {

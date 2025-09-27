@@ -2,7 +2,7 @@
 //  AssimpLoader.hpp
 //  PathTracing
 //
-//  Created by on 9/18/25.
+//  Created on 9/18/25.
 //
 
 #pragma once
@@ -41,6 +41,7 @@ struct MeshData {
     EmbeddedTexture* embeddedColorTexture = nullptr;
     EmbeddedTexture* embeddedRoughnessTexture = nullptr;
     EmbeddedTexture* embeddedMetallicTexture = nullptr;
+    EmbeddedTexture* embeddedEmissiveTexture = nullptr;
 };
 
 struct SceneData {

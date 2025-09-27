@@ -2,7 +2,7 @@
 //  AssimpLoader.cpp
 //  PathTracing
 //
-//  Created by on 9/18/25.
+//  Created on 9/18/25.
 //
 
 #include "AssimpLoader.hpp"
@@ -101,13 +101,11 @@ SceneData* loadModel(const char* path) {
         mesh.embeddedRoughnessTexture = nullptr;
         mesh.embeddedMetallicTexture = nullptr;
         
-        // Allocate vertex data
         mesh.vertexCount = aiMesh->mNumVertices;
         mesh.positions = new simd::float3[mesh.vertexCount];
         mesh.normals = new simd::float3[mesh.vertexCount];
         mesh.texCoords = new simd::float2[mesh.vertexCount];
         
-        // Copy vertex data
         for (unsigned int v = 0; v < aiMesh->mNumVertices; v++) {
             mesh.positions[v].x = aiMesh->mVertices[v].x;
             mesh.positions[v].y = aiMesh->mVertices[v].y;
@@ -129,7 +127,6 @@ SceneData* loadModel(const char* path) {
             }
         }
         
-        // Copy indices
         mesh.indexCount = 0;
         for (unsigned int f = 0; f < aiMesh->mNumFaces; f++) {
             mesh.indexCount += aiMesh->mFaces[f].mNumIndices;
@@ -143,9 +140,7 @@ SceneData* loadModel(const char* path) {
                 mesh.indices[idx++] = face.mIndices[i];
             }
         }
-        
-        // Initialize material with defaults
-        
+                
         mesh.material.color.value = simd::float3(0.8f);
         mesh.material.color.textureIndex = -1;
         
@@ -158,9 +153,11 @@ SceneData* loadModel(const char* path) {
         mesh.material.metallic.value = 0.0f;
         mesh.material.metallic.textureIndex = -1;
         
+        mesh.material.emission.value = simd::float3(0.0f);
+        mesh.material.emission.textureIndex = -1;
+        
         mesh.material.BXDFs = DIFFUSE;
         
-
         if (scene->mMaterials && aiMesh->mMaterialIndex < scene->mNumMaterials) {
             aiMaterial* mat = scene->mMaterials[aiMesh->mMaterialIndex];
             
@@ -181,9 +178,7 @@ SceneData* loadModel(const char* path) {
                 }
             }
 
-
             aiColor4D color;
-            
             if (mat->Get(AI_MATKEY_BASE_COLOR, color) == AI_SUCCESS) {
                 mesh.material.color.value.x = color.r;
                 mesh.material.color.value.y = color.g;
@@ -216,9 +211,21 @@ SceneData* loadModel(const char* path) {
             }
             mesh.material.metallic.value = metallic;
             
+            aiColor4D emission;
+            if (mat->Get(AI_MATKEY_COLOR_EMISSIVE, emission) == AI_SUCCESS) {
+                mesh.material.emission.value.x = emission.r;
+                mesh.material.emission.value.y = emission.g;
+                mesh.material.emission.value.z = emission.b;
+            }
+            
+            float emissiveIntensity = 1.0f;
+            if (mat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emissiveIntensity) == AI_SUCCESS) {
+                mesh.material.emission.value *= emissiveIntensity;
+            }
+            
             mesh.material.BXDFs = determineBXDF(metallic, roughness, opacity, ior);
+            
             aiString texPath;
-                 
             if (mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texPath) == AI_SUCCESS) {
                 mesh.embeddedColorTexture = extractEmbeddedTexture(scene, texPath.C_Str());
                 printf("Found embedded color texture: %s\n", texPath.C_Str());
@@ -235,6 +242,14 @@ SceneData* loadModel(const char* path) {
             if (mat->GetTexture(aiTextureType_METALNESS, 0, &texPath) == AI_SUCCESS) {
                 mesh.embeddedMetallicTexture = extractEmbeddedTexture(scene, texPath.C_Str());
                 printf("Found embedded metallic texture: %s\n", texPath.C_Str());
+            }
+            
+            if (mat->GetTexture(aiTextureType_EMISSION_COLOR, 0, &texPath) == AI_SUCCESS) {
+                mesh.embeddedEmissiveTexture = extractEmbeddedTexture(scene, texPath.C_Str());
+                printf("Found embedded emission color texture: %s\n", texPath.C_Str());
+            } else if (mat->GetTexture(aiTextureType_EMISSIVE, 0, &texPath) == AI_SUCCESS) {
+                mesh.embeddedEmissiveTexture = extractEmbeddedTexture(scene, texPath.C_Str());
+                printf("Found embedded emissive texture: %s\n", texPath.C_Str());
             }
         }
     }

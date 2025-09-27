@@ -16,7 +16,7 @@
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
-#define ENVIRONMENT_MAP_SCALE 10
+#define ENVIRONMENT_MAP_SCALE 3
 
 enum LightType : unsigned int {
     POINT_LIGHT = 0,
@@ -28,7 +28,7 @@ enum LightType : unsigned int {
 struct Light {
     enum LightType type;
     unsigned int index;
-    int delta;
+    bool delta;
     vector_float3 position;
     vector_float3 color;
     unsigned int firstTriangleIndex; // area lights only
@@ -38,14 +38,10 @@ struct Light {
 };
 
 struct LightTriangle {
-    vector_float3 v0;
-    vector_float3 v1;
-    vector_float3 v2;
-    vector_float3 emission0;
-    vector_float3 emission1;
-    vector_float3 emission2;
-    float area;
-    float cdf;
+    vector_float3 v0, v1, v2;
+    vector_float2 uv0, uv1, uv2;
+    VectorParameter emission;
+    float CDF;
 };
 
 #ifdef __METAL_VERSION__
@@ -99,13 +95,14 @@ LightSample sampleAreaLight(constant Light& areaLight, constant LightTriangle *l
 
 LightSample sampleLight(float3 position,
                         constant Light& light,
-                        constant LightTriangle *lightTriangles,
+                        constant LightTriangle* lightTriangles,
+                        constant Textures* textures,
                         texture2d<float> environmentMapTexture,
                         constant float *environmentMapCDF,
                         float3 r3
                         );
 
-constant Light& selectLight(constant Light *lights, constant LightTriangle *lightTriangles, constant Uniforms& uniforms, float r, thread float& selectionPDF);
+constant Light& selectLight(constant Light *lights, constant Uniforms& uniforms, float r, thread float& selectionPDF);
 
 LightEmissionSample sampleLightEmission(constant Light& light,
                                         constant LightTriangle *lightTriangles,

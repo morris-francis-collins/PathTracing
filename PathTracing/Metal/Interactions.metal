@@ -13,9 +13,10 @@ using namespace raytracing;
 
 struct TriangleResources {
     device float3 *vertexNormals;
-    device float3 *vertexColors;
+//    device float3 *vertexColors;
     device Material *vertexMaterials;
     device float2 *vertexUVs;
+    device int *vertexPrimitiveLightIndices;
 };
 
 IntersectionResult intersect(ray ray,
@@ -52,10 +53,10 @@ IntersectionResult intersect(ray ray,
 }
 
 void sampleBXDF(thread SampledMaterial& material) {
-    if (material.refraction > 1.01f) {
-        material.BXDFs = SPECULAR_TRANSMISSION;
-    } else if (material.metallic > 0.5f) {
+    if (material.metallic > 0.5f) {
         material.BXDFs = CONDUCTOR;
+    } else if (material.refraction > 1.01f) {
+        material.BXDFs = SPECULAR_TRANSMISSION;
     } else {
         material.BXDFs = DIFFUSE;
     }
@@ -106,7 +107,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
-                                         constant int *lightIndices,
+                                         constant int* instanceLightIndices,
                                          int resourcesStride,
                                          constant Textures* textures
                                          )
@@ -117,27 +118,35 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     unsigned int instanceIndex = intersection.instance_id;
     unsigned int mask = instances[instanceIndex].mask;
     float4x3 objectToWorldTransform = intersection.object_to_world_transform;
-    
-    
+
     unsigned primitiveIndex = intersection.primitive_id;
     unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
     float2 barycentric_coords = intersection.triangle_barycentric_coord;
     
     device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
-    
     float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
     float3 worldNormal = normalize(transformDirection(objectNormal, objectToWorldTransform));
     surfaceInteraction.normal = worldNormal;
     
+    float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
+
     Material material = triangleResources.vertexMaterials[primitiveIndex];
     
-    surfaceInteraction.hitLight = mask & GEOMETRY_MASK_LIGHT;
-    surfaceInteraction.lightIndex = lightIndices[instanceIndex];
-    
-    float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
-    
+    int primitiveLightIndex = triangleResources.vertexPrimitiveLightIndices[primitiveIndex];
+    if (primitiveLightIndex != -1) {
+        surfaceInteraction.lightIndex = instanceLightIndices[instanceIndex] + primitiveLightIndex;
+        constexpr sampler textureSampler(address::repeat, filter::linear);
+        
+        surfaceInteraction.emission = material.emission.value;
+        if (material.emission.textureIndex != -1) {
+            surfaceInteraction.emission *= textures->textures[material.emission.textureIndex].sample(textureSampler, uv).rgb;
+        }
+    } else {
+        surfaceInteraction.lightIndex = -1;
+        surfaceInteraction.emission = float3(0.0f);
+    }
+        
     surfaceInteraction.material = sampleMaterial(material, uv, textures);
-    surfaceInteraction.textureColor = float3(1.0f);
 
     return surfaceInteraction;
 }
