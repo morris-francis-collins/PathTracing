@@ -1876,7 +1876,7 @@ class GameScene: ObservableObject {
     
     func addAssimpGeometry(fileName: String, fileExtension: String, defaultMaterial: Material? = nil, emissionAmplifier: Float = 1.0) -> AssimpGeometry {
         if let modelPath = Bundle.main.path(forResource: fileName, ofType: fileExtension) {
-            let geometry = AssimpGeometry(device: device, modelPath: modelPath, defaultMaterial: defaultMaterial, emissionAmplifier: emissionAmplifier)
+            let geometry = AssimpGeometry(device: device, modelPath: modelPath, defaultMaterial: defaultMaterial, defaultTexture: <#TextureInfo#>, emissionAmplifier: emissionAmplifier)
             addGeometry(geometry)
             return geometry
         } else {
