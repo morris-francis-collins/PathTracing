@@ -44,18 +44,15 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float, access::read_write> splatTex,
                              texture2d<float, access::write> finalImage,
                              texture2d<float> environmentMapTexture,
-                             
                              constant LightTriangle *lightTriangles,
-//                             constant int *lightIndices,
-//                             constant float* areaLightCDFs,
                              constant int* instanceLightIndices,
-                             
                              constant float *environmentMapCDF,
-                             constant Textures* textures
+                             constant Textures* textures,
+                             constant Material* materials
                              )
 {
     unsigned int offset = randomTex.read(tid).x;
-    Sampler sampler = Sampler(HALTON, offset, uniforms.frameIndex);
+    Sampler sampler(offset, uniforms.frameIndex);
     
     float2 pixel = (float2) tid;
     pixel += sampler.r2() - 0.5f;
@@ -64,10 +61,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         return;
 
     float3 ptContribution = float3(0.0f);
-    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, sampler, textures);
+    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, sampler, textures, materials);
     
     float3 bdptContribution = float3(0.0f);
-//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer);
+//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer, materials);
     
     float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;

@@ -17,10 +17,29 @@ func createStaticMaterial(color: SIMD3<Float>, refraction: Float, roughness: Flo
                     )
 }
 
-var GLASS = createStaticMaterial(color: .zero, refraction: 1.5, roughness: 0.0, metallic: 0.0, emission: .zero, BXDFs: SPECULAR_TRANSMISSION)
-var PLASTIC = createStaticMaterial(color: 0.7 * .one, refraction: 1, roughness: 0.9, metallic: 0.0, emission: .zero, BXDFs: DIFFUSE)
-var MIRROR = createStaticMaterial(color: .one, refraction: 1.5, roughness: 0.0, metallic: 1.0, emission: .zero, BXDFs: CONDUCTOR)
-var WATER = createStaticMaterial(color: .one, refraction: 1.3, roughness: 0.0, metallic: 0.0, emission: .zero, BXDFs: SPECULAR_TRANSMISSION)
+func createEmissiveMaterial(color: SIMD3<Float>) -> Material {
+    return createStaticMaterial(color: .one, refraction: 1.0, roughness: 0.0, metallic: 0.0, emission: color, BXDFs: DIFFUSE)
+}
+
+func colorMaterial(material: Material, color: SIMD3<Float>) -> Material {
+    var newMaterial = material
+    newMaterial.color.value = color
+    return newMaterial
+}
+
+let GLASS = createStaticMaterial(color: .one, refraction: 1.5, roughness: 0.0, metallic: 0.0, emission: .zero, BXDFs: SPECULAR_TRANSMISSION)
+let PLASTIC = createStaticMaterial(color: 0.7 * .one, refraction: 1, roughness: 0.9, metallic: 0.0, emission: .zero, BXDFs: DIFFUSE)
+let MIRROR = createStaticMaterial(color: .one, refraction: 1.5, roughness: 0.0, metallic: 1.0, emission: .zero, BXDFs: CONDUCTOR)
+let WATER = createStaticMaterial(color: .one, refraction: 1.3, roughness: 0.0, metallic: 0.0, emission: .zero, BXDFs: SPECULAR_TRANSMISSION)
+let EMISSIVE = createStaticMaterial(color: .one, refraction: 1, roughness: 0.0, metallic: 0.0, emission: .one, BXDFs: SPECULAR_TRANSMISSION)
+
+let RED = SIMD3<Float>(1.0, 0.0, 0.0)
+let ORANGE = SIMD3<Float>(1.0, 0.647, 0.0)
+let YELLOW = SIMD3<Float>(1.0, 1.0, 0.0)
+let GREEN = SIMD3<Float>(0.0, 1.0, 0.0)
+let BLUE = SIMD3<Float>(0.0, 0.0, 1.0)
+let INDIGO = SIMD3<Float>(0.294, 0.0, 0.510)
+let BIOLET = SIMD3<Float>(0.933, 0.510, 0.933)
 
 let colors: [SIMD3<Float>] = [
     SIMD3(1.000, 0.000, 0.000),

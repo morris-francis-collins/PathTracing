@@ -48,6 +48,7 @@ IntersectionResult intersect(ray ray,
     intersection.triangle_barycentric_coord = i.get_committed_triangle_barycentric_coord();
     intersection.instance_id = i.get_committed_instance_id();
     intersection.object_to_world_transform = i.get_committed_object_to_world_transform();
+    intersection.primitive_data = i.get_committed_primitive_data();
     
     return intersection;
 }
@@ -109,7 +110,8 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          instance_acceleration_structure accelerationStructure,
                                          constant int* instanceLightIndices,
                                          int resourcesStride,
-                                         constant Textures* textures
+                                         constant Textures* textures,
+                                         constant Material* materials
                                          )
 {
     SurfaceInteraction surfaceInteraction;
@@ -123,20 +125,21 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
     float2 barycentric_coords = intersection.triangle_barycentric_coord;
     
-    device TriangleResources& triangleResources = *(device TriangleResources *)((device char *)resources + resourcesStride * resourceIndex);
-    float3 objectNormal = interpolateVertexAttribute(triangleResources.vertexNormals, primitiveIndex, barycentric_coords);
+    const device PrimitiveData* primitiveData = static_cast<const device PrimitiveData*>(intersection.primitive_data);
+
+    float3 objectNormal = interpolateVertexAttribute(primitiveData->n0, primitiveData->n1, primitiveData->n2, barycentric_coords);
     float3 worldNormal = normalize(transformDirection(objectNormal, objectToWorldTransform));
     surfaceInteraction.normal = worldNormal;
-    
-    float2 uv = interpolateVertexAttribute(triangleResources.vertexUVs, primitiveIndex, barycentric_coords);
 
-    Material material = triangleResources.vertexMaterials[primitiveIndex];
+    float2 uv = interpolateVertexAttribute(primitiveData->uv0, primitiveData->uv1, primitiveData->uv2, barycentric_coords);
     
-    int primitiveLightIndex = triangleResources.vertexPrimitiveLightIndices[primitiveIndex];
+    constant Material& material = materials[primitiveData->materialIndex];
+
+    int primitiveLightIndex = primitiveData->primitiveLightIndex;
     if (primitiveLightIndex != -1) {
         surfaceInteraction.lightIndex = instanceLightIndices[instanceIndex] + primitiveLightIndex;
         constexpr sampler textureSampler(address::repeat, filter::linear);
-        
+
         surfaceInteraction.emission = material.emission.value;
         if (material.emission.textureIndex != -1) {
             surfaceInteraction.emission *= textures->textures[material.emission.textureIndex].sample(textureSampler, uv).rgb;
@@ -145,9 +148,9 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
         surfaceInteraction.lightIndex = -1;
         surfaceInteraction.emission = float3(0.0f);
     }
-        
-    surfaceInteraction.material = sampleMaterial(material, uv, textures);
 
+    surfaceInteraction.material = sampleMaterial(material, uv, textures);
+    
     return surfaceInteraction;
 }
 

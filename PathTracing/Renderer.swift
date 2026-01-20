@@ -9,7 +9,7 @@ import MetalKit
 import simd
 import SwiftUI
 
-let maxFramesInFlight: Int = 1
+let maxFramesInFlight: Int = 5
 let alignedUniformsSize: Int = (MemoryLayout<Uniforms>.size + 255) & ~255
 
 class Renderer: NSObject, MTKViewDelegate {
@@ -26,7 +26,7 @@ class Renderer: NSObject, MTKViewDelegate {
     var copyPipeline: MTLRenderPipelineState!
     var clearBufferPipeline: MTLComputePipelineState!
     var finalizePipeline: MTLComputePipelineState!
-
+    
     var finalImage: MTLTexture?
     var accumulationTargets: [MTLTexture?] = [nil, nil]
     var splatTargets: [MTLTexture?] = [nil, nil]
@@ -54,6 +54,8 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var resourcesStride: Int = 0
     var useIntersectionFunctions: Bool = false
+    
+    var resourceHeap: MTLHeap!
     
     init(device: MTLDevice, scene: GameScene) {
         self.device = device
@@ -190,6 +192,18 @@ class Renderer: NSObject, MTKViewDelegate {
         return encoder
     }
     
+    func fixedArgumentEncoder() -> MTLArgumentEncoder {
+        var arguments: [MTLArgumentDescriptor] = []
+        for i in 0..<4 {
+            let desc = MTLArgumentDescriptor()
+            desc.index = i
+            desc.dataType = .pointer
+            desc.access = .readOnly
+            arguments.append(desc)
+        }
+        return device.makeArgumentEncoder(arguments: arguments)!
+    }
+    
     func createBuffers() {
         let uniformBufferSize = alignedUniformsSize * maxFramesInFlight
         let options: MTLResourceOptions = getManagedBufferStorageMode()
@@ -197,51 +211,39 @@ class Renderer: NSObject, MTKViewDelegate {
         
         scene.uploadToBuffers()
         
-        resourcesStride = 0
-        for geometry in scene.geometries {
-            let encoder = newArgumentEncoder(forResources: geometry.resources())
-            resourcesStride = max(resourcesStride, encoder.encodedLength)
-        }
+        let encoder = fixedArgumentEncoder()
+        resourcesStride = encoder.encodedLength
         
-        resourceBuffer = device.makeBuffer(length: resourcesStride * scene.geometries.count, options: options)
+        resourceBuffer = device.makeBuffer(
+            length: resourcesStride * scene.geometries.count,
+            options: options
+        )
         
         for (geometryIndex, geometry) in scene.geometries.enumerated() {
-            let encoder = newArgumentEncoder(forResources: geometry.resources())
             encoder.setArgumentBuffer(resourceBuffer, offset: resourcesStride * geometryIndex)
-            for (argumentIndex, resource) in geometry.resources().enumerated() {
-                if let bufferResource = resource as? MTLBuffer {
-                    encoder.setBuffer(bufferResource, offset: 0, index: argumentIndex)
-                } else if let textureResource = resource as? MTLTexture {
-                    encoder.setTexture(textureResource, index: argumentIndex)
-                }
-            }
+            geometry.encodeResources(to: encoder)
         }
         
         let bufferSize = Int(2 * PIXEL_WIDTH) * Int(2 * PIXEL_HEIGHT) * 3 * MemoryLayout<Float>.size
-        atomicSplatBuffer = device.makeBuffer(length: bufferSize,
-                                              options: .storageModeManaged)
+        atomicSplatBuffer = device.makeBuffer(
+            length: bufferSize,
+            options: .storageModeShared
+        )
         
         createTextureArgumentBuffer()
-
-#if !os(iOS)
-        resourceBuffer.didModifyRange(0..<resourceBuffer.length)
-        atomicSplatBuffer.didModifyRange(0..<atomicSplatBuffer.length)
-#endif
     }
     
     func createTextureArgumentBuffer() {
         let textures = TextureRegistry.shared.getTextures()
         textureCount = textures.count
         
-        // Match your shader struct exactly
         var argumentDescriptors: [MTLArgumentDescriptor] = []
         
-        // Single descriptor for the array
         let desc = MTLArgumentDescriptor()
         desc.index = 0
         desc.dataType = .texture
         desc.textureType = .type2D
-        desc.arrayLength = Int(MAX_TEXTURES)  // Must match shader struct
+        desc.arrayLength = Int(MAX_TEXTURES)
         desc.access = .readOnly
         argumentDescriptors.append(desc)
         
@@ -249,16 +251,14 @@ class Renderer: NSObject, MTKViewDelegate {
             fatalError("Failed to create texture argument encoder")
         }
         
-        // Create buffer with proper alignment
         let length = encoder.encodedLength
         textureArgumentBuffer = device.makeBuffer(
             length: length,
-            options: .storageModeManaged
+            options: .storageModeShared
         )
         
         encoder.setArgumentBuffer(textureArgumentBuffer, offset: 0)
         
-        // Set textures, padding with nil if needed
         for i in 0..<Int(MAX_TEXTURES) {
             if i < textures.count {
                 encoder.setTexture(textures[i], index: i)
@@ -267,11 +267,11 @@ class Renderer: NSObject, MTKViewDelegate {
             }
         }
         
-        #if !os(iOS)
-        textureArgumentBuffer.didModifyRange(0..<length)
-        #endif
+        //        #if !os(iOS)
+        //        textureArgumentBuffer.didModifyRange(0..<length)
+        //        #endif
     }
-        
+    
     func newAccelerationStructure(descriptor: MTLAccelerationStructureDescriptor) -> MTLAccelerationStructure {
         let accelSizes = device.accelerationStructureSizes(descriptor: descriptor)
         let accelerationStructure = device.makeAccelerationStructure(size: accelSizes.accelerationStructureSize)!
@@ -311,7 +311,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         return compactedAccelerationStructure
     }
-        
+    
     func createAccelerationStructures() {
         let options: MTLResourceOptions = getManagedBufferStorageMode()
         primitiveAccelerationStructures = []
@@ -321,7 +321,6 @@ class Renderer: NSObject, MTKViewDelegate {
                 geometryDescriptor.intersectionFunctionTableOffset = i
                 let accelDescriptor = MTLPrimitiveAccelerationStructureDescriptor()
                 accelDescriptor.geometryDescriptors = [geometryDescriptor]
-//                accelDescriptor.usage =
                 let accelStructure = newAccelerationStructure(descriptor: accelDescriptor)
                 primitiveAccelerationStructures.append(accelStructure)
             } else {
@@ -337,26 +336,26 @@ class Renderer: NSObject, MTKViewDelegate {
             let geometryIndex = scene.geometries.firstIndex { $0 === instance.geometry } ?? 0
             instanceDescriptors[instanceIndex].accelerationStructureIndex = UInt32(geometryIndex)
             instanceDescriptors[instanceIndex].options = (instance.geometry.intersectionFunctionName() == nil)
-                ? MTLAccelerationStructureInstanceOptions(rawValue: MTLAccelerationStructureInstanceOptions.opaque.rawValue)
-                : []
+            ? MTLAccelerationStructureInstanceOptions(rawValue: MTLAccelerationStructureInstanceOptions.opaque.rawValue)
+            : []
             instanceDescriptors[instanceIndex].intersectionFunctionTableOffset = 0
             instanceDescriptors[instanceIndex].mask = UInt32(instance.mask)
             instanceDescriptors[instanceIndex].transformationMatrix = instance.getPackedTransform()
         }
         
-        #if !os(iOS)
-        instanceBuffer.didModifyRange(0..<instanceBuffer.length)
-        #endif
+        //        #if !os(iOS)
+        //        instanceBuffer.didModifyRange(0..<instanceBuffer.length)
+        //        #endif
         
         let accelDescriptor = MTLInstanceAccelerationStructureDescriptor()
         accelDescriptor.instancedAccelerationStructures = primitiveAccelerationStructures
         accelDescriptor.instanceCount = instanceDescriptorCount
         accelDescriptor.instanceDescriptorBuffer = instanceBuffer
-        accelDescriptor.usage = .extendedLimits
+        accelDescriptor.usage = .preferFastIntersection
         
         instanceAccelerationStructure = newAccelerationStructure(descriptor: accelDescriptor)
     }
-
+    
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         drawableSize = size
         
@@ -377,17 +376,17 @@ class Renderer: NSObject, MTKViewDelegate {
         for i in 0..<2 {
             splatTargets[i] = device.makeTexture(descriptor: textureDescriptor)
         }
-
+        
         textureDescriptor.pixelFormat = .r32Uint
         textureDescriptor.usage = [.shaderRead]
-        #if !os(iOS)
-        textureDescriptor.storageMode = .managed // change????
-        #else
+#if !os(iOS)
+        textureDescriptor.storageMode = .shared // change????
+#else
         textureDescriptor.storageMode = .shared
-        #endif
+#endif
         
         randomTexture = device.makeTexture(descriptor: textureDescriptor)
-
+        
         // random texture data
         let pixelCount = Int(size.width * size.height)
         var randomValues = [UInt32](repeating: 0, count: pixelCount)
@@ -438,16 +437,19 @@ class Renderer: NSObject, MTKViewDelegate {
         uniforms.lightCount = UInt32(scene.lights.count)
         uniformsPointer.pointee = uniforms
         
-        #if !os(iOS)
-        uniformBuffer.didModifyRange(uniformBufferOffset..<uniformBufferOffset + alignedUniformsSize)
-        #endif
+        //        #if !os(iOS)
+        //        uniformBuffer.didModifyRange(uniformBufferOffset..<uniformBufferOffset + alignedUniformsSize)
+        //        #endif
         
         uniformBufferIndex = (uniformBufferIndex + 1) % maxFramesInFlight
     }
     
     func draw(in view: MTKView) {
-        _ = semaphore.wait(timeout: .distantFuture)
+        let t0 = CFAbsoluteTimeGetCurrent()
         
+        _ = semaphore.wait(timeout: .distantFuture)
+        let t1 = CFAbsoluteTimeGetCurrent()
+                
         guard let commandBuffer = queue.makeCommandBuffer() else {
             return
         }
@@ -456,32 +458,29 @@ class Renderer: NSObject, MTKViewDelegate {
             self.semaphore.signal()
         }
         
+        let t2 = CFAbsoluteTimeGetCurrent()
+        
         processCameraInput()
+        let t3 = CFAbsoluteTimeGetCurrent()
+        
         updateUniforms()
+        let t4 = CFAbsoluteTimeGetCurrent()
         
         let width = Int(drawableSize.width)
         let height = Int(drawableSize.height)
         
-        let threadsPerThreadgroup = MTLSize(width: 32, height: 32, depth: 1)
+        let threadWidth = raytracingPipeline.threadExecutionWidth
+        let threadHeight = raytracingPipeline.maxTotalThreadsPerThreadgroup / threadWidth
+        
+        let threadsPerThreadgroup = MTLSize(width: threadWidth, height: threadHeight, depth: 1)
         let threadgroups = MTLSize(width: (width + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
                                    height: (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
                                    depth: 1)
         
-        // clearAtomicBuffer
-        guard let clearEncoder = commandBuffer.makeComputeCommandEncoder() else {
-            return
-        }
-        
-        clearEncoder.setComputePipelineState(clearBufferPipeline)
-        clearEncoder.setBuffer(atomicSplatBuffer, offset: 0, index: 0)
-        clearEncoder.setBytes([UInt32(width), UInt32(height)], length: 8, index: 1)
-        clearEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
-        clearEncoder.endEncoding()
-               
-        // raytracingKernel
         guard let computeEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return
         }
+        let t5 = CFAbsoluteTimeGetCurrent()
         
         computeEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 0)
         computeEncoder.setBuffer(resourceBuffer, offset: 0, index: 1)
@@ -501,7 +500,10 @@ class Renderer: NSObject, MTKViewDelegate {
         computeEncoder.setBuffer(scene.instanceLightIndicesBuffer, offset: 0, index: 8)
         computeEncoder.setBuffer(scene.environmentMapCDFBuffer, offset: 0, index: 9)
         computeEncoder.setBuffer(textureArgumentBuffer, offset: 0, index: 10)
-
+        computeEncoder.setBuffer(MaterialRegistry.shared.getBuffer(), offset: 0, index: 11)
+                
+        let t6 = CFAbsoluteTimeGetCurrent()
+        
         let textures = TextureRegistry.shared.getTextures()
         computeEncoder.useResources(textures, usage: .read)
 
@@ -516,27 +518,23 @@ class Renderer: NSObject, MTKViewDelegate {
         }
         
         computeEncoder.setComputePipelineState(raytracingPipeline)
+        let t7 = CFAbsoluteTimeGetCurrent()
+        
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        let t8 = CFAbsoluteTimeGetCurrent()
+        
         computeEncoder.endEncoding()
+        let t9 = CFAbsoluteTimeGetCurrent()
         
-        // finalizeAtomicBuffer
-        guard let finalizeEncoder = commandBuffer.makeComputeCommandEncoder() else {
-            return
-        }
-        
-        finalizeEncoder.setComputePipelineState(finalizePipeline)
-        finalizeEncoder.setBuffer(atomicSplatBuffer, offset: 0, index: 0)
-        finalizeEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
-        finalizeEncoder.setTexture(splatTargets[1], index: 0)
-        finalizeEncoder.setTexture(splatTargets[0], index: 1)
-        finalizeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
-        finalizeEncoder.endEncoding()
-        
-        // prepare for next frame
-        (accumulationTargets[0], accumulationTargets[1]) = (accumulationTargets[1], accumulationTargets[0]) // swap prev and current
+        (accumulationTargets[0], accumulationTargets[1]) = (accumulationTargets[1], accumulationTargets[0])
         (splatTargets[0], splatTargets[1]) = (splatTargets[1], splatTargets[0])
         
+        var t10 = CFAbsoluteTimeGetCurrent()
+        var t11 = t10
+        
         if let currentDrawable = view.currentDrawable {
+            t10 = CFAbsoluteTimeGetCurrent()
+
             let renderPassDescriptor = MTLRenderPassDescriptor()
             renderPassDescriptor.colorAttachments[0].texture = currentDrawable.texture
             renderPassDescriptor.colorAttachments[0].loadAction = .clear
@@ -550,16 +548,49 @@ class Renderer: NSObject, MTKViewDelegate {
             }
             
             commandBuffer.present(currentDrawable)
+            t11 = CFAbsoluteTimeGetCurrent()
         }
-
+        
         commandBuffer.commit()
+        let t12 = CFAbsoluteTimeGetCurrent()
+        
+//        print(String(format: """
+//            -----------------------------
+//            Semaphore wait:     %7.2fms
+//            Command buffer:     %7.2fms
+//            Camera input:       %7.2fms
+//            Uniforms:           %7.2fms
+//            Make encoder:       %7.2fms
+//            Set buffers/tex:    %7.2fms
+//            Set pipeline:       %7.2fms
+//            Dispatch:           %7.2fms
+//            End encoding:       %7.2fms
+//            Get drawable:       %7.2fms
+//            Render pass:        %7.2fms
+//            Commit:             %7.2fms
+//            -----------------------------
+//            TOTAL CPU:          %7.2fms
+//            """,
+//                     (t1 - t0) * 1000,
+//                     (t2 - t1) * 1000,
+//                     (t3 - t2) * 1000,
+//                     (t4 - t3) * 1000,
+//                     (t5 - t4) * 1000,
+//                     (t6 - t5) * 1000,
+//                     (t7 - t6) * 1000,
+//                     (t8 - t7) * 1000,
+//                     (t9 - t8) * 1000,
+//                     (t10 - t9) * 1000,
+//                     (t11 - t10) * 1000,
+//                     (t12 - t11) * 1000,
+//                     (t12 - t0) * 1000))
     }
 }
 
 func getManagedBufferStorageMode() -> MTLResourceOptions {
-    #if os(iOS)
+#if os(iOS)
     return []
-    #else
-    return .storageModeManaged
-    #endif
+#else
+    return .storageModeShared
+#endif
 }

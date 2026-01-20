@@ -36,17 +36,13 @@ float3 pathIntegrator(float2 pixel,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure,
                       constant Light *lights,
-                      
                       constant LightTriangle *lightTriangles,
-//                      constant int *lightIndices,
-                      
-//                      constant float* areaLightCDFs,
                       constant int* instanceLightIndices,
-                      
                       texture2d<float> environmentMapTexture,
                       constant float *environmentMapCDF,
                       thread Sampler& sampler,
-                      constant Textures* textures
+                      constant Textures* textures,
+                      constant Material* materials
                       );
 
 float3 bidirectionalPathIntegrator(float2 pixel,
@@ -63,7 +59,8 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant Textures* textures,
                                    thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
-                                   device atomic_float* splatBuffer
+                                   device atomic_float* splatBuffer,
+                                   constant Material* materials
                                    );
 
 struct EndpointInteraction {

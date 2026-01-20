@@ -16,6 +16,16 @@ struct AreaLight {
     let UVs: [SIMD2<Float>]
 }
 
+struct TextureInfo {
+    let textureURL: URL?
+    let uvMultiplier: Float
+    
+    init(textureURL: URL? = nil, uvMultiplier: Float = 1.0) {
+        self.textureURL = textureURL
+        self.uvMultiplier = uvMultiplier
+    }
+}
+
 class Geometry {
     let device: MTLDevice
     
@@ -27,6 +37,7 @@ class Geometry {
     var vertexTangentBuffer: MTLBuffer?
     var vertexBitangentBuffer: MTLBuffer?
     var primitiveLightIndicesBuffer: MTLBuffer?
+    var primitiveTriangleDataBuffer: MTLBuffer?
 
     var vertices: [SIMD3<Float>] = []
     var normals: [SIMD3<Float>] = []
@@ -36,6 +47,7 @@ class Geometry {
     var tangents: [SIMD3<Float>] = []
     var bitangents: [SIMD3<Float>] = []
     var primitiveLightIndices: [Int32] = []
+    var primitiveTriangleData: [PrimitiveData] = []
     
     var areaLights: [AreaLight] = []
     var lightGeometry: LightGeometry?
@@ -46,7 +58,7 @@ class Geometry {
     }
 
     func uploadToBuffers() {
-        let options = getManagedBufferStorageMode()
+        let options: MTLResourceOptions = getManagedBufferStorageMode()
         
         if !vertices.isEmpty {
             vertexPositionBuffer = device.makeBuffer(bytes: vertices,
@@ -81,14 +93,14 @@ class Geometry {
         
         if !tangents.isEmpty {
             vertexTangentBuffer = device.makeBuffer(bytes: tangents,
-                                              length: tangents.count * MemoryLayout<Material>.stride,
+                                              length: tangents.count * MemoryLayout<SIMD3<Float>>.stride,
                                               options: options)
             
         }
         
         if !bitangents.isEmpty {
             vertexBitangentBuffer = device.makeBuffer(bytes: bitangents,
-                                              length: bitangents.count * MemoryLayout<Material>.stride,
+                                              length: bitangents.count * MemoryLayout<SIMD3<Float>>.stride,
                                               options: options)
             
         }
@@ -99,41 +111,47 @@ class Geometry {
                                               options: options)
     
         }
-
-        #if !os(iOS)
-        if let buffer = vertexPositionBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
-
-        if let buffer = vertexNormalBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
-
-        if let buffer = vertexColorBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
-
-        if let buffer = textureCoordinatesBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
-
-        if let buffer = materialBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
         
-        if let buffer = vertexTangentBuffer {
-            buffer.didModifyRange(0..<buffer.length)
+        if !primitiveTriangleData.isEmpty {
+            primitiveTriangleDataBuffer = device.makeBuffer(bytes: primitiveTriangleData,
+                                              length: primitiveTriangleData.count * MemoryLayout<PrimitiveData>.stride,
+                                              options: options)
         }
-
-        if let buffer = vertexBitangentBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
-        
-        if let buffer = primitiveLightIndicesBuffer {
-            buffer.didModifyRange(0..<buffer.length)
-        }
-
-        #endif
+ 
+//        #if !os(iOS)
+//        if let buffer = vertexPositionBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = vertexNormalBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = vertexColorBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = textureCoordinatesBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = materialBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = vertexTangentBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = vertexBitangentBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        if let buffer = primitiveLightIndicesBuffer {
+//            buffer.didModifyRange(0..<buffer.length)
+//        }
+//
+//        #endif
     }
 
     func geometryDescriptor() -> MTLAccelerationStructureGeometryDescriptor? {
@@ -150,6 +168,21 @@ class Geometry {
     
     func getLightGeometry() -> LightGeometry? {
         return nil
+    }
+    
+    func encodeResources(to encoder: MTLArgumentEncoder) {
+        if let nb = vertexNormalBuffer {
+            encoder.setBuffer(nb, offset: 0, index: 0)
+        }
+        if let mb = materialBuffer {
+            encoder.setBuffer(mb, offset: 0, index: 1)
+        }
+        if let tx = textureCoordinatesBuffer {
+            encoder.setBuffer(tx, offset: 0, index: 2)
+        }
+        if let pi = primitiveLightIndicesBuffer {
+            encoder.setBuffer(pi, offset: 0, index: 3)
+        }
     }
 }
 
@@ -212,7 +245,7 @@ class ObjGeometry: Geometry {
                        let vIndex = Int(subTokens[0]),
                        let vtIndex = Int(subTokens[1]),
                        let nIndex = Int(subTokens[2]) {
-                        // accounting for 1‑based
+                        // accounting for 1â€‘based
                         faceVertices.append((v: vIndex - 1, vt: vtIndex - 1, n: nIndex - 1))
                     }
                 }
@@ -233,15 +266,15 @@ class ObjGeometry: Geometry {
         ]
         do {
             texture = try textureLoader.newTexture(URL: textureURL, options: options)
-            let index = TextureRegistry.shared.addTexture(texture!, identifier: textureURL.path)
+            let index = TextureRegistry.shared.addTexture(texture!, identifier: String(TextureRegistry.shared.getTextures().count))
             self.material?.color.textureIndex = Int32(index)
+            print("TEXINDEX", index, textureURL.path())
         } catch {
             fatalError("Couldn't load texture: \(error)")
         }
         
         let isEmissive = simd_length_squared(emissionColor) > 1e-4
         let primitiveLightIndex = Int32(isEmissive ? 0 : -1)
-//        print("Primitive light index", primitiveLightIndex)
         var totalArea: Float = 0.0
         var lightTriangles: [LightTriangle] = []
         
@@ -316,9 +349,9 @@ class ObjGeometry: Geometry {
 class GeometryInstance {
     let geometry: Geometry
     
-    var translation: SIMD3<Float>
-    var rotation: SIMD3<Float>
-    var scale: SIMD3<Float>
+    let translation: SIMD3<Float>
+    let rotation: SIMD3<Float>
+    let scale: SIMD3<Float>
     
     var transform: simd_float4x4 {
         return LinearAlgebra.translate(translation: translation) *

@@ -11,6 +11,13 @@
 #include "Utility.h"
 #include "Materials.h"
 
+struct PrimitiveData {
+    vector_float3 n0, n1, n2;
+    vector_float2 uv0, uv1, uv2;
+    int materialIndex;
+    int primitiveLightIndex;
+};
+
 #ifdef __METAL_VERSION__
 #include <metal_stdlib>
 using namespace metal;
@@ -60,7 +67,8 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          instance_acceleration_structure accelerationStructure,
                                          constant int* instanceLightIndices,
                                          int resourcesStride,
-                                         constant Textures* textures
+                                         constant Textures* textures,
+                                         constant Material* materials
                                          );
 
 inline float3 transformPoint(float3 p, float4x3 transform) {
@@ -71,7 +79,7 @@ inline float3 transformDirection(float3 p, float4x3 transform) {
     return transform * float4(p.x, p.y, p.z, 0.0f);
 }
 
-template<typename T>
+template <typename T>
 inline T interpolateVertexAttribute(device T *attributes, unsigned int primitiveIndex, float2 uv)
 {
     T T0 = attributes[primitiveIndex * 3 + 0];
@@ -79,6 +87,11 @@ inline T interpolateVertexAttribute(device T *attributes, unsigned int primitive
     T T2 = attributes[primitiveIndex * 3 + 2];
 
     return (1.0f - uv.x - uv.y) * T0 + uv.x * T1 + uv.y * T2;
+}
+
+template <typename T>
+inline T interpolateVertexAttribute(T v0, T v1, T v2, float2 uv) {
+    return (1.0f - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2;
 }
 
 bool isVisible(float3 pos1, float3 normal1,

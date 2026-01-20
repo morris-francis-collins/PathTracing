@@ -15,7 +15,7 @@ class AssimpGeometry: Geometry {
     private var modelName: String
     private var emissionAmplifier: Float
     
-    init(device: MTLDevice, modelPath: String, defaultMaterial: Material? = nil, emissionAmplifier: Float = 1.0) {
+    init(device: MTLDevice, modelPath: String, defaultMaterial: Material?, defaultTexture: TextureInfo, emissionAmplifier: Float) {
         modelName = URL(fileURLWithPath: modelPath).lastPathComponent
         self.emissionAmplifier = emissionAmplifier
         super.init(device: device)
@@ -33,7 +33,7 @@ class AssimpGeometry: Geometry {
         
         for m in 0..<Int(scene.meshCount) {
             let mesh = scene.meshes[m]
-            let material = loadMaterialWithTextures(mesh: mesh, defaultMaterial: defaultMaterial)
+            let material = loadMaterialWithTextures(mesh: mesh, defaultMaterial: defaultMaterial, defaultTexture: defaultTexture)
             let isEmissive = length_squared(material.emission.value) > 1e-4 || material.emission.textureIndex != -1
             let primitiveLightIndex = isEmissive ? areaLights.count : -1
             
@@ -54,13 +54,26 @@ class AssimpGeometry: Geometry {
                 normals.append(normalize(mesh.normals[i1]))
                 normals.append(normalize(mesh.normals[i2]))
                 
-                texCoords.append(mesh.texCoords[i0])
-                texCoords.append(mesh.texCoords[i1])
-                texCoords.append(mesh.texCoords[i2])
+                texCoords.append(mesh.texCoords[i0] * defaultTexture.uvMultiplier)
+                texCoords.append(mesh.texCoords[i1] * defaultTexture.uvMultiplier)
+                texCoords.append(mesh.texCoords[i2] * defaultTexture.uvMultiplier)
+
+                let materialIndex = MaterialRegistry.shared.addMaterial(material)
                 
                 materials.append(material)
                 
                 primitiveLightIndices.append(Int32(primitiveLightIndex))
+                
+                let primitiveData = PrimitiveData(n0: normalize(mesh.normals[i0]),
+                                                  n1: normalize(mesh.normals[i1]),
+                                                  n2: normalize(mesh.normals[i2]),
+                                                  uv0: mesh.texCoords[i0] * defaultTexture.uvMultiplier,
+                                                  uv1: mesh.texCoords[i1] * defaultTexture.uvMultiplier,
+                                                  uv2: mesh.texCoords[i2] * defaultTexture.uvMultiplier,
+                                                  materialIndex: Int32(materialIndex),
+                                                  primitiveLightIndex: Int32(primitiveLightIndex))
+                
+                primitiveTriangleData.append(primitiveData)
             }
 
             if isEmissive {
@@ -76,17 +89,22 @@ class AssimpGeometry: Geometry {
         uploadToBuffers()
     }
     
-    private func loadMaterialWithTextures(mesh: MeshData, defaultMaterial: Material?) -> Material {
+    private func loadMaterialWithTextures(mesh: MeshData, defaultMaterial: Material?, defaultTexture: TextureInfo) -> Material {
         var material = defaultMaterial ?? createStaticMaterial(
             color: SIMD3<Float>(mesh.material.color.value.x, mesh.material.color.value.y, mesh.material.color.value.z),
             refraction: mesh.material.refraction.value,
             roughness: mesh.material.roughness.value,
             metallic: mesh.material.metallic.value,
-            emission: emissionAmplifier * mesh.material.emission.value,
+            emission: mesh.material.emission.value,
             BXDFs: mesh.material.BXDFs
         )
         
-        if let colorIndex = loadEmbeddedTexture(mesh.embeddedColorTexture, type: "color", pixelFormat: .rgba8Unorm_srgb, sRGB: true, bytesPerPixel: 4) {
+        material.emission.value *= emissionAmplifier
+        
+        if let textureURL = defaultTexture.textureURL {
+            let index = loadTexture(device: device, textureURL: textureURL)
+            material.color.textureIndex = Int32(index)
+        } else if let colorIndex = loadEmbeddedTexture(mesh.embeddedColorTexture, type: "color", pixelFormat: .rgba8Unorm_srgb, sRGB: true, bytesPerPixel: 4) {
             material.color.textureIndex = Int32(colorIndex)
         }
         
@@ -148,6 +166,19 @@ class AssimpGeometry: Geometry {
         }
     }
     
+    private func loadTexture(device: MTLDevice, textureURL: URL) -> Int32 {
+        let textureLoader = MTKTextureLoader(device: device)
+        let options: [MTKTextureLoader.Option: Any] = [.SRGB: false]
+        
+        do {
+            let texture = try textureLoader.newTexture(URL: textureURL, options: options)
+            let index = TextureRegistry.shared.addTexture(texture, identifier: String("defaultTexture_\(textureURL.lastPathComponent)"))
+            return Int32(index)
+        } catch {
+            fatalError("Couldn't load texture: \(error)")
+        }
+    }
+    
     deinit {
         if let scene = sceneData {
             freeSceneData(scene)
@@ -159,6 +190,9 @@ class AssimpGeometry: Geometry {
         descriptor.vertexBuffer = vertexPositionBuffer
         descriptor.vertexStride = MemoryLayout<SIMD3<Float>>.stride
         descriptor.triangleCount = vertices.count / 3
+        descriptor.primitiveDataBuffer = primitiveTriangleDataBuffer
+        descriptor.primitiveDataStride = MemoryLayout<PrimitiveData>.stride
+        descriptor.primitiveDataElementSize = MemoryLayout<PrimitiveData>.size
         return descriptor
     }
         
