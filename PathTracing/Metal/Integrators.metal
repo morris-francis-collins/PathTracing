@@ -14,8 +14,6 @@ using namespace raytracing;
 
 float3 pathIntegrator(float2 pixel,
                       constant Uniforms& uniforms,
-                      constant unsigned int& resourceStride,
-                      device void *resources,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure,
                       constant Light *lights,
@@ -41,7 +39,6 @@ float3 pathIntegrator(float2 pixel,
     for (int bounce = 0; bounce < MAX_PATH_LENGTH; bounce++) {
         IntersectionResult intersection = intersect(ray,
                                                     RAY_MASK_PRIMARY,
-                                                    resources,
                                                     instances,
                                                     accelerationStructure,
                                                     false);
@@ -64,7 +61,7 @@ float3 pathIntegrator(float2 pixel,
             break;
         }
         
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, instanceLightIndices, resourceStride, textures, materials);
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = surfaceInteraction.material;
         
         float3 n = surfaceInteraction.normal;
@@ -97,7 +94,7 @@ float3 pathIntegrator(float2 pixel,
             throughput *= exp(absorption * attenuationDistance);
             attenuationDistance = 0.0f;
         }
-                        
+
         if (!bsdfSample.delta) {
             float selectionPDF;
             constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
@@ -110,7 +107,7 @@ float3 pathIntegrator(float2 pixel,
             float cosCamera = dot(wo, n);
             float cosLight = light.type == AREA_LIGHT ? dot(-wo, lightSample.normal) : 1.0f;
         
-            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, resources, instances, accelerationStructure)) {
+            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, instances, accelerationStructure)) {
                 float3 BSDF = getBXDF(wi, wo, n, material);
 
                 float G = cosCamera * cosLight / (distance * distance);
@@ -146,8 +143,6 @@ float3 pathIntegrator(float2 pixel,
 
 int tracePath(float2 pixel,
               constant Uniforms& uniforms,
-              constant unsigned int& resourceStride,
-              device void *resources,
               device MTLAccelerationStructureInstanceDescriptor *instances,
               instance_acceleration_structure accelerationStructure,
               constant Light *lights,
@@ -174,7 +169,6 @@ int tracePath(float2 pixel,
         
         IntersectionResult intersection = intersect(ray,
                                                     RAY_MASK_PRIMARY,
-                                                    resources,
                                                     instances,
                                                     accelerationStructure,
                                                     false);
@@ -188,7 +182,7 @@ int tracePath(float2 pixel,
             break;
         }
 
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, resources, instances, accelerationStructure, instanceLightIndices, resourceStride, textures, materials);
+        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = surfaceInteraction.material;
         float3 n = surfaceInteraction.normal;
         
@@ -234,8 +228,6 @@ int tracePath(float2 pixel,
 
 int traceCameraPath(float2 pixel,
                     constant Uniforms& uniforms,
-                    constant unsigned int& resourceStride,
-                    device void *resources,
                     device MTLAccelerationStructureInstanceDescriptor *instances,
                     instance_acceleration_structure accelerationStructure,
                     constant Light *lights,
@@ -260,13 +252,11 @@ int traceCameraPath(float2 pixel,
     cameraVertices[0].forwardPDF = positionPDF;
     float3 throughput = float3(1.0f);
 
-    return tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF, materials);
+    return tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF, materials);
 }
 
 int traceLightPath(float2 pixel,
                    constant Uniforms& uniforms,
-                   constant unsigned int& resourceStride,
-                   device void *resources,
                    device MTLAccelerationStructureInstanceDescriptor *instances,
                    instance_acceleration_structure accelerationStructure,
                    constant Light *lights,
@@ -300,7 +290,7 @@ int traceLightPath(float2 pixel,
     if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
 
-    int numVertices = tracePath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF, materials);
+    int numVertices = tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF, materials);
 
     if (lightVertices[0].isInfiniteLight()) {
         if (numVertices > 0) {
@@ -316,7 +306,6 @@ int traceLightPath(float2 pixel,
 
 float3 calculateGeometricTerm(thread PathVertex& cameraVertex,
                               thread PathVertex& lightVertex,
-                              device void *resources,
                               device MTLAccelerationStructureInstanceDescriptor *instances,
                               instance_acceleration_structure accelerationStructure
                               )
@@ -341,7 +330,7 @@ float3 calculateGeometricTerm(thread PathVertex& cameraVertex,
         G *= abs(cosLight);
     }
     
-    if (!isVisible(cameraVertex.position(), cameraVertex.normal(), lightVertex.position(), lightVertex.normal(), resources, instances, accelerationStructure)) {
+    if (!isVisible(cameraVertex.position(), cameraVertex.normal(), lightVertex.position(), lightVertex.normal(), instances, accelerationStructure)) {
         return float3(0.0f);
     }
 
@@ -501,8 +490,6 @@ void splat(texture2d<float, access::read_write> splatTex,
 }
 
 float3 connectVertices(constant Uniforms& uniforms,
-                       constant unsigned int& resourceStride,
-                       device void *resources,
                        device MTLAccelerationStructureInstanceDescriptor *instances,
                        instance_acceleration_structure accelerationStructure,
                        constant Light *lights,
@@ -539,7 +526,7 @@ float3 connectVertices(constant Uniforms& uniforms,
             contribution = We * lightVertex.throughput * lightBSDF;
             
             if (!isBlack(contribution))
-                contribution *= calculateGeometricTerm(cameraVertex, lightVertex, resources, instances, accelerationStructure);
+                contribution *= calculateGeometricTerm(cameraVertex, lightVertex, instances, accelerationStructure);
         }
     } else if (l == 1) {
         thread PathVertex& cameraVertex = cameraVertices[c - 1];
@@ -553,7 +540,7 @@ float3 connectVertices(constant Uniforms& uniforms,
             contribution = cameraVertex.throughput * cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), sampled) * sampled.throughput;
                         
             if (!isBlack(contribution))
-                contribution *= calculateGeometricTerm(cameraVertex, sampled, resources, instances, accelerationStructure);
+                contribution *= calculateGeometricTerm(cameraVertex, sampled, instances, accelerationStructure);
         }
     } else {
         thread PathVertex& cameraVertex = cameraVertices[c - 1];
@@ -565,7 +552,7 @@ float3 connectVertices(constant Uniforms& uniforms,
             contribution = cameraVertex.throughput * lightVertex.throughput * cameraBSDF * lightBSDF;
 
             if (!isBlack(contribution))
-                contribution *= calculateGeometricTerm(cameraVertex, lightVertex, resources, instances, accelerationStructure);
+                contribution *= calculateGeometricTerm(cameraVertex, lightVertex, instances, accelerationStructure);
         }
     }
     
@@ -577,8 +564,6 @@ float3 connectVertices(constant Uniforms& uniforms,
 
 float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant Uniforms& uniforms,
-                                   constant unsigned int& resourceStride,
-                                   device void *resources,
                                    device MTLAccelerationStructureInstanceDescriptor *instances,
                                    instance_acceleration_structure accelerationStructure,
                                    constant Light *lights,
@@ -596,9 +581,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
     PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
     
-    int cameraPathLength = traceCameraPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, materials);
+    int cameraPathLength = traceCameraPath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, materials);
     
-    int lightPathLength = traceLightPath(pixel, uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, lightVertices, materials);
+    int lightPathLength = traceLightPath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, lightVertices, materials);
 
     float3 totalContribution = float3(0.0f);
     
@@ -608,7 +593,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
 
-            float3 contribution = connectVertices(uniforms, resourceStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, lightVertices, c, l);
+            float3 contribution = connectVertices(uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, lightVertices, c, l);
             
             if (any(contribution < 0.0f) || any(isnan(contribution)) || any(isinf(contribution))) {
 //                DEBUG("Invalid contribution - c: %d, l: %d, float3(%f, %f, %f)", c, l, contribution.x, contribution.y, contribution.z);

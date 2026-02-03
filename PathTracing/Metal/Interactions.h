@@ -51,22 +51,26 @@ struct SurfaceInteraction {
     }
 };
 
-typedef intersector<triangle_data, instancing, world_space_data>::result_type IntersectionResult;
+struct IntersectionResult {
+    float4x3 object_to_world_transform;
+    const device void* primitive_data;
+    float2 triangle_barycentric_coord;
+    float distance;
+    uint instance_id;
+    intersection_type type;
+};
 
 IntersectionResult intersect(ray ray,
                              unsigned int mask,
-                             device void *resources,
                              device MTLAccelerationStructureInstanceDescriptor *instances,
                              instance_acceleration_structure accelerationStructure,
                              bool accept_any_intersection);
 
 SurfaceInteraction getSurfaceInteraction(ray ray,
                                          IntersectionResult intersection,
-                                         device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
                                          constant int* instanceLightIndices,
-                                         int resourcesStride,
                                          constant Textures* textures,
                                          constant Material* materials
                                          );
@@ -96,7 +100,6 @@ inline T interpolateVertexAttribute(T v0, T v1, T v2, float2 uv) {
 
 bool isVisible(float3 pos1, float3 normal1,
                float3 pos2, float3 normal2,
-               device void *resources,
                device MTLAccelerationStructureInstanceDescriptor *instances,
                instance_acceleration_structure accelerationStructure);
 

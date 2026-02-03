@@ -31,8 +31,6 @@ using namespace raytracing;
 
 float3 pathIntegrator(float2 pixel,
                       constant Uniforms& uniforms,
-                      constant unsigned int& resourceStride,
-                      device void *resources,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
                       instance_acceleration_structure accelerationStructure,
                       constant Light *lights,
@@ -47,8 +45,6 @@ float3 pathIntegrator(float2 pixel,
 
 float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant Uniforms& uniforms,
-                                   constant unsigned int& resourceStride,
-                                   device void *resources,
                                    device MTLAccelerationStructureInstanceDescriptor *instances,
                                    instance_acceleration_structure accelerationStructure,
                                    constant Light *lights,

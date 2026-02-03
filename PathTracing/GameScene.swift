@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createKoenigseggScene()
+        createColorfulDragonScene()
     }
         
     func addGeometry(_ mesh: Geometry) {

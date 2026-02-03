@@ -6,9 +6,7 @@
 import SwiftUI
 import MetalKit
 
-struct appView: View {
-    @EnvironmentObject var gamescene: GameScene
-    
+struct appView: View {    
     var body: some View {
         VStack{
             Text("Path Tracing")

@@ -31,7 +31,7 @@ let GLASS = createStaticMaterial(color: .one, refraction: 1.5, roughness: 0.0, m
 let PLASTIC = createStaticMaterial(color: 0.7 * .one, refraction: 1, roughness: 0.9, metallic: 0.0, emission: .zero, BXDFs: DIFFUSE)
 let MIRROR = createStaticMaterial(color: .one, refraction: 1.5, roughness: 0.0, metallic: 1.0, emission: .zero, BXDFs: CONDUCTOR)
 let WATER = createStaticMaterial(color: .one, refraction: 1.3, roughness: 0.0, metallic: 0.0, emission: .zero, BXDFs: SPECULAR_TRANSMISSION)
-let EMISSIVE = createStaticMaterial(color: .one, refraction: 1, roughness: 0.0, metallic: 0.0, emission: .one, BXDFs: SPECULAR_TRANSMISSION)
+let EMISSIVE = createStaticMaterial(color: .one, refraction: 1, roughness: 0.0, metallic: 0.0, emission: .one, BXDFs: DIFFUSE)
 
 let RED = SIMD3<Float>(1.0, 0.0, 0.0)
 let ORANGE = SIMD3<Float>(1.0, 0.647, 0.0)

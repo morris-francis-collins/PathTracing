@@ -10,9 +10,6 @@
 using namespace metal;
 using namespace raytracing;
 
-constant unsigned int resourcesStride  [[function_constant(0)]];
-constant bool useIntersectionFunctions [[function_constant(1)]];
-
 // Return type for a bounding box intersection function.
 struct BoundingBoxIntersection
 {
@@ -34,7 +31,6 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<unsigned int> randomTex,
                              texture2d<float> prevTex,
                              texture2d<float, access::read_write> dstTex,
-                             device void *resources,
                              device MTLAccelerationStructureInstanceDescriptor *instances,
                              constant Light *lights,
                              instance_acceleration_structure accelerationStructure,
@@ -61,10 +57,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         return;
 
     float3 ptContribution = float3(0.0f);
-    ptContribution = pathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, sampler, textures, materials);
+    ptContribution = pathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, sampler, textures, materials);
     
     float3 bdptContribution = float3(0.0f);
-//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, resourcesStride, resources, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer, materials);
+//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer, materials);
     
     float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;

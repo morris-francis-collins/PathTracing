@@ -11,17 +11,8 @@
 using namespace metal;
 using namespace raytracing;
 
-struct TriangleResources {
-    device float3 *vertexNormals;
-//    device float3 *vertexColors;
-    device Material *vertexMaterials;
-    device float2 *vertexUVs;
-    device int *vertexPrimitiveLightIndices;
-};
-
 IntersectionResult intersect(ray ray,
                              unsigned int mask,
-                             device void *resources,
                              device MTLAccelerationStructureInstanceDescriptor *instances,
                              instance_acceleration_structure accelerationStructure,
                              bool accept_any_intersection)
@@ -41,14 +32,12 @@ IntersectionResult intersect(ray ray,
     
     IntersectionResult intersection;
     
-    intersection.type = i.get_committed_intersection_type();
-    intersection.distance = i.get_committed_distance();
-    intersection.primitive_id = i.get_committed_primitive_id();
-    intersection.geometry_id = i.get_committed_geometry_id();
     intersection.triangle_barycentric_coord = i.get_committed_triangle_barycentric_coord();
     intersection.instance_id = i.get_committed_instance_id();
     intersection.object_to_world_transform = i.get_committed_object_to_world_transform();
     intersection.primitive_data = i.get_committed_primitive_data();
+    intersection.distance = i.get_committed_distance();
+    intersection.type = i.get_committed_intersection_type();
     
     return intersection;
 }
@@ -105,11 +94,9 @@ SampledMaterial sampleMaterial(Material material, float2 uv, constant Textures* 
 
 SurfaceInteraction getSurfaceInteraction(ray ray,
                                          IntersectionResult intersection,
-                                         device void *resources,
                                          device MTLAccelerationStructureInstanceDescriptor *instances,
                                          instance_acceleration_structure accelerationStructure,
                                          constant int* instanceLightIndices,
-                                         int resourcesStride,
                                          constant Textures* textures,
                                          constant Material* materials
                                          )
@@ -118,11 +105,7 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     surfaceInteraction.position = ray.origin + ray.direction * intersection.distance;
     
     unsigned int instanceIndex = intersection.instance_id;
-    unsigned int mask = instances[instanceIndex].mask;
     float4x3 objectToWorldTransform = intersection.object_to_world_transform;
-
-    unsigned primitiveIndex = intersection.primitive_id;
-    unsigned int resourceIndex = instances[instanceIndex].accelerationStructureIndex;
     float2 barycentric_coords = intersection.triangle_barycentric_coord;
     
     const device PrimitiveData* primitiveData = static_cast<const device PrimitiveData*>(intersection.primitive_data);
@@ -134,8 +117,8 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     float2 uv = interpolateVertexAttribute(primitiveData->uv0, primitiveData->uv1, primitiveData->uv2, barycentric_coords);
     
     constant Material& material = materials[primitiveData->materialIndex];
-
     int primitiveLightIndex = primitiveData->primitiveLightIndex;
+    
     if (primitiveLightIndex != -1) {
         surfaceInteraction.lightIndex = instanceLightIndices[instanceIndex] + primitiveLightIndex;
         constexpr sampler textureSampler(address::repeat, filter::linear);
@@ -156,7 +139,6 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
 
 bool isVisible(float3 pos1, float3 normal1,
                float3 pos2, float3 normal2,
-               device void *resources,
                device MTLAccelerationStructureInstanceDescriptor *instances,
                instance_acceleration_structure accelerationStructure
                )
@@ -183,7 +165,6 @@ bool isVisible(float3 pos1, float3 normal1,
     
     IntersectionResult intersection = intersect(shadowRay,
                                                 RAY_MASK_SHADOW,
-                                                resources,
                                                 instances,
                                                 accelerationStructure,
                                                 true);

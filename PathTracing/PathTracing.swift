@@ -12,7 +12,7 @@ struct ProjectApp: App {
 
     init() {
         let createdDevice = MTLCreateSystemDefaultDevice()!
-        self.device = createdDevice
+        self.device = MTLCreateSystemDefaultDevice()!
         self._gameScene = StateObject(wrappedValue: GameScene(device: createdDevice))
     }
 
