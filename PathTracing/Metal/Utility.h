@@ -29,7 +29,6 @@
 #define PIXEL_WIDTH 800.0f
 #define PIXEL_HEIGHT 600.0f
 #define ASPECT_RATIO (PIXEL_WIDTH / PIXEL_HEIGHT)
-#define A 4.0f * ASPECT_RATIO * pow(tan(M_PI_F * CAMERA_FOV_ANGLE * 0.5f / 180.0f), 2.0f)
 
 struct Camera {
     vector_float3 position;
@@ -83,12 +82,12 @@ inline float powerHeuristic(float main, float other) {
     return main2 / (main2 + other2);
 }
 
-inline float isBlack(float3 w) {
+inline bool isBlack(float3 w) {
     return all(w < 1e-20f);
 }
 
-void cameraRayPDF(const constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF);
-float3 cameraWe(constant Camera& camera, float3 position);
+void cameraRayPDF(constant Uniforms& uniforms, float3 w, thread float& positionPDF, thread float& directionPDF);
+float3 cameraWe(constant Uniforms& uniforms, float3 position);
 float3 generateRayDirection(float2 pixel, constant Uniforms& uniforms);
 ray generateRay(float2 pixel, constant Uniforms& uniforms);
 

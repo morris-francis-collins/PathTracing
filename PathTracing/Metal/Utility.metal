@@ -13,15 +13,17 @@ using namespace raytracing;
 
 // MARK: Cameras
 
-void cameraRayPDF(constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF) {
+void cameraRayPDF(constant Uniforms& uniforms, float3 w, thread float& positionPDF, thread float& directionPDF) {
     positionPDF = 1.0f;
-    float cosCamera = dot(w, camera.forward);
+    float cosCamera = dot(w, uniforms.camera.forward);
+    float A = 4.0f * (uniforms.width / uniforms.height) * pow(tan(M_PI_F * CAMERA_FOV_ANGLE * 0.5f / 180.0f), 2.0f);
     directionPDF = 1.0f / (A * pow(cosCamera, 3.0f));
 }
 
-float3 cameraWe(constant Camera& camera, float3 position) {
-    float3 w = normalize(position - camera.position);
-    return 1.0f / (A * pow(dot(camera.forward, w), 4.0f));
+float3 cameraWe(constant Uniforms& uniforms, float3 position) {
+    float3 w = normalize(position - uniforms.camera.position);
+    float A = 4.0f * (uniforms.width / uniforms.height) * pow(tan(M_PI_F * CAMERA_FOV_ANGLE * 0.5f / 180.0f), 2.0f);
+    return 1.0f / (A * pow(dot(uniforms.camera.forward, w), 4.0f));
 }
 
 float3 generateRayDirection(float2 pixel, constant Uniforms& uniforms) {

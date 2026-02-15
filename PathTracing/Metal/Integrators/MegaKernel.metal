@@ -521,7 +521,7 @@ float3 connectVertices(constant Uniforms& uniforms,
         thread PathVertex& lightVertex = lightVertices[l - 1];
 //        return contribution;
         if (lightVertex.isConnectible()) {
-            float3 We = cameraWe(uniforms.camera, lightVertex.position());
+            float3 We = cameraWe(uniforms, lightVertex.position());
             float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex);
             contribution = We * lightVertex.throughput * lightBSDF;
             
