@@ -7,10 +7,11 @@
 
 #pragma once
 
+#include "Integrators/MegaKernel.h"
+
 #include <simd/simd.h>
 #include "Utility.h"
 #include "Lights.h"
 #include "Interactions.h"
-#include "Integrators.h"
 #include "Materials.h"
 #include "Samplers.h"

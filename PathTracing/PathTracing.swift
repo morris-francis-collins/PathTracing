@@ -6,20 +6,10 @@
 import SwiftUI
 
 @main
-struct ProjectApp: App {
-    let device: MTLDevice
-    @StateObject private var gameScene: GameScene
-
-    init() {
-        let createdDevice = MTLCreateSystemDefaultDevice()!
-        self.device = MTLCreateSystemDefaultDevice()!
-        self._gameScene = StateObject(wrappedValue: GameScene(device: createdDevice))
-    }
-
+struct PathTracingApp: App {
     var body: some Scene {
         WindowGroup {
-            appView()
-                .environmentObject(gameScene)
+            ContentView()
         }
     }
 }

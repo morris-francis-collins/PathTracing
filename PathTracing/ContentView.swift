@@ -6,12 +6,20 @@
 import SwiftUI
 import MetalKit
 
-struct ContentView: NSViewRepresentable {
-    @EnvironmentObject var gameScene: GameScene
+struct ContentView: View {
+    var body: some View {
+        VStack {
+            MetalView()
+        }
+    }
+}
+
+
+struct MetalView: NSViewRepresentable {
     let device: MTLDevice = MTLCreateSystemDefaultDevice()!
-    
+        
     func makeCoordinator() -> Renderer {
-        Renderer(device: device, scene: gameScene)
+        Renderer(device: device, scene: GameScene(device: device))
     }
     
     func makeNSView(context: Context) -> MTKView {

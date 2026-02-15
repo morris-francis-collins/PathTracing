@@ -46,4 +46,23 @@ struct Sampler {
     }
 };
 
+inline uint init_prng(uint pixelIndex, uint frameIndex) {
+    return pixelIndex + frameIndex * 719393u;
+}
+
+inline float prng(device uint& state) {
+    state = state * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    word = (word >> 22u) ^ word;
+    return float(word) / 4294967295.0f;
+}
+
+inline float prng(thread uint& state) {
+    state = state * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    word = (word >> 22u) ^ word;
+    return float(word) / 4294967295.0f;
+}
+
+
 #endif

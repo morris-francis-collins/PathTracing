@@ -24,17 +24,18 @@ float3 cameraWe(constant Camera& camera, float3 position) {
     return 1.0f / (A * pow(dot(camera.forward, w), 4.0f));
 }
 
-ray generateRay(float2 pixel, const constant Uniforms& uniforms) {
-    constant Camera& camera = uniforms.camera;
+float3 generateRayDirection(float2 pixel, constant Uniforms& uniforms) {
     float2 uv = pixel / float2(uniforms.width, uniforms.height);
     uv = uv * 2.0f - 1.0f;
-    
+    return normalize(uv.x * uniforms.camera.right + uv.y * uniforms.camera.up + uniforms.camera.forward);
+}
+
+ray generateRay(float2 pixel, constant Uniforms& uniforms) {
     ray ray;
-    ray.origin = camera.position;
-    ray.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);
+    ray.origin = uniforms.camera.position;
+    ray.direction = generateRayDirection(pixel, uniforms);
     ray.min_distance = 1e-6f;
     ray.max_distance = INFINITY;
-    
     return ray;
 }
 

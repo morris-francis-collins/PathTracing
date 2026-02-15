@@ -1,5 +1,5 @@
 //
-//  Integrators.h
+//  MegaKernel.h
 //  PathTracing
 //
 //  Created on 7/19/25.
@@ -8,11 +8,11 @@
 #pragma once
 
 #include <simd/simd.h>
-#include "Utility.h"
-#include "Lights.h"
-#include "Interactions.h"
-#include "Materials.h"
-#include "Samplers.h"
+#include "../Utility.h"
+#include "../Lights.h"
+#include "../Interactions.h"
+#include "../Materials.h"
+#include "../Samplers.h"
 
 #define MAX_PATH_LENGTH 10
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)

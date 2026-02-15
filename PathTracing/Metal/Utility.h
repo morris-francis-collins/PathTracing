@@ -89,6 +89,7 @@ inline float isBlack(float3 w) {
 
 void cameraRayPDF(const constant Camera& camera, float3 w, thread float& positionPDF, thread float& directionPDF);
 float3 cameraWe(constant Camera& camera, float3 position);
-ray generateRay(float2 pixel, const constant Uniforms& uniforms);
+float3 generateRayDirection(float2 pixel, constant Uniforms& uniforms);
+ray generateRay(float2 pixel, constant Uniforms& uniforms);
 
 #endif

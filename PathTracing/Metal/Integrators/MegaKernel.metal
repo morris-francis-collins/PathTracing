@@ -1,5 +1,5 @@
 //
-//  Integrators.metal
+//  MegaKernel.metal
 //  PathTracing
 //
 //  Created on 7/19/25.
@@ -7,7 +7,7 @@
 
 #include <metal_stdlib>
 #include <simd/simd.h>
-#include "Integrators.h"
+#include "MegaKernel.h"
 
 using namespace metal;
 using namespace raytracing;
