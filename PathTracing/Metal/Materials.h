@@ -16,6 +16,9 @@
 #define DIELECTRIC_REFLECTION (1 << 3)
 
 #define ALPHA_OPAQUE 0
+#define ALPHA_MASK 1
+#define ALPHA_BLEND 2
+
 
 struct Material {
     vector_float3 colorValue;

@@ -64,6 +64,11 @@ float3 pathIntegrator(float2 pixel,
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = surfaceInteraction.material;
         
+        if (material.alphaMode == ALPHA_MASK && material.alpha < material.alphaCutoff) {
+            ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
+            continue;
+        }
+        
         float3 n = surfaceInteraction.normal;
 
         if (surfaceInteraction.hitLight()) {

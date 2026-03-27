@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createSoloScene()
+        createBistroScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -788,7 +788,8 @@ class GameScene: ObservableObject {
         
     func createBistroScene() {
         cameraLocations = [
-            (SIMD3<Float>(-14.601961, 3.1426682, -1.5453186), SIMD3<Float>(-5.979579, 1.3546469, 0.31400716))
+            (SIMD3<Float>(-14.601961, 3.1426682, -1.5453186), SIMD3<Float>(-5.979579, 1.3546469, 0.31400716)),
+            (SIMD3<Float>(47.638798, 3.7606301, 37.219215), SIMD3<Float>(40.495815, 3.7606497, 31.744099))
         ]
         
         (cameraPosition, cameraTarget) = cameraLocations[0]
@@ -797,7 +798,7 @@ class GameScene: ObservableObject {
         let bistroGeometry = addGLTFGeometry(fileName: "Bistro_Godot", fileExtension: "glb", emissionAmplifier: 0)
         addInstance(with: bistroGeometry)
         
-        addEnvironmentMap(textureURL: duskURL)
+        addEnvironmentMap(textureURL: skyURL)
     }
     
     func createCornellScene() {
@@ -869,8 +870,8 @@ class GameScene: ObservableObject {
 //                    rotation: SIMD3<Float>(-.pi/2, 0, 0),
 //                    scale: SIMD3<Float>(0.01, 0.01, 0.01)
 //                )
-        
-        let scalingPlasticGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: SMOOTH_OPAQUE_DIELECTRIC)
+
+        let scalingPlasticGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: SMOOTH_OPAQUE_DIELECTRIC)
         
         addInstance(with: scalingPlasticGeometry,
                     translation: SIMD3<Float>(-20, 0, 0),

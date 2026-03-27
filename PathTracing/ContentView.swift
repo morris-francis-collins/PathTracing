@@ -7,7 +7,8 @@ import SwiftUI
 import MetalKit
 
 struct ContentView: View {
-    @State private var rendererType: RendererType = .megaKernel
+    @State private var rendererType: RendererType = .debug
+    @State private var debugType: DebugType = Color
     @State private var widthText: String = ""
     @State private var heightText: String = ""
     @State private var currentPixelWidth: Int = 0
@@ -15,37 +16,48 @@ struct ContentView: View {
     @State private var metalViewPointSize: CGSize = .zero
     @State private var isProgrammaticResize: Bool = false
     
+    @State private var device: MTLDevice = MTLCreateSystemDefaultDevice()!
+    @State private var scene: GameScene? = nil
+    
     private let hudWidth: CGFloat = 180
     
     var body: some View {
         HStack(spacing: 0) {
-            // Metal render view — fills all remaining space
             GeometryReader { geometry in
-                MetalView(rendererType: rendererType)
-                    .id(rendererType)
-                    .onChange(of: geometry.size) { oldSize, newSize in
-                        guard !isProgrammaticResize,
-                              newSize.width > 0, newSize.height > 0 else { return }
-                        metalViewPointSize = newSize
-                        let (pw, ph) = physicalPixels(from: newSize)
-                        currentPixelWidth = pw
-                        currentPixelHeight = ph
-                        widthText = "\(pw)"
-                        heightText = "\(ph)"
-                    }
-                    .onAppear {
-                        guard geometry.size.width > 0, geometry.size.height > 0 else { return }
-                        metalViewPointSize = geometry.size
-                        let (pw, ph) = physicalPixels(from: geometry.size)
-                        currentPixelWidth = pw
-                        currentPixelHeight = ph
-                        widthText = "\(pw)"
-                        heightText = "\(ph)"
-                    }
+                if let scene = scene {
+                    MetalView(device: device, scene: scene,
+                              rendererType: rendererType, debugType: debugType)
+                        // No .id() — the view persists, only the renderer swaps
+                        .onChange(of: geometry.size) { oldSize, newSize in
+                            guard !isProgrammaticResize,
+                                  newSize.width > 0, newSize.height > 0 else { return }
+                            metalViewPointSize = newSize
+                            let (pw, ph) = physicalPixels(from: newSize)
+                            currentPixelWidth = pw
+                            currentPixelHeight = ph
+                            widthText = "\(pw)"
+                            heightText = "\(ph)"
+                        }
+                        .onAppear {
+                            guard geometry.size.width > 0, geometry.size.height > 0 else { return }
+                            metalViewPointSize = geometry.size
+                            let (pw, ph) = physicalPixels(from: geometry.size)
+                            currentPixelWidth = pw
+                            currentPixelHeight = ph
+                            widthText = "\(pw)"
+                            heightText = "\(ph)"
+                        }
+                } else {
+                    ProgressView("Loading scene…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
             
             VStack(alignment: .leading, spacing: 16) {
                 rendererSection
+                if rendererType == .debug {
+                    debugTypeSection
+                }
                 Divider()
                 resolutionSection
                 Spacer()
@@ -53,6 +65,11 @@ struct ContentView: View {
             .padding(12)
             .frame(width: hudWidth)
             .background(Color(NSColor.controlBackgroundColor))
+        }
+        .onAppear {
+            if scene == nil {
+                scene = GameScene(device: device)
+            }
         }
     }
         
@@ -65,6 +82,35 @@ struct ContentView: View {
             Picker("", selection: $rendererType) {
                 Text(RendererType.megaKernel.displayName).tag(RendererType.megaKernel)
                 Text(RendererType.waveFront.displayName).tag(RendererType.waveFront)
+                Text(RendererType.debug.displayName).tag(RendererType.debug)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        }
+    }
+    
+    private var debugTypeSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Debug Channel")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Picker("", selection: $debugType) {
+                Text("Color").tag(Color)
+                Text("Roughness").tag(Roughness)
+                Text("Metallic").tag(Metallic)
+                Text("IOR").tag(IOR)
+                Text("Transmission").tag(Transmission)
+                Text("Clearcoat").tag(Clearcoat)
+                Text("Clearcoat Roughness").tag(ClearcoatRoughness)
+                Text("Thickness").tag(ThicknessFactor)
+                Text("Attenuation Color").tag(AttenuationColor)
+                Text("Attenuation Distance").tag(AttenuationDistance)
+                Text("Alpha").tag(Alpha)
+                Text("Alpha Mode").tag(AlphaMode)
+                Text("Emission").tag(Emission)
+                Text("BXDF").tag(BXDF)
+                Text("Normal").tag(Normal)
             }
             .labelsHidden()
             .pickerStyle(.menu)
@@ -144,44 +190,97 @@ struct ContentView: View {
     }
 }
 
+// MARK: - MetalView
+
 struct MetalView: NSViewRepresentable {
-    let device: MTLDevice = MTLCreateSystemDefaultDevice()!
+    let device: MTLDevice
+    let scene: GameScene
     var rendererType: RendererType
+    var debugType: DebugType
     
-    func makeCoordinator() -> Renderer {
-        switch rendererType {
-        case .megaKernel:
-            return MegaKernelRenderer(device: device, scene: GameScene(device: device))
-        case .waveFront:
-            return WaveFrontRenderer(device: device, scene: GameScene(device: device))
+    class Coordinator {
+        let device: MTLDevice
+        let scene: GameScene
+        var renderer: Renderer?
+        var activeRendererType: RendererType?
+        var activeDebugType: DebugType?
+        weak var mtkView: KeyHandlingMTKView?
+        
+        init(device: MTLDevice, scene: GameScene) {
+            self.device = device
+            self.scene = scene
         }
+        
+        func swapRenderer(to type: RendererType, debugType: DebugType) {
+            mtkView?.isPaused = true
+            
+            let newRenderer: Renderer
+            switch type {
+            case .megaKernel:
+                newRenderer = MegaKernelRenderer(device: device, scene: scene)
+            case .waveFront:
+                newRenderer = WaveFrontRenderer(device: device, scene: scene)
+            case .debug:
+                newRenderer = DebugRenderer(device: device, scene: scene, debugType: debugType)
+            }
+            
+            renderer = newRenderer
+            activeRendererType = type
+            activeDebugType = debugType
+            
+            mtkView?.delegate = newRenderer
+            mtkView?.renderer = newRenderer
+            
+            if let mtkView = mtkView {
+                let size = mtkView.drawableSize
+                if size.width > 0, size.height > 0 {
+                    newRenderer.mtkView(mtkView, drawableSizeWillChange: size)
+                }
+            }
+            
+            mtkView?.isPaused = false
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(device: device, scene: scene)
     }
     
     func makeNSView(context: Context) -> MTKView {
         let mtkView = KeyHandlingMTKView()
-        mtkView.delegate = context.coordinator
         mtkView.preferredFramesPerSecond = 60
         mtkView.device = device
         mtkView.framebufferOnly = false
         mtkView.isPaused = false
         mtkView.depthStencilPixelFormat = .depth32Float
-        mtkView.renderer = context.coordinator
+        
+        context.coordinator.mtkView = mtkView
+        context.coordinator.swapRenderer(to: rendererType, debugType: debugType)
+        
         return mtkView
     }
     
     func updateNSView(_ nsView: MTKView, context: Context) {
+        let needsSwap =
+            context.coordinator.activeRendererType != rendererType ||
+            (rendererType == .debug && context.coordinator.activeDebugType != debugType)
         
+        if needsSwap {
+            context.coordinator.swapRenderer(to: rendererType, debugType: debugType)
+        }
     }
 }
 
-enum RendererType {
+enum RendererType: Equatable {
     case megaKernel
     case waveFront
+    case debug
     
     var displayName: String {
         switch self {
         case .megaKernel: return "Mega Kernel"
         case .waveFront: return "Wave Front"
+        case .debug: return "Debug"
         }
     }
 }

@@ -5,10 +5,15 @@
 //  Created on 9/18/25.
 //
 
-#import "Utility.h"
-#import "Lights.h"
-#import "Interactions.h"
-#import "Materials.h"
-#import "Samplers.h"
-#import "AssimpLoader.h"
-#import "GLTFLoader.h"
+// Metal
+#include "Utility.h"
+#include "Lights.h"
+#include "Interactions.h"
+#include "Materials.h"
+#include "Samplers.h"
+
+#import "Debug.h"
+
+// Asset Loading
+#include "AssimpLoader.h"
+#include "GLTFLoader.h"
