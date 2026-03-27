@@ -8,12 +8,12 @@ A physically-based renderer written in Metal and Swift. The renderer leverages M
 - Point lights, area lights, directional/infinite lights, and importance sampled environment maps
 
 ### Possible future features
-[] Better light transport, e.g. vertex connection and merging (VCM) or path guiding
-[] Spectral rendering
-[] Volumetric rendering of homogeneous and non-homogeneous media
-[] More complex materials to simulate thin-film interference and subsurface scattering 
-[] Realistic camera models with depth of field
-[X] Improved 3D file format support
+- [ ] Better light transport, e.g. vertex connection and merging (VCM) or path guiding
+- [ ] Spectral rendering
+- [ ] Volumetric rendering of homogeneous and non-homogeneous media
+- [ ] More complex materials to simulate thin-film interference and subsurface scattering 
+- [ ] Realistic camera models with depth of field
+- [X] Improved 3D file format support
 
 <img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/46cdcb49-3f42-4ee4-8426-5091799d7a10" />
 <img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/db0940ef-187c-40f0-8bd7-aaba03679e14" />
