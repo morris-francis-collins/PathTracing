@@ -6,29 +6,30 @@
 
 import MetalKit
 
-extension VectorParameter: Equatable {
-    public static func ==(lhs: VectorParameter, rhs: VectorParameter) -> Bool {
-        return lhs.value.x == rhs.value.x &&
-               lhs.value.y == rhs.value.y &&
-               lhs.value.z == rhs.value.z &&
-               lhs.textureIndex == rhs.textureIndex
-    }
-}
-
-extension ScalarParameter: Equatable {
-    public static func ==(lhs: ScalarParameter, rhs: ScalarParameter) -> Bool {
-        return lhs.value == rhs.value && lhs.textureIndex == rhs.textureIndex
-    }
-}
-
 extension Material: Equatable {
     public static func ==(lhs: Material, rhs: Material) -> Bool {
-        return lhs.color == rhs.color &&
-               lhs.refraction == rhs.refraction &&
-               lhs.roughness == rhs.roughness &&
-               lhs.metallic == rhs.metallic &&
-               lhs.emission == rhs.emission &&
-               lhs.BXDFs == rhs.BXDFs
+        return lhs.colorValue == rhs.colorValue &&
+               lhs.colorTextureIndex == rhs.colorTextureIndex &&
+               lhs.roughnessValue == rhs.roughnessValue &&
+               lhs.roughnessTextureIndex == rhs.roughnessTextureIndex &&
+               lhs.metallicValue == rhs.metallicValue &&
+               lhs.metallicTextureIndex == rhs.metallicTextureIndex &&
+               lhs.emissionValue == rhs.emissionValue &&
+               lhs.emissionTextureIndex == rhs.emissionTextureIndex &&
+               lhs.emissiveStrength == rhs.emissiveStrength &&
+               lhs.ior == rhs.ior &&
+               lhs.alphaMode == rhs.alphaMode &&
+               lhs.alphaCutoff == rhs.alphaCutoff &&
+               lhs.transmissionValue == rhs.transmissionValue &&
+               lhs.transmissionTextureIndex == rhs.transmissionTextureIndex &&
+               lhs.thicknessFactor == rhs.thicknessFactor &&
+               lhs.normalTextureIndex == rhs.normalTextureIndex &&
+               lhs.clearcoatValue == rhs.clearcoatValue &&
+               lhs.clearcoatTextureIndex == rhs.clearcoatTextureIndex &&
+               lhs.clearcoatRoughnessValue == rhs.clearcoatRoughnessValue &&
+               lhs.clearcoatRoughnessTextureIndex == rhs.clearcoatRoughnessTextureIndex &&
+               lhs.clearcoatNormalTextureIndex == rhs.clearcoatNormalTextureIndex &&
+               lhs.doubleSided == rhs.doubleSided
     }
 }
 
@@ -37,25 +38,14 @@ class MaterialRegistry {
     
     private var materials: [Material] = []
     private var materialBuffer: MTLBuffer?
-        
+    
     func addMaterial(_ material: Material) -> Int {
-        let index = getIndex(for: material)
-        
-        if (index != -1) {
-            return index;
+        if let index = materials.firstIndex(of: material) {
+            return index
         }
         
         materials.append(material)
         return materials.count - 1
-    }
-    
-    func getIndex(for material: Material) -> Int {
-        for i in 0..<materials.count {
-            if material == materials[i] {
-                return i
-            }
-        }
-        return -1;
     }
     
     func getMaterials() -> [Material] {
@@ -64,12 +54,14 @@ class MaterialRegistry {
     
     func uploadToBuffers(device: MTLDevice) {
         if !materials.isEmpty {
-            materialBuffer = device.makeBuffer(bytes: materials,
-                                               length: materials.count * MemoryLayout<Material>.stride,
-                                               options: getManagedBufferStorageMode())
+            materialBuffer = device.makeBuffer(
+                bytes: materials,
+                length: materials.count * MemoryLayout<Material>.stride,
+                options: getManagedBufferStorageMode()
+            )
         }
     }
-    
+
     func getBuffer() -> MTLBuffer? {
         return materialBuffer
     }

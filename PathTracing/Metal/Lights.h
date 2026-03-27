@@ -40,7 +40,8 @@ struct Light {
 struct LightTriangle {
     vector_float3 v0, v1, v2;
     vector_float2 uv0, uv1, uv2;
-    VectorParameter emission;
+    vector_float3 emission;
+    int emissionTextureIndex;
     float CDF;
 };
 

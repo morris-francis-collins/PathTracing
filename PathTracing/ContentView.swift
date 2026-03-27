@@ -7,7 +7,7 @@ import SwiftUI
 import MetalKit
 
 struct ContentView: View {
-    @State private var rendererType: RendererType = .waveFront
+    @State private var rendererType: RendererType = .megaKernel
     @State private var widthText: String = ""
     @State private var heightText: String = ""
     @State private var currentPixelWidth: Int = 0

@@ -77,13 +77,14 @@ LightSample sampleAreaLight(float3 position,
     float d = length(wo);
     wo /= d;
     
-    float3 emission = triangle.emission.value;
+    float3 emission = triangle.emission;
     constexpr sampler textureSampler(address::repeat, filter::linear);
-    if (triangle.emission.textureIndex != -1) {
-        emission *= textures->textures[triangle.emission.textureIndex].sample(textureSampler, lightUV).rgb;
+    
+    if (triangle.emissionTextureIndex != -1) {
+        emission *= textures->textures[triangle.emissionTextureIndex].sample(textureSampler, lightUV).rgb;
     }
 
-    return LightSample(lightPosition, normal, wo, triangle.emission.value, d, 1.0f / areaLight.totalArea);
+    return LightSample(lightPosition, normal, wo, triangle.emission, d, 1.0f / areaLight.totalArea);
 }
 
 LightEmissionSample sampleAreaLightEmission(constant Light& areaLight, constant LightTriangle *lightTriangles, float2 r2, float3 r3) {
@@ -264,39 +265,42 @@ float getLightPower(constant Light& light) {
 constant Light& selectLight(constant Light *lights,
                             constant Uniforms& uniforms,
                             float r,
-                            thread float& selectionPDF
-                  )
+                            thread float& selectionPDF)
 {
     float weights[MAX_LIGHTS];
     float totalWeight = 0.0f;
     
     for (unsigned int i = 0; i < uniforms.lightCount; i++) {
         float power = getLightPower(lights[i]);
-                        
-        weights[i] = power;
+        
+        weights[i] = max(power, 0.0f);
         totalWeight += weights[i];
     }
     
-    unsigned int idx = 0;
-    
-    if (totalWeight < 1e-4f) {
-        idx = r * float(uniforms.lightCount);
+    if (totalWeight < 1e-8f || isnan(totalWeight)) {
+        unsigned int idx = min((unsigned int)(r * float(uniforms.lightCount)),
+                               uniforms.lightCount - 1);
         selectionPDF = 1.0f / float(uniforms.lightCount);
-    } else {
-        float random = r * totalWeight;
-        float accumWeight = 0.0f;
+        return lights[idx];
+    }
+    
+    float random = r * totalWeight;
+    float accumWeight = 0.0f;
+    unsigned int idx = uniforms.lightCount - 1;
+    selectionPDF = weights[idx] / totalWeight;
+    
+    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
+        accumWeight += weights[i];
         
-        for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-            accumWeight += weights[i];
-            
-            if (accumWeight >= random) {
-                idx = i;
-                selectionPDF = weights[i] / totalWeight;
-                break;
-            }
+        if (accumWeight >= random) {
+            idx = i;
+            selectionPDF = weights[i] / totalWeight;
+            break;
         }
     }
-
+    
+    selectionPDF = max(selectionPDF, 1e-8f);
+    
     return lights[idx];
 }
 

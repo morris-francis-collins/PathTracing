@@ -87,13 +87,13 @@ float3 pathIntegrator(float2 pixel,
         float epsilon = calculateEpsilon(surfaceInteraction.position);
         prevSpecular = bsdfSample.delta;
         
-        if (inMedium) {
-            attenuationDistance += length(surfaceInteraction.position - ray.origin);
-        } else if (bsdfSample.transmitted) {
-            float3 absorption = log(1 - material.color);
-            throughput *= exp(absorption * attenuationDistance);
-            attenuationDistance = 0.0f;
-        }
+//        if (inMedium) {
+//            attenuationDistance += length(surfaceInteraction.position - ray.origin);
+//        } else if (bsdfSample.transmitted) {
+//            float3 absorption = log(1 - material.color);
+//            throughput *= exp(absorption * attenuationDistance);
+//            attenuationDistance = 0.0f;
+//        }
 
         if (!bsdfSample.delta) {
             float selectionPDF;

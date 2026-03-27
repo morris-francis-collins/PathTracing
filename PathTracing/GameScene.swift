@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createColorfulDragonScene()
+        createSoloScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -97,7 +97,7 @@ class GameScene: ObservableObject {
         }
         
         if (lightTriangles.isEmpty) {
-            lightTriangles.append(LightTriangle(v0: .zero, v1: .zero, v2: .zero, uv0: .zero, uv1: .zero, uv2: .zero, emission: VectorParameter(), CDF: 0.0))
+            lightTriangles.append(LightTriangle(v0: .zero, v1: .zero, v2: .zero, uv0: .zero, uv1: .zero, uv2: .zero, emission: .zero, emissionTextureIndex: -1, CDF: 0.0))
         }
 
         lightBuffer = device.makeBuffer(bytes: lights, length: lights.count * MemoryLayout<Light>.size, options: options)
@@ -423,8 +423,7 @@ class GameScene: ObservableObject {
         
         buildColorfulBox()
                 
-        let goldMaterial = createStaticMaterial(color: SIMD3<Float>(1.0, 0.84, 0.6), refraction: 1.5, roughness: 0.35,
-                                                metallic: 1.0, emission: .zero, BXDFs: CONDUCTOR)
+        let goldMaterial = createStaticMaterial(color: SIMD3<Float>(1.0, 0.84, 0.6), roughness: 0.35, metallic: 1.0, emission: .zero)
         let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: goldMaterial)
         
         addInstance(with: dragonGeometry,
@@ -687,7 +686,7 @@ class GameScene: ObservableObject {
         var plasticMaterial = PLASTIC
         
         for i in 0...10 {
-            plasticMaterial.roughness.value = Float(i) * 0.1
+            plasticMaterial.roughnessValue = Float(i) * 0.1
             
             let scalingPlasticGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: plasticMaterial)
             
@@ -700,7 +699,7 @@ class GameScene: ObservableObject {
         var mirrorMaterial = MIRROR
         
         for i in 0...10 {
-            mirrorMaterial.roughness.value = Float(i) * 0.1
+            mirrorMaterial.roughnessValue = Float(i) * 0.1
             
             let scalingMirrorGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: mirrorMaterial)
             
@@ -713,7 +712,7 @@ class GameScene: ObservableObject {
         var glassMaterial = GLASS
         
         for i in 0...10 {
-            glassMaterial.roughness.value = Float(i) * 0.1
+            glassMaterial.roughnessValue = Float(i) * 0.1
             
             let scalingGlassGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: glassMaterial)
             
@@ -726,7 +725,7 @@ class GameScene: ObservableObject {
         var coloredGlassMaterial = GLASS
 
         for i in 0...10 {
-            coloredGlassMaterial.color = VectorParameter(value: colors[i], textureIndex: -1)
+            coloredGlassMaterial.colorValue = colors[i]
 
             let coloredGlassGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: coloredGlassMaterial)
 
@@ -764,7 +763,7 @@ class GameScene: ObservableObject {
         let rotations: [Float] = [.pi/24, .pi/12, .pi/6, .pi/3.1]
 
         for i in 0..<4 {
-            mirrorMaterial.roughness.value = roughnesses[i]
+            mirrorMaterial.roughnessValue = roughnesses[i]
 
             let mirrorSlabGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: mirrorMaterial)
 
@@ -795,11 +794,26 @@ class GameScene: ObservableObject {
         (cameraPosition, cameraTarget) = cameraLocations[0]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
-        let bistroGeometry = addAssimpGeometry(fileName: "BistroExterior", fileExtension: "fbx", emissionAmplifier: 200.0)
+        let bistroGeometry = addGLTFGeometry(fileName: "Bistro_Godot", fileExtension: "glb", emissionAmplifier: 0)
         addInstance(with: bistroGeometry)
         
         addEnvironmentMap(textureURL: duskURL)
     }
+    
+    func createCornellScene() {
+        cameraLocations = [
+            (SIMD3<Float>(5, 3, 2.75), SIMD3<Float>(4, 3, 2.75))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let cornellBoxGeometry = addGLTFGeometry(fileName: "box", fileExtension: "glb", emissionAmplifier: 50)
+        addInstance(with: cornellBoxGeometry,
+                    rotation: SIMD3<Float>(-.pi/2, 0, .pi/2)
+        )
+    }
+
     
     func createKoenigseggScene() {
         cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
@@ -813,11 +827,64 @@ class GameScene: ObservableObject {
         let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
         addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(6, 0.1, 6))
 
-        let koenigseggGeometry = addAssimpGeometry(fileName: "koenigsegg_one_pro", fileExtension: "glb", emissionAmplifier: 5.0)
+        let koenigseggGeometry = addGLTFGeometry(fileName: "koenigsegg_one_pro", fileExtension: "glb", emissionAmplifier: 5.0)
         addInstance(with: koenigseggGeometry, scale: 10 * .one)
 
         addEnvironmentMap(textureURL: duskURL)
     }
+    
+    func createSoloScene() {
+        cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
+                           (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
+                           (SIMD3<Float>(0.17043182, 0.72948277, -0.16555624), SIMD3<Float>(0.6853374, -1.058545, 8.639974))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+//        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
+//        let angelGeometry = addAssimpGeometry(fileName: "lucy", fileExtension: "obj", defaultMaterial: GLASS)
+//        let saintGeometry = addAssimpGeometry(fileName: "saint", fileExtension: "obj", defaultMaterial: GLASS)
+//                
+//        addInstance(with: dragonGeometry,
+//                    translation: SIMD3<Float>(-1.8, 0.0, 2.5),
+//                    rotation: SIMD3<Float>(0, .pi, 0),
+//                    scale: SIMD3<Float>(0.1, 0.1, 0.1)
+//        )
+//        
+//        addInstance(with: dragonGeometry,
+//                    translation: SIMD3<Float>(-1.8, 2.0, 2.5),
+//                    rotation: SIMD3<Float>(0, .pi, 0),
+//                    scale: SIMD3<Float>(1, 1, 1)
+//        )
+//        
+//        addInstance(with: angelGeometry,
+//                    translation: SIMD3<Float>(0, 0, 2.5),
+//                    rotation: SIMD3<Float>(.pi, 0, 0),
+//                    scale: SIMD3<Float>(0.0015, 0.0015, 0.0015)
+//        )
+//
+//        addInstance(with: saintGeometry,
+//                    translation: SIMD3<Float>(1.5, 0, 2.2),
+//                    rotation: SIMD3<Float>(-.pi/2, 0, 0),
+//                    scale: SIMD3<Float>(0.01, 0.01, 0.01)
+//                )
+        
+        let scalingPlasticGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: SMOOTH_OPAQUE_DIELECTRIC)
+        
+        addInstance(with: scalingPlasticGeometry,
+                    translation: SIMD3<Float>(-20, 0, 0),
+                    scale: 25 * .one
+        )
+        
+        addInstance(with: scalingPlasticGeometry,
+                    translation: SIMD3<Float>(20, 0, 0),
+                    scale: 25 * .one
+        )
+
+        addEnvironmentMap(textureURL: skyURL)
+    }
+
          
     func createEnvironmentMapBallsScene() {
         cameraLocations = [(SIMD3<Float>(0.0, 3.95, 0.0), SIMD3<Float>(0.0, 1.0, -0.01)),
@@ -832,20 +899,13 @@ class GameScene: ObservableObject {
         (cameraPosition, cameraTarget) = cameraLocations[6]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
-        let wallGeometry = ObjGeometry(device: device, objURL: cubeURL, material: PLASTIC)
-        
-        addInstance(
-            with: wallGeometry,
-            translation: SIMD3<Float>(0.0, 0.0, 0.0),
-            rotation: SIMD3<Float>(0, 0, 0),
-            scale: SIMD3<Float>(6, 1e-3, 6),
-            mask: GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_OPAQUE
-        )
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(6, 0.1, 6))
         
         var plasticMaterial = PLASTIC
         
         for i in 0...10 {
-            plasticMaterial.roughness.value = Float(i) * 0.1
+            plasticMaterial.roughnessValue = Float(i) * 0.1
             
             let scalingPlasticGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: plasticMaterial)
             
@@ -858,7 +918,7 @@ class GameScene: ObservableObject {
         var mirrorMaterial = MIRROR
         
         for i in 0...10 {
-            mirrorMaterial.roughness.value = Float(i) * 0.1
+            mirrorMaterial.roughnessValue = Float(i) * 0.1
             
             let scalingMirrorGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: mirrorMaterial)
             
@@ -871,7 +931,7 @@ class GameScene: ObservableObject {
         var glassMaterial = GLASS
         
         for i in 0...10 {
-            glassMaterial.roughness.value = Float(i) * 0.1
+            glassMaterial.roughnessValue = Float(i) * 0.1
             
             let scalingGlassGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: glassMaterial)
             
@@ -947,6 +1007,7 @@ class GameScene: ObservableObject {
             instanceLightTriangles.append(LightTriangle(v0: v0, v1: v1, v2: v2,
                                                         uv0: UVs[3 * i + 0], uv1: UVs[3 * i + 1], uv2: UVs[3 * i + 2],
                                                         emission: areaLight.emission,
+                                                        emissionTextureIndex: areaLight.emissionTextureIndex,
                                                         CDF: totalArea)
             )
         }
@@ -1078,5 +1139,23 @@ class GameScene: ObservableObject {
         } else {
             fatalError("Failed to find resource \(fileName)")
         }
+    }
+    
+    func addGLTFGeometry(
+        fileName: String,
+        fileExtension: String,
+        emissionAmplifier: Float = 1.0
+    ) -> GLTFGeometry {
+        guard let modelPath = Bundle.main.path(forResource: fileName, ofType: fileExtension) else {
+            fatalError("[GameScene] Failed to find resource \(fileName).\(fileExtension)")
+        }
+ 
+        let geometry = GLTFGeometry(
+            device: device,
+            modelPath: modelPath,
+            emissionAmplifier: emissionAmplifier
+        )
+        addGeometry(geometry)
+        return geometry
     }
 }

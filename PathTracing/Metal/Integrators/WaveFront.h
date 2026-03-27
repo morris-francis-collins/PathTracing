@@ -6,8 +6,8 @@
 //
 
 #include <simd/simd.h>
-#include "../Utility.h"
-#include "../Lights.h"
-#include "../Interactions.h"
-#include "../Materials.h"
-#include "../Samplers.h" 
+#include "Utility.h"
+#include "Lights.h"
+#include "Interactions.h"
+#include "Materials.h"
+#include "Samplers.h"

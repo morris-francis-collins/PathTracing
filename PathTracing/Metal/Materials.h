@@ -10,34 +10,80 @@
 #include "Utility.h"
 #include "Samplers.h"
 
-#define DIFFUSE 1 << 0
-#define CONDUCTOR 1 << 1
-#define SPECULAR_TRANSMISSION 1 << 2
+#define DIFFUSE (1 << 0)
+#define CONDUCTOR (1 << 1)
+#define DIELECTRIC_TRANSMISSION (1 << 2)
+#define DIELECTRIC_REFLECTION (1 << 3)
 
-struct VectorParameter {
-    vector_float3 value;
-    int textureIndex;
-};
-
-struct ScalarParameter {
-    float value;
-    int textureIndex;
-};
+#define ALPHA_OPAQUE 0
 
 struct Material {
-    VectorParameter color;
-    ScalarParameter refraction;
-    ScalarParameter roughness;
-    ScalarParameter metallic;
-    VectorParameter emission;
-    int BXDFs;
-};
+    vector_float3 colorValue;
+    int colorTextureIndex;
 
+    float roughnessValue;
+    int roughnessTextureIndex;
+
+    float metallicValue;
+    int metallicTextureIndex;
+
+    vector_float3 emissionValue;
+    int emissionTextureIndex;
+    float emissiveStrength;
+
+    float ior;
+
+    unsigned int alphaMode;
+    float alphaCutoff;
+
+    float transmissionValue;
+    int transmissionTextureIndex;
+    
+    float thicknessFactor;
+    vector_float3 attenuationColor;
+    float attenuationDistance;
+ 
+    int normalTextureIndex;
+    float normalScale;
+ 
+    float clearcoatValue;
+    int clearcoatTextureIndex;
+
+    float clearcoatRoughnessValue;
+    int clearcoatRoughnessTextureIndex;
+
+    int clearcoatNormalTextureIndex;
+    
+    float anisotropyStrength;
+    float anisotropyRotation;
+    int anisotropyTextureIndex;
+ 
+    vector_float3 sheenColor;
+    float sheenRoughness;
+ 
+    unsigned int doubleSided;
+};
+  
 struct SampledMaterial {
     vector_float3 color;
-    float refraction;
+    float ior;
     float roughness;
     float metallic;
+    float transmission;
+ 
+    float clearcoat;
+    float clearcoatRoughness;
+ 
+    float thicknessFactor;
+    vector_float3 attenuationColor;
+    float attenuationDistance;
+ 
+    float alpha;
+    unsigned int alphaMode;
+    float alphaCutoff;
+ 
+    vector_float3 emission;
+ 
     int BXDFs;
 };
 
@@ -52,19 +98,6 @@ struct BSDFSample {
     float PDF;
     bool delta;
     bool transmitted;
-    
-    BSDFSample() {
-        delta = false;
-        transmitted = false;
-    }
-    
-    BSDFSample(float3 _BSDF, float3 _wo, float _PDF, bool _delta = false, bool _transmitted = false) {
-        BSDF = _BSDF;
-        wo = _wo;
-        PDF = _PDF;
-        delta = _delta;
-        transmitted = _transmitted;
-    }
 };
 
 BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, SampledMaterial material, float2 r2);

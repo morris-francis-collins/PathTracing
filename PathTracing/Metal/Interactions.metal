@@ -43,53 +43,77 @@ IntersectionResult intersect(ray ray,
 }
 
 void sampleBXDF(thread SampledMaterial& material) {
-    if (material.metallic > 0.5f) {
+    if (material.transmission > 0.01f) {
+        material.BXDFs = DIELECTRIC_TRANSMISSION;
+    } else if (material.metallic > 0.5f) {
         material.BXDFs = CONDUCTOR;
-    } else if (material.refraction > 1.01f) {
-        material.BXDFs = SPECULAR_TRANSMISSION;
+    } else if (material.ior > 1.01f) {
+        material.BXDFs = DIELECTRIC_REFLECTION;
     } else {
         material.BXDFs = DIFFUSE;
     }
 }
 
 SampledMaterial sampleMaterial(Material material, float2 uv, constant Textures* textures) {
-    SampledMaterial sampledMaterial;
-    constexpr sampler textureSampler(address::repeat, filter::linear);
-    bool transparent = false;
+    SampledMaterial out;
+    constexpr sampler s(address::repeat, filter::linear);
     
-    if (material.color.textureIndex >= 0) {
-        float4 texColor = textures->textures[material.color.textureIndex].sample(textureSampler, uv);
-        transparent = texColor.a < 0.8f; // cutoff seems to work
-        sampledMaterial.color = material.color.value * (transparent ? 1.0f : texColor.rgb);
+    float alpha = 1.0f;
+    if (material.colorTextureIndex >= 0) {
+        float4 tex = textures->textures[material.colorTextureIndex].sample(s, uv);
+        out.color = material.colorValue * tex.rgb;
+        alpha = tex.a;
     } else {
-        sampledMaterial.color = material.color.value;
+        out.color = material.colorValue;
     }
-        
-    if (material.roughness.textureIndex >= 0) {
-        float4 texValue = textures->textures[material.roughness.textureIndex].sample(textureSampler, uv);
-        sampledMaterial.roughness = texValue.g;
+
+    if (material.roughnessTextureIndex >= 0) {
+        out.roughness = material.roughnessValue * textures->textures[material.roughnessTextureIndex].sample(s, uv).g;
     } else {
-        sampledMaterial.roughness = material.roughness.value;
+        out.roughness = material.roughnessValue;
     }
-    
-    if (material.metallic.textureIndex >= 0) {
-        float4 texValue = textures->textures[material.metallic.textureIndex].sample(textureSampler, uv);
-        sampledMaterial.metallic = texValue.b;
+
+    if (material.metallicTextureIndex >= 0) {
+        out.metallic = material.metallicValue * textures->textures[material.metallicTextureIndex].sample(s, uv).b;
     } else {
-        sampledMaterial.metallic = material.metallic.value;
+        out.metallic = material.metallicValue;
     }
-    
-    sampledMaterial.refraction = material.refraction.value;
-    sampleBXDF(sampledMaterial);
-    
-    if (transparent) {
-        sampledMaterial.BXDFs = SPECULAR_TRANSMISSION;
-        sampledMaterial.roughness = 0.0f;
-        sampledMaterial.color = 1.0f - sampledMaterial.color;
-        sampledMaterial.refraction = 1.0f;
+
+    if (material.emissionTextureIndex >= 0) {
+        out.emission = material.emissionValue * textures->textures[material.emissionTextureIndex].sample(s, uv).rgb * material.emissiveStrength;
+    } else {
+        out.emission = material.emissionValue * material.emissiveStrength;
     }
-    
-    return sampledMaterial;
+
+    if (material.transmissionTextureIndex >= 0) {
+        out.transmission = material.transmissionValue * textures->textures[material.transmissionTextureIndex].sample(s, uv).r;
+    } else {
+        out.transmission = material.transmissionValue;
+    }
+
+    if (material.clearcoatTextureIndex >= 0) {
+        out.clearcoat = material.clearcoatValue * textures->textures[material.clearcoatTextureIndex].sample(s, uv).r;
+    } else {
+        out.clearcoat = material.clearcoatValue;
+    }
+
+    if (material.clearcoatRoughnessTextureIndex >= 0) {
+        out.clearcoatRoughness = material.clearcoatRoughnessValue * textures->textures[material.clearcoatRoughnessTextureIndex].sample(s, uv).g;
+    } else {
+        out.clearcoatRoughness = material.clearcoatRoughnessValue;
+    }
+
+    out.ior = material.ior;
+    out.thicknessFactor = material.thicknessFactor;
+    out.attenuationColor = material.attenuationColor;
+    out.attenuationDistance = material.attenuationDistance;
+
+    out.alphaMode = material.alphaMode;
+    out.alphaCutoff = material.alphaCutoff;
+    out.alpha = (material.alphaMode == ALPHA_OPAQUE) ? 1.0f : alpha;
+
+    sampleBXDF(out);
+    return out;
 }
 
 SurfaceInteraction getSurfaceInteraction(ray ray,
@@ -113,23 +137,33 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     float3 objectNormal = interpolateVertexAttribute(primitiveData->n0, primitiveData->n1, primitiveData->n2, barycentric_coords);
     float3 worldNormal = normalize(transformDirection(objectNormal, objectToWorldTransform));
     surfaceInteraction.normal = worldNormal;
-
+    
     float2 uv = interpolateVertexAttribute(primitiveData->uv0, primitiveData->uv1, primitiveData->uv2, barycentric_coords);
     
     constant Material& material = materials[primitiveData->materialIndex];
+    constexpr sampler textureSampler(address::repeat, filter::linear);
     int primitiveLightIndex = primitiveData->primitiveLightIndex;
     
     if (primitiveLightIndex != -1) {
         surfaceInteraction.lightIndex = instanceLightIndices[instanceIndex] + primitiveLightIndex;
-        constexpr sampler textureSampler(address::repeat, filter::linear);
-
-        surfaceInteraction.emission = material.emission.value;
-        if (material.emission.textureIndex != -1) {
-            surfaceInteraction.emission *= textures->textures[material.emission.textureIndex].sample(textureSampler, uv).rgb;
+        surfaceInteraction.emission = material.emissionValue * material.emissiveStrength;
+        if (material.emissionTextureIndex >= 0) {
+            surfaceInteraction.emission *= textures->textures[material.emissionTextureIndex].sample(textureSampler, uv).rgb;
         }
     } else {
         surfaceInteraction.lightIndex = -1;
         surfaceInteraction.emission = float3(0.0f);
+    }
+    
+    if (material.normalTextureIndex >= 0) {
+        float3 texNormal = textures->textures[material.normalTextureIndex].sample(textureSampler, uv).xyz;
+        texNormal = texNormal * 2.0 - 1.0;
+        texNormal.xy *= material.normalScale;
+        
+        float3 T, B;
+        createOrthonormalBasis(surfaceInteraction.normal, T, B);
+
+        surfaceInteraction.normal = normalize(T * texNormal.x + B * texNormal.y + surfaceInteraction.normal * texNormal.z);
     }
 
     surfaceInteraction.material = sampleMaterial(material, uv, textures);

@@ -10,7 +10,8 @@ import MetalKit
 import Foundation
 
 struct AreaLight {
-    let emission: VectorParameter
+    let emission: SIMD3<Float>
+    let emissionTextureIndex: Int32
     let averageEmission: SIMD3<Float>
     let vertices: [SIMD3<Float>]
     let UVs: [SIMD2<Float>]
@@ -187,7 +188,7 @@ class Geometry {
 }
 
 class ObjGeometry: Geometry {
-    var material: Material?
+    var material: Material!
     var texture: MTLTexture?
     
     init(device: MTLDevice, objURL: URL, textureURL: URL = transparentURL, color: SIMD3<Float> = .one, emissionColor: SIMD3<Float> = .zero, material: Material = PLASTIC, inwardsNormals: Bool = false) {
@@ -196,7 +197,8 @@ class ObjGeometry: Geometry {
         
         self.inwardsNormals = inwardsNormals
         self.material = material
-        self.material?.emission = VectorParameter(value: emissionColor, textureIndex: -1)
+        self.material.emissionValue = emissionColor
+        self.material.emissionTextureIndex = -1
         
         guard let fileContent = try? String(contentsOf: objURL, encoding: .utf8) else {
             print("Failed to read OBJ file from \(objURL)")
@@ -267,7 +269,7 @@ class ObjGeometry: Geometry {
         do {
             texture = try textureLoader.newTexture(URL: textureURL, options: options)
             let index = TextureRegistry.shared.addTexture(texture!, identifier: String(TextureRegistry.shared.getTextures().count))
-            self.material?.color.textureIndex = Int32(index)
+            self.material.colorTextureIndex = Int32(index)
             print("TEXINDEX", index, textureURL.path())
         } catch {
             fatalError("Couldn't load texture: \(error)")
@@ -287,7 +289,7 @@ class ObjGeometry: Geometry {
                 vertices.append(pos)
                 normals.append(inwardsNormals ? -norm : norm)
                 texCoords.append(uv)
-                materials.append(self.material!)
+                materials.append(self.material)
                 primitiveLightIndices.append(primitiveLightIndex)
             }
             
@@ -306,7 +308,8 @@ class ObjGeometry: Geometry {
                 totalArea += area
                 lightTriangles.append(LightTriangle(v0: v0, v1: v1, v2: v2,
                                                     uv0: texCoords[i0], uv1: texCoords[i1], uv2: texCoords[i2],
-                                                    emission: self.material!.emission,
+                                                    emission: self.material.emissionValue,
+                                                    emissionTextureIndex: self.material.emissionTextureIndex,
                                                     CDF: totalArea)
                 )
             }
@@ -316,7 +319,12 @@ class ObjGeometry: Geometry {
             for i in 0..<lightTriangles.count {
                 lightTriangles[i].CDF /= totalArea
             }
-            areaLights.append(AreaLight(emission: self.material!.emission, averageEmission: emissionColor, vertices: vertices, UVs: texCoords))
+            areaLights.append(AreaLight(emission: self.material.emissionValue,
+                                        emissionTextureIndex: self.material.emissionTextureIndex,
+                                        averageEmission: emissionColor,
+                                        vertices: vertices,
+                                        UVs: texCoords)
+            )
         }
         
         uploadToBuffers()

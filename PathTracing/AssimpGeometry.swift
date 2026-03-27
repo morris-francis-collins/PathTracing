@@ -34,12 +34,8 @@ class AssimpGeometry: Geometry {
         for m in 0..<Int(scene.meshCount) {
             let mesh = scene.meshes[m]
             let material = loadMaterialWithTextures(mesh: mesh, defaultMaterial: defaultMaterial, defaultTexture: defaultTexture)
-            let isEmissive = length_squared(material.emission.value) > 1e-4 || material.emission.textureIndex != -1
+            let isEmissive = length_squared(material.emissionValue * material.emissiveStrength) > 1e-4 || material.emissionTextureIndex != -1
             let primitiveLightIndex = isEmissive ? areaLights.count : -1
-            
-//            if (!isEmissive) {
-//                continue
-//            }
             
             for i in stride(from: 0, to: Int(mesh.indexCount), by: 3) {
                 let i0 = Int(mesh.indices[i + 0])
@@ -59,9 +55,7 @@ class AssimpGeometry: Geometry {
                 texCoords.append(mesh.texCoords[i2] * defaultTexture.uvMultiplier)
 
                 let materialIndex = MaterialRegistry.shared.addMaterial(material)
-                
                 materials.append(material)
-                
                 primitiveLightIndices.append(Int32(primitiveLightIndex))
                 
                 let primitiveData = PrimitiveData(n0: normalize(mesh.normals[i0]),
@@ -77,12 +71,12 @@ class AssimpGeometry: Geometry {
             }
 
             if isEmissive {
-                let averageEmission = material.emission.value // FIXME: get avg texture
-                areaLights.append(AreaLight(emission: material.emission,
+                let averageEmission = material.emissionValue * material.emissiveStrength
+                areaLights.append(AreaLight(emission: averageEmission,
+                                            emissionTextureIndex: material.emissionTextureIndex,
                                             averageEmission: averageEmission,
                                             vertices: vertices.suffix(Int(mesh.indexCount)),
-                                            UVs: texCoords.suffix(Int(mesh.indexCount)))
-                )
+                                            UVs: texCoords.suffix(Int(mesh.indexCount))))
             }
         }
         
@@ -91,33 +85,30 @@ class AssimpGeometry: Geometry {
     
     private func loadMaterialWithTextures(mesh: MeshData, defaultMaterial: Material?, defaultTexture: TextureInfo) -> Material {
         var material = defaultMaterial ?? createStaticMaterial(
-            color: SIMD3<Float>(mesh.material.color.value.x, mesh.material.color.value.y, mesh.material.color.value.z),
-            refraction: mesh.material.refraction.value,
-            roughness: mesh.material.roughness.value,
-            metallic: mesh.material.metallic.value,
-            emission: mesh.material.emission.value,
-            BXDFs: mesh.material.BXDFs
+            color: SIMD3<Float>(mesh.material.colorValue.x, mesh.material.colorValue.y, mesh.material.colorValue.z),
+            roughness: mesh.material.roughnessValue,
+            metallic: mesh.material.metallicValue,
+            emission: mesh.material.emissionValue
         )
         
-        material.emission.value *= emissionAmplifier
+        material.emissionValue *= emissionAmplifier
         
         if let textureURL = defaultTexture.textureURL {
-            let index = loadTexture(device: device, textureURL: textureURL)
-            material.color.textureIndex = Int32(index)
+            material.colorTextureIndex = loadTexture(device: device, textureURL: textureURL)
         } else if let colorIndex = loadEmbeddedTexture(mesh.embeddedColorTexture, type: "color", pixelFormat: .rgba8Unorm_srgb, sRGB: true, bytesPerPixel: 4) {
-            material.color.textureIndex = Int32(colorIndex)
+            material.colorTextureIndex = Int32(colorIndex)
         }
         
         if let roughnessIndex = loadEmbeddedTexture(mesh.embeddedRoughnessTexture, type: "roughness", pixelFormat: .r8Unorm, sRGB: false, bytesPerPixel: 1) {
-            material.roughness.textureIndex = Int32(roughnessIndex)
+            material.roughnessTextureIndex = Int32(roughnessIndex)
         }
         
         if let metallicIndex = loadEmbeddedTexture(mesh.embeddedMetallicTexture, type: "metallic", pixelFormat: .r8Unorm, sRGB: false, bytesPerPixel: 1) {
-            material.metallic.textureIndex = Int32(metallicIndex)
+            material.metallicTextureIndex = Int32(metallicIndex)
         }
         
         if let emissiveIndex = loadEmbeddedTexture(mesh.embeddedEmissiveTexture, type: "emission", pixelFormat: .rgba8Unorm_srgb, sRGB: true, bytesPerPixel: 4) {
-            material.emission.textureIndex = Int32(emissiveIndex)
+            material.emissionTextureIndex = Int32(emissiveIndex)
         }
         
         return material
@@ -133,13 +124,8 @@ class AssimpGeometry: Geometry {
             guard let texture = try? textureLoader!.newTexture(data: data, options: [.SRGB: NSNumber(value: sRGB), .generateMipmaps: NSNumber(value: true)])
             else { return nil }
             
-            let index = TextureRegistry.shared.addTexture(
-                texture,
-                identifier: "Embedded_\(modelName)_\(type)_\(embedded.index)"
-            )
-            print("Loaded embedded \(type) texture at index \(index)")
+            let index = TextureRegistry.shared.addTexture(texture, identifier: "Embedded_\(modelName)_\(type)_\(embedded.index)")
             return index
-            
         } else {
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(
                 pixelFormat: pixelFormat,
@@ -157,11 +143,7 @@ class AssimpGeometry: Geometry {
                 bytesPerRow: Int(embedded.width) * bytesPerPixel
             )
             
-            let index = TextureRegistry.shared.addTexture(
-                texture,
-                identifier: "EmbeddedRaw_\(modelName)_\(type)_\(embedded.index)"
-            )
-            print("Loaded embedded raw \(type) texture at index \(index)")
+            let index = TextureRegistry.shared.addTexture(texture, identifier: "EmbeddedRaw_\(modelName)_\(type)_\(embedded.index)")
             return index
         }
     }
@@ -172,7 +154,7 @@ class AssimpGeometry: Geometry {
         
         do {
             let texture = try textureLoader.newTexture(URL: textureURL, options: options)
-            let index = TextureRegistry.shared.addTexture(texture, identifier: String("defaultTexture_\(textureURL.lastPathComponent)"))
+            let index = TextureRegistry.shared.addTexture(texture, identifier: "defaultTexture_\(textureURL.lastPathComponent)")
             return Int32(index)
         } catch {
             fatalError("Couldn't load texture: \(error)")
@@ -203,7 +185,7 @@ class AssimpGeometry: Geometry {
         if let mb = materialBuffer { resourceArray.append(mb) }
         if let tx = textureCoordinatesBuffer { resourceArray.append(tx) }
         if let pi = primitiveLightIndicesBuffer { resourceArray.append(pi) }
-
+        
         return resourceArray
     }
         
