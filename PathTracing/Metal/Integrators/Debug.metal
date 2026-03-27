@@ -96,7 +96,7 @@ kernel void debugSurfaceProperties(uint2 tid [[thread_position_in_grid]],
                 color = float3(1.0f);
             break;
         case Normal:
-            color = surfaceInteraction.normal; break;
+            color = surfaceInteraction.normal * 0.5f + 0.5f; break;
     }
     
     image.write(float4(color, 1.0f), tid);

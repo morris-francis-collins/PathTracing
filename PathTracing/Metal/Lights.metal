@@ -278,8 +278,7 @@ constant Light& selectLight(constant Light *lights,
     }
     
     if (totalWeight < 1e-8f || isnan(totalWeight)) {
-        unsigned int idx = min((unsigned int)(r * float(uniforms.lightCount)),
-                               uniforms.lightCount - 1);
+        unsigned int idx = min((unsigned int)(r * float(uniforms.lightCount)), uniforms.lightCount - 1);
         selectionPDF = 1.0f / float(uniforms.lightCount);
         return lights[idx];
     }

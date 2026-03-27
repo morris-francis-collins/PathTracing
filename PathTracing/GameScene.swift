@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createBistroScene()
+        createTheWhiteRoom()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -99,6 +99,8 @@ class GameScene: ObservableObject {
         if (lightTriangles.isEmpty) {
             lightTriangles.append(LightTriangle(v0: .zero, v1: .zero, v2: .zero, uv0: .zero, uv1: .zero, uv2: .zero, emission: .zero, emissionTextureIndex: -1, CDF: 0.0))
         }
+        
+        print("instanceLightIndices", instanceLightIndices)
 
         lightBuffer = device.makeBuffer(bytes: lights, length: lights.count * MemoryLayout<Light>.size, options: options)
         lightTriangleBuffer = device.makeBuffer(bytes: lightTriangles, length: lightTriangles.count * MemoryLayout<LightTriangle>.size, options: options)
@@ -803,17 +805,30 @@ class GameScene: ObservableObject {
     
     func createCornellScene() {
         cameraLocations = [
-            (SIMD3<Float>(5, 3, 2.75), SIMD3<Float>(4, 3, 2.75))
+            (SIMD3<Float>(-1.0515742e-08, 2.1341612, -2.5105686), SIMD3<Float>(-6.5451777e-09, 1.8385572, -1.5556743))
         ]
         
         (cameraPosition, cameraTarget) = cameraLocations[0]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
-        let cornellBoxGeometry = addGLTFGeometry(fileName: "box", fileExtension: "glb", emissionAmplifier: 50)
-        addInstance(with: cornellBoxGeometry,
-                    rotation: SIMD3<Float>(-.pi/2, 0, .pi/2)
+        let cornellBoxGeometry = addGLTFGeometry(fileName: "veach_mis_remake", fileExtension: "glb", emissionAmplifier: 10)
+        addInstance(with: cornellBoxGeometry
+//                    rotation: SIMD3<Float>(-.pi/2, 0, .pi/2)
         )
     }
+    
+    func createTheWhiteRoom() {
+        cameraLocations = [
+            (SIMD3<Float>(2.617519, 1.4286628, 6.338271), SIMD3<Float>(2.0222836, 1.3286594, 5.541462))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let theWhiteRoomGeometry = addGLTFGeometry(fileName: "the-white-room", fileExtension: "gltf", emissionAmplifier: 5)
+        addInstance(with: theWhiteRoomGeometry)
+    }
+
 
     
     func createKoenigseggScene() {
@@ -984,6 +999,7 @@ class GameScene: ObservableObject {
 
             lightTriangles.append(contentsOf: instanceLightTriangles)
             lights.append(areaLight)
+            print("new light", light.averageEmission, totalArea, length(light.averageEmission / totalArea), instanceLightTriangles.count, lightTriangles[0].emission)
         }
     }
     

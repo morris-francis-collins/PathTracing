@@ -7,7 +7,7 @@ import SwiftUI
 import MetalKit
 
 struct ContentView: View {
-    @State private var rendererType: RendererType = .debug
+    @State private var rendererType: RendererType = .megaKernel
     @State private var debugType: DebugType = Color
     @State private var widthText: String = ""
     @State private var heightText: String = ""

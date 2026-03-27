@@ -81,8 +81,9 @@ class GLTFGeometry: Geometry {
                 let emissionVerts = Array(vertices.suffix(vCount))
                 let emissionUVs = Array(texCoords.suffix(vCount))
                 let avgEmission = material.emissionValue * material.emissiveStrength
+                
                 areaLights.append(AreaLight(
-                    emission: material.emissionValue,
+                    emission: material.emissionValue * material.emissiveStrength,
                     emissionTextureIndex: material.emissionTextureIndex,
                     averageEmission: avgEmission,
                     vertices: emissionVerts,
