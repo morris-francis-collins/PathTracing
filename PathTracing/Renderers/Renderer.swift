@@ -228,11 +228,12 @@ class Renderer: NSObject, MTKViewDelegate {
         drawableSize = size
         let textureDescriptor = getImageTextureDescriptor(size)
         
+        textureDescriptor.storageMode = .shared
         finalImage = device.makeTexture(descriptor: textureDescriptor)
                 
         textureDescriptor.pixelFormat = .r32Uint
         textureDescriptor.usage = [.shaderRead, .shaderWrite]
-        textureDescriptor.storageMode = .shared
+        textureDescriptor.storageMode = .shared // ?
         
         randomTexture = device.makeTexture(descriptor: textureDescriptor)
         

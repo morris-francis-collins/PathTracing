@@ -16,6 +16,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		1DA12E742F7747DB00C5FE9F /* Renders */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Renders;
+			sourceTree = "<group>";
+		};
 		1DB937E82DBC835A00B93D69 /* PathTracing */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PathTracing;
@@ -41,6 +46,7 @@
 				1DB937E82DBC835A00B93D69 /* PathTracing */,
 				1DD55F512E7CD24B00C9D78D /* Frameworks */,
 				1DB937E72DBC835A00B93D69 /* Products */,
+				1DA12E742F7747DB00C5FE9F /* Renders */,
 			);
 			sourceTree = "<group>";
 		};
@@ -76,6 +82,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				1DA12E742F7747DB00C5FE9F /* Renders */,
 				1DB937E82DBC835A00B93D69 /* PathTracing */,
 			);
 			name = PathTracing;

@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var currentPixelHeight: Int = 0
     @State private var metalViewPointSize: CGSize = .zero
     @State private var isProgrammaticResize: Bool = false
+    @State private var coordinator: MetalView.Coordinator?
     
     @State private var device: MTLDevice = MTLCreateSystemDefaultDevice()!
     @State private var scene: GameScene? = nil
@@ -25,9 +26,7 @@ struct ContentView: View {
         HStack(spacing: 0) {
             GeometryReader { geometry in
                 if let scene = scene {
-                    MetalView(device: device, scene: scene,
-                              rendererType: rendererType, debugType: debugType)
-                        // No .id() — the view persists, only the renderer swaps
+                    MetalView(device: device, scene: scene, rendererType: rendererType, debugType: debugType, coordinator: $coordinator)
                         .onChange(of: geometry.size) { oldSize, newSize in
                             guard !isProgrammaticResize,
                                   newSize.width > 0, newSize.height > 0 else { return }
@@ -55,11 +54,11 @@ struct ContentView: View {
             
             VStack(alignment: .leading, spacing: 16) {
                 rendererSection
-                if rendererType == .debug {
-                    debugTypeSection
-                }
+                if rendererType == .debug { debugTypeSection }
                 Divider()
                 resolutionSection
+                Divider()
+                exportSection
                 Spacer()
             }
             .padding(12)
@@ -149,6 +148,21 @@ struct ContentView: View {
         }
     }
     
+    private var exportSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Export")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 8) {
+                Button("EXR") { coordinator?.renderer?.exportImage(format: .exr) }
+                    .controlSize(.small)
+                Button("PNG") { coordinator?.renderer?.exportImage(format: .png) }
+                    .controlSize(.small)
+            }
+        }
+    }
+    
     private func physicalPixels(from viewSize: CGSize) -> (Int, Int) {
         let scale = screenScaleFactor()
         return (Int(round(viewSize.width * scale)), Int(round(viewSize.height * scale)))
@@ -197,6 +211,8 @@ struct MetalView: NSViewRepresentable {
     let scene: GameScene
     var rendererType: RendererType
     var debugType: DebugType
+    
+    @Binding var coordinator: MetalView.Coordinator?
     
     class Coordinator {
         let device: MTLDevice
@@ -256,6 +272,10 @@ struct MetalView: NSViewRepresentable {
         
         context.coordinator.mtkView = mtkView
         context.coordinator.swapRenderer(to: rendererType, debugType: debugType)
+        
+        DispatchQueue.main.async {
+            coordinator = context.coordinator
+        }
         
         return mtkView
     }

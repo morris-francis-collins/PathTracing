@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createTheWhiteRoom()
+        createTheWhiteRoomScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -817,7 +817,7 @@ class GameScene: ObservableObject {
         )
     }
     
-    func createTheWhiteRoom() {
+    func createTheWhiteRoomScene() {
         cameraLocations = [
             (SIMD3<Float>(2.617519, 1.4286628, 6.338271), SIMD3<Float>(2.0222836, 1.3286594, 5.541462))
         ]
@@ -829,7 +829,31 @@ class GameScene: ObservableObject {
         addInstance(with: theWhiteRoomGeometry)
     }
 
-
+    func createClassroomScene() {
+        cameraLocations = [
+            (SIMD3<Float>(2.617519, 1.4286628, 6.338271), SIMD3<Float>(2.0222836, 1.3286594, 5.541462))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let classroomGeometry = addGLTFGeometry(fileName: "classroom", fileExtension: "glb", emissionAmplifier: 5)
+        addInstance(with: classroomGeometry)
+    }
+    
+    func createSponzaScene() {
+        cameraLocations = [
+            (SIMD3<Float>(8.942848, 1.4464355, -0.914266), SIMD3<Float>(7.945744, 1.4462265, -0.84355915))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let sponzaGeometry = addGLTFGeometry(fileName: "sponza", fileExtension: "glb", emissionAmplifier: 5)
+        addInstance(with: sponzaGeometry)
+        
+        addEnvironmentMap(textureURL: skyURL)
+    }
     
     func createKoenigseggScene() {
         cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
