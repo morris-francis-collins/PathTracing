@@ -2,6 +2,7 @@
 A physically-based renderer written in Metal and Swift. The renderer leverages Metal's ray tracing capabilities for GPU acceleration. 
 
 ### Features
+
 - Bidirectional and unidirectional path tracing with multiple importance sampling (MIS) 
 - GGX microfacet model for rough conductors and dielectrics
 - Lambertian diffuse, perfect and rough specular reflection/transmission
@@ -15,6 +16,7 @@ A physically-based renderer written in Metal and Swift. The renderer leverages M
 - [ ] Realistic camera models with depth of field
 - [X] Improved 3D file format support
 
+<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/f5ee930d-79bd-454e-93cb-f40e30e87df1" />
 <img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/46cdcb49-3f42-4ee4-8426-5091799d7a10" />
 <img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/db0940ef-187c-40f0-8bd7-aaba03679e14" />
 <img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/e8e3438e-7544-4b8a-bff7-c10fd90632a8" />
