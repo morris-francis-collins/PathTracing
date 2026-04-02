@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createTheWhiteRoomScene()
+        createKoenigseggScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -657,33 +657,33 @@ class GameScene: ObservableObject {
         
         buildBox(width: 6.0, height: 4.0, depth: 6.0)
         
-        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
-        let angelGeometry = addAssimpGeometry(fileName: "lucy", fileExtension: "obj", defaultMaterial: GLASS)
-        let saintGeometry = addAssimpGeometry(fileName: "saint", fileExtension: "obj", defaultMaterial: GLASS)
+//        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
+//        let angelGeometry = addAssimpGeometry(fileName: "lucy", fileExtension: "obj", defaultMaterial: GLASS)
+//        let saintGeometry = addAssimpGeometry(fileName: "saint", fileExtension: "obj", defaultMaterial: GLASS)
                 
-        addInstance(with: dragonGeometry,
-                    translation: SIMD3<Float>(-1.8, 0.0, 2.5),
-                    rotation: SIMD3<Float>(0, .pi, 0),
-                    scale: SIMD3<Float>(0.1, 0.1, 0.1)
-        )
-        
-        addInstance(with: dragonGeometry,
-                    translation: SIMD3<Float>(-1.8, 2.0, 2.5),
-                    rotation: SIMD3<Float>(0, .pi, 0),
-                    scale: SIMD3<Float>(1, 1, 1)
-        )
-        
-        addInstance(with: angelGeometry,
-                    translation: SIMD3<Float>(0, 0, 2.5),
-                    rotation: SIMD3<Float>(.pi, 0, 0),
-                    scale: SIMD3<Float>(0.0015, 0.0015, 0.0015)
-        )
-
-        addInstance(with: saintGeometry,
-                            translation: SIMD3<Float>(1.5, 0, 2.2),
-                            rotation: SIMD3<Float>(-.pi/2, 0, 0),
-                            scale: SIMD3<Float>(0.01, 0.01, 0.01)
-                )
+//        addInstance(with: dragonGeometry,
+//                    translation: SIMD3<Float>(-1.8, 0.0, 2.5),
+//                    rotation: SIMD3<Float>(0, .pi, 0),
+//                    scale: SIMD3<Float>(0.1, 0.1, 0.1)
+//        )
+//        
+//        addInstance(with: dragonGeometry,
+//                    translation: SIMD3<Float>(-1.8, 2.0, 2.5),
+//                    rotation: SIMD3<Float>(0, .pi, 0),
+//                    scale: SIMD3<Float>(1, 1, 1)
+//        )
+//        
+//        addInstance(with: angelGeometry,
+//                    translation: SIMD3<Float>(0, 0, 2.5),
+//                    rotation: SIMD3<Float>(.pi, 0, 0),
+//                    scale: SIMD3<Float>(0.0015, 0.0015, 0.0015)
+//        )
+//
+//        addInstance(with: saintGeometry,
+//                            translation: SIMD3<Float>(1.5, 0, 2.2),
+//                            rotation: SIMD3<Float>(-.pi/2, 0, 0),
+//                            scale: SIMD3<Float>(0.01, 0.01, 0.01)
+//                )
 
         var plasticMaterial = PLASTIC
         
@@ -724,18 +724,18 @@ class GameScene: ObservableObject {
             )
         }
 
-        var coloredGlassMaterial = GLASS
-
-        for i in 0...10 {
-            coloredGlassMaterial.colorValue = colors[i]
-
-            let coloredGlassGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: coloredGlassMaterial)
-
-            addInstance(with: coloredGlassGeometry,
-                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 2.0, 2.8),
-                        scale: SIMD3<Float>(0.4, 0.1, 0.4)
-            )
-        }
+//        var coloredGlassMaterial = GLASS
+//
+//        for i in 0...10 {
+//            coloredGlassMaterial.colorValue = colors[i]
+//
+//            let coloredGlassGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: coloredGlassMaterial)
+//
+//            addInstance(with: coloredGlassGeometry,
+//                        translation: SIMD3<Float>(2.5 - 0.5 * Float(i), 2.0, 2.8),
+//                        scale: SIMD3<Float>(0.4, 0.1, 0.4)
+//            )
+//        }
         
         let lightStripGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj",
                                                    defaultMaterial: createEmissiveMaterial(color: .one), emissionAmplifier: 10.0)
@@ -801,6 +801,11 @@ class GameScene: ObservableObject {
         addInstance(with: bistroGeometry)
         
         addEnvironmentMap(textureURL: skyURL)
+//        addDirectionalLight(direction: normalize(SIMD3<Float>(-5.179535, 2.3451493, 1.7693316) - SIMD3<Float>(-2.4023888, 7.42692, -5.1199884)),
+//                            color: 50 * SIMD3<Float>(1.0, 0.7, 0.3))
+        
+//        addDirectionalLight(direction: normalize(SIMD3<Float>(-11.187415, 2.126988, -0.48907298) - SIMD3<Float>(-6.061944, 9.1769085, 1.7531793)),
+//                            color: 30 * SIMD3<Float>(1.0, 0.9, 0.7))
     }
     
     func createCornellScene() {
@@ -819,14 +824,20 @@ class GameScene: ObservableObject {
     
     func createTheWhiteRoomScene() {
         cameraLocations = [
-            (SIMD3<Float>(2.617519, 1.4286628, 6.338271), SIMD3<Float>(2.0222836, 1.3286594, 5.541462))
+            (SIMD3<Float>(2.617519, 1.4286628, 6.338271), SIMD3<Float>(2.0222836, 1.3286594, 5.541462)),
+            (SIMD3<Float>(1.1198118, 2.628534, 3.8063128), SIMD3<Float>(0.88185596, 2.5285306, 2.8406072)),
+            (SIMD3<Float>(1.3578613, 2.7285774, 4.7724), SIMD3<Float>(1.1199056, 2.628574, 3.806694)),
+            (SIMD3<Float>(1.6609695, 1.7784909, 2.5131052), SIMD3<Float>(1.0657344, 1.6784875, 1.7162956)),
+            (SIMD3<Float>(0.15505639, 2.3613663, 3.05573), SIMD3<Float>(0.59740114, 2.3611557, 2.1593232))
         ]
         
         (cameraPosition, cameraTarget) = cameraLocations[0]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
-        let theWhiteRoomGeometry = addGLTFGeometry(fileName: "the-white-room", fileExtension: "gltf", emissionAmplifier: 5)
+        let theWhiteRoomGeometry = addGLTFGeometry(fileName: "the-white-room", fileExtension: "gltf", emissionAmplifier: 5) // default 5
         addInstance(with: theWhiteRoomGeometry)
+        
+//        addPointLight(position: SIMD3<Float>(0.30735147, 1.7533731, 3.622696), color: 100 * .one)
     }
 
     func createClassroomScene() {
@@ -849,11 +860,40 @@ class GameScene: ObservableObject {
         (cameraPosition, cameraTarget) = cameraLocations[0]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
-        let sponzaGeometry = addGLTFGeometry(fileName: "sponza", fileExtension: "glb", emissionAmplifier: 5)
+        let sponzaGeometry = addGLTFGeometry(fileName: "light_sponza", fileExtension: "glb", emissionAmplifier: 5)
         addInstance(with: sponzaGeometry)
         
-        addEnvironmentMap(textureURL: skyURL)
+//        addEnvironmentMap(textureURL: skyURL)
     }
+    
+    func createDragonArrayScene() {
+        cameraLocations = [
+            (SIMD3<Float>(8.942848, 1.4464355, -0.914266), SIMD3<Float>(7.945744, 1.4462265, -0.84355915))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let dragonArrayGeometry = addGLTFGeometry(fileName: "dragon_array", fileExtension: "glb")
+        addInstance(with: dragonArrayGeometry)
+        
+        addEnvironmentMap(textureURL: duskURL)
+    }
+    
+    func createMitsubaScene() {
+        cameraLocations = [
+            (SIMD3<Float>(8.942848, 1.4464355, -0.914266), SIMD3<Float>(7.945744, 1.4462265, -0.84355915))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let mitsubaGeometry = addGLTFGeometry(fileName: "mitsuba_knob", fileExtension: "glb")
+        addInstance(with: mitsubaGeometry)
+        
+        addEnvironmentMap(textureURL: duskURL)
+    }
+
     
     func createKoenigseggScene() {
         cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
@@ -870,8 +910,26 @@ class GameScene: ObservableObject {
         let koenigseggGeometry = addGLTFGeometry(fileName: "koenigsegg_one_pro", fileExtension: "glb", emissionAmplifier: 5.0)
         addInstance(with: koenigseggGeometry, scale: 10 * .one)
 
-        addEnvironmentMap(textureURL: duskURL)
+        addEnvironmentMap(textureURL: skyURL)
+//        addDirectionalLight(direction: normalize(SIMD3<Float>(-5.179535, 2.3451493, 1.7693316) - SIMD3<Float>(-2.4023888, 7.42692, -5.1199884)),
+//                            color: 50 * SIMD3<Float>(1.0, 0.7, 0.3))
     }
+    
+    func createBedroomScene() {
+        cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
+                           (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
+                           (SIMD3<Float>(0.17043182, 0.72948277, -0.16555624), SIMD3<Float>(0.6853374, -1.058545, 8.639974))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let bedroomGeometry = addAssimpGeometry(fileName: "salle_de_bain", fileExtension: "obj", emissionAmplifier: 5.0)
+        addInstance(with: bedroomGeometry, scale: .one)
+
+//        addEnvironmentMap(textureURL: skyURL)
+    }
+
     
     func createSoloScene() {
         cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),

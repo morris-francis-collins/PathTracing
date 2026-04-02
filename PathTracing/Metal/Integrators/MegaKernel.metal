@@ -64,11 +64,21 @@ float3 pathIntegrator(float2 pixel,
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = surfaceInteraction.material;
         
+        if (material.BXDFs == DIFFUSE || material.BXDFs == CONDUCTOR || material.BXDFs == DIELECTRIC_REFLECTION) {
+            if (dot(-ray.direction, surfaceInteraction.normal) < 0.0f)
+                surfaceInteraction.normal = -surfaceInteraction.normal;
+        }
+        
         if (material.alphaMode == ALPHA_MASK && material.alpha < material.alphaCutoff) {
             ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
             continue;
         }
         
+        if (material.alphaMode == ALPHA_BLEND && sampler.r() > material.alpha) {
+            ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
+            continue;
+        }
+
         float3 n = surfaceInteraction.normal;
 
         if (surfaceInteraction.hitLight()) {
@@ -138,7 +148,7 @@ float3 pathIntegrator(float2 pixel,
             throughput /= q;
         }
         
-        ray.origin = surfaceInteraction.position + calculateOffset(wo, n, epsilon);
+        ray.origin = surfaceInteraction.position + wo * 1e-4f;
         ray.direction = wo;
         ray.min_distance = epsilon;
     }
@@ -189,6 +199,17 @@ int tracePath(float2 pixel,
 
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = surfaceInteraction.material;
+        
+        if (material.BXDFs == DIFFUSE || material.BXDFs == CONDUCTOR || material.BXDFs == DIELECTRIC_REFLECTION) {
+            if (dot(-ray.direction, surfaceInteraction.normal) < 0.0f)
+                surfaceInteraction.normal = -surfaceInteraction.normal;
+        }
+                
+        if (material.alphaMode == ALPHA_MASK && material.alpha < material.alphaCutoff) {
+            ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
+            continue;
+        }
+
         float3 n = surfaceInteraction.normal;
         
         vx = createSurfaceVertex(surfaceInteraction, throughput, forwardPDF, prev);
@@ -223,9 +244,9 @@ int tracePath(float2 pixel,
             throughput /= q;
         }
 
-        ray.origin = surfaceInteraction.position + calculateOffset(wo, n, epsilon);
+        ray.origin = surfaceInteraction.position + calculateOffset(wo, n, 1e-4f);
         ray.direction = wo;
-        ray.min_distance = epsilon;
+        ray.min_distance = 1e-5f;
     }
 
     return bounces;
@@ -250,11 +271,13 @@ int traceCameraPath(float2 pixel,
     ray ray = generateRay(pixel, uniforms);
     
     float positionPDF, directionPDF;
-//    cameraRayPDF(camera, ray.direction, positionPDF, directionPDF); // better results when directionPDF = 0? possibly due to pinhole
+//    cameraRayPDF(uniforms, ray.direction, positionPDF, directionPDF); // better results when directionPDF = 0? possibly due to pinhole
     positionPDF = 1.0f, directionPDF = 0.0f;
     
     cameraVertices[0] = createCameraVertex(&camera, camera.position, camera.forward, float3(1.0f));
-    cameraVertices[0].forwardPDF = positionPDF;
+//    cameraVertices[0].forwardPDF = positionPDF;
+//    cameraVertices[0].delta = true;
+
     float3 throughput = float3(1.0f);
 
     return tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF, materials);
@@ -288,7 +311,7 @@ int traceLightPath(float2 pixel,
     ray.direction = lightEmissionSample.wo;
     ray.min_distance = epsilon;
     ray.max_distance = INFINITY;
-
+    // TODO: light.color needs to be sampled from texture
     lightVertices[0] = createLightVertex(&light, lightEmissionSample.position, normal, light.color, positionPDF * selectionPDF);
     float3 throughput = lightEmissionSample.emission / (selectionPDF * positionPDF * directionPDF);
 
@@ -319,8 +342,11 @@ float3 calculateGeometricTerm(thread PathVertex& cameraVertex,
     float connectionDistance = length(connectionVector);
     float3 connectionDirection = connectionVector / connectionDistance;
                 
-    float G = (lightVertex.isInfiniteLight() || lightVertex.ei.light->type == DIRECTIONAL_LIGHT) ? 1.0f : 1.0f / max(connectionDistance * connectionDistance, 0.0f);
+    bool noFalloff = lightVertex.isInfiniteLight()
+                 || (lightVertex.type == LIGHT_VERTEX && lightVertex.ei.light && lightVertex.ei.light->type == DIRECTIONAL_LIGHT);
 
+    float G = noFalloff ? 1.0f : 1.0f / max(connectionDistance * connectionDistance, 1e-8f);
+    
     if (cameraVertex.isOnSurface()) {
         float cosCamera = dot(cameraVertex.normal(), connectionDirection);
         if (cosCamera < 0.0f)
@@ -371,14 +397,14 @@ float calculateMISWeight(constant Uniforms& uniforms,
     float origCamPrevRev = (cip >= 0) ? cameraVertices[cip].reversePDF : 0.0f;
     bool  origCamPrevDel = (cip >= 0) ? cameraVertices[cip].delta   : false;
 
-    float origLgtRev     = lightVertices[li].reversePDF;
-    bool  origLgtDelta   = lightVertices[li].delta;
+    float origLgtRev   = (li >= 0) ? lightVertices[li].reversePDF : 0.0f;
+    bool  origLgtDelta = (li >= 0) ? lightVertices[li].delta : false;
     float origLgtPrevRev = (lip >= 0) ? lightVertices[lip].reversePDF : 0.0f;
     bool  origLgtPrevDel = (lip >= 0) ? lightVertices[lip].delta   : false;
                 
     if (ci >= 0) {
         if (li >= 0) {
-            cameraVertices[ci].reversePDF = lightVertices[li].PDF(lightVertices[lip], cameraVertices[ci], environmentMapCDF);
+            cameraVertices[ci].reversePDF = lightVertices[li].PDF(lightVertices[lip], cameraVertices[ci], environmentMapCDF, uniforms);
         } else { // l = 0 case
             constant Light& light = lights[cameraVertices[ci].si.lightIndex]; // originally origin
             cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms, cameraVertices[cip], environmentMapCDF);
@@ -388,7 +414,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
     
     if (cip >= 0) {
         if (li >= 0) {
-            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapCDF);
+            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapCDF, uniforms);
         } else { // l = 0 case
             constant Light& light = lights[cameraVertices[ci].si.lightIndex]; // originally direction
             cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip], environmentMapCDF);
@@ -396,18 +422,18 @@ float calculateMISWeight(constant Uniforms& uniforms,
     }
     
     if (li >= 0) {
-        lightVertices[li].reversePDF = cameraVertices[ci].PDF(cameraVertices[cip], lightVertices[li], environmentMapCDF);
+        lightVertices[li].reversePDF = cameraVertices[ci].PDF(cameraVertices[cip], lightVertices[li], environmentMapCDF, uniforms);
         lightVertices[li].delta = false;
     }
     
     if (lip >= 0) {
-        lightVertices[lip].reversePDF = lightVertices[li].PDF(cameraVertices[ci], lightVertices[lip], environmentMapCDF);
+        lightVertices[lip].reversePDF = lightVertices[li].PDF(cameraVertices[ci], lightVertices[lip], environmentMapCDF, uniforms);
     }
     
     float sum = 0.0f;
     float r = 1.0f;
 
-    for (int i = ci; i > 0; i--) {
+    for (int i = ci; i > 1; i--) {
         r *= remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF);
 
         if (!cameraVertices[i].delta && !cameraVertices[i - 1].delta)
@@ -431,8 +457,10 @@ float calculateMISWeight(constant Uniforms& uniforms,
         cameraVertices[cip].delta   = origCamPrevDel;
     }
 
-    lightVertices[li].reversePDF = origLgtRev;
-    lightVertices[li].delta = origLgtDelta;
+    if (li >= 0) {
+        lightVertices[li].reversePDF = origLgtRev;
+        lightVertices[li].delta = origLgtDelta;
+    }
     if (lip >= 0) {
         lightVertices[lip].reversePDF = origLgtPrevRev;
         lightVertices[lip].delta   = origLgtPrevDel;
@@ -527,6 +555,7 @@ float3 connectVertices(constant Uniforms& uniforms,
 //        return contribution;
         if (lightVertex.isConnectible()) {
             float3 We = cameraWe(uniforms, lightVertex.position());
+//            sampled = createCameraVertex(&uniforms.camera, uniforms.camera.position, uniforms.camera.forward, We);
             float3 lightBSDF = lightVertex.BXDF(-normalize(lightVertex.position() - lightVertices[l - 2].position()), cameraVertex);
             contribution = We * lightVertex.throughput * lightBSDF;
             

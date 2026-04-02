@@ -174,34 +174,30 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
 bool isVisible(float3 pos1, float3 normal1,
                float3 pos2, float3 normal2,
                device MTLAccelerationStructureInstanceDescriptor *instances,
-               instance_acceleration_structure accelerationStructure
-               )
+               instance_acceleration_structure accelerationStructure)
 {
     float3 w = pos2 - pos1;
     float dist = length(w);
     w /= dist;
-    
-    float epsilon1 = calculateEpsilon(pos1);
-    float epsilon2 = calculateEpsilon(pos2);
-    
-    float3 offsetOrigin = pos1 + calculateOffset(normal1, w, epsilon1);
-    float3 offsetTarget = pos2 + calculateOffset(normal2, -w, epsilon2);
 
-    float3 offsetDir = offsetTarget - offsetOrigin;
-    float offsetDist = length(offsetDir);
-    offsetDir /= offsetDist;
-    
+    float3 origin = pos1 + w * 1e-4f;
+    float3 target = pos2 - w * 1e-4f;
+
+    float3 dir = target - origin;
+    float len = length(dir);
+    dir /= len;
+
     ray shadowRay;
-    shadowRay.origin = offsetOrigin;
-    shadowRay.direction = offsetDir;
+    shadowRay.origin = origin;
+    shadowRay.direction = dir;
     shadowRay.min_distance = 0.0f;
-    shadowRay.max_distance = offsetDist * (1.0f - 1e-3f);
+    shadowRay.max_distance = len - 1e-4f;
     
     IntersectionResult intersection = intersect(shadowRay,
                                                 RAY_MASK_SHADOW,
                                                 instances,
                                                 accelerationStructure,
                                                 true);
-    
+
     return intersection.type == intersection_type::none;
 }

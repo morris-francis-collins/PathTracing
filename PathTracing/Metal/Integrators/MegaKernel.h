@@ -142,7 +142,7 @@ struct PathVertex {
         }
     }
     
-    float PDF(thread PathVertex& prev, thread PathVertex& nxt, constant float* environmentMapCDF) {
+    float PDF(thread PathVertex& prev, thread PathVertex& nxt, constant float* environmentMapCDF, constant Uniforms& uniforms) {
         if (type == LIGHT_VERTEX) {
             if (!ei.light) DEBUG("NO LIGHT");
             return lightDirectionPDF(*ei.light, nxt, environmentMapCDF);
@@ -153,7 +153,7 @@ struct PathVertex {
         float PDF, unused;
         if (type == CAMERA_VERTEX) {
             PDF = 0.0f;
-//            cameraRayPDF(*ei.camera, wo, unused, PDF);
+//            cameraRayPDF(uniforms, wo, unused, PDF);
         } else if (type == SURFACE_VERTEX) {
             float3 wi = normalize(position() - prev.position());
             PDF = getPDF(-wi, wo, normal(), si.material);
@@ -206,7 +206,7 @@ struct PathVertex {
             float2 uv = getEnvironmentMapUV(w);
             return environmentMapEmission(uv, environmentMapTexture);
         } else if (si.hitLight()) {
-            return lights[si.lightIndex].color;
+            return si.emission; // TODO: needs to sample from texture
         }
         
         return float3(0.0f);
@@ -223,7 +223,8 @@ struct PathVertex {
             case LIGHT_VERTEX:
                 return ei.light->type != DIRECTIONAL_LIGHT;
             case SURFACE_VERTEX:
-                return true;
+                // TODO: change to test if pure specular lobe. should only return false if all lobes are perfect interactions
+                return !(si.material.roughness < 0.01f and (si.material.transmission > 0.01f or si.material.metallic > 0.5f));
             default:
                 DEBUG("Vertex type not found.");
                 return false;
@@ -235,7 +236,7 @@ struct PathVertex {
     }
     
     inline bool isInfiniteLight() {
-        return type == LIGHT_VERTEX && (!ei.light || ei.light->type == ENVIRONMENT_MAP/* || ei.light->type == DIRECTIONAL_LIGHT*/);
+        return type == LIGHT_VERTEX && (!ei.light || ei.light->type == ENVIRONMENT_MAP || ei.light->type == DIRECTIONAL_LIGHT);
     }
     
     inline bool isDeltaLight() {

@@ -24,7 +24,8 @@ LightSample samplePointLight(float3 position, constant Light& pointLight) {
 LightEmissionSample samplePointLightEmission(constant Light& pointLight, float2 r2) {
     float z = 1.0f - 2.0f * r2.x;
     float phi = 2.0f * M_PI_F * r2.y;
-    float3 wo = float3(cos(phi), sin(phi), z);
+    float radius = sqrt(max(1.0f - z * z, 0.0f));
+    float3 wo = float3(radius * cos(phi), radius * sin(phi), z);
     float directionPDF = 1.0f / (4.0f * M_PI_F);
     
     return LightEmissionSample(pointLight.position, float3(0.0f), wo, pointLight.color, 1.0f, directionPDF);
@@ -70,7 +71,7 @@ LightSample sampleAreaLight(float3 position,
     float3 edge1 = triangle.v1 - triangle.v0;
     float3 edge2 = triangle.v2 - triangle.v0;
     float3 lightPosition = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
-    float2 lightUV = triangle.uv0 + v * triangle.uv1 + w * triangle.uv2;
+    float2 lightUV = u * triangle.uv0 + v * triangle.uv1 + w * triangle.uv2;
     float3 normal = normalize(cross(edge1, edge2));
         
     float3 wo = lightPosition - position;
@@ -84,7 +85,7 @@ LightSample sampleAreaLight(float3 position,
         emission *= textures->textures[triangle.emissionTextureIndex].sample(textureSampler, lightUV).rgb;
     }
 
-    return LightSample(lightPosition, normal, wo, triangle.emission, d, 1.0f / areaLight.totalArea);
+    return LightSample(lightPosition, normal, wo, emission, d, 1.0f / areaLight.totalArea);
 }
 
 LightEmissionSample sampleAreaLightEmission(constant Light& areaLight, constant LightTriangle *lightTriangles, float2 r2, float3 r3) {
@@ -110,7 +111,7 @@ LightEmissionSample sampleAreaLightEmission(constant Light& areaLight, constant 
     float positionPDF = 1.0f / areaLight.totalArea;
     float directionPDF = dot(wo, normal) / M_PI_F;
     
-    return LightEmissionSample(lightPosition, normal, wo, areaLight.color, positionPDF, directionPDF);
+    return LightEmissionSample(lightPosition, normal, wo, triangle.emission, positionPDF, directionPDF);
 }
 
 // MARK: Directional Lights
@@ -357,7 +358,7 @@ float getLightDirectionPDF(constant Light& light, float3 w, float3 n, constant f
         case POINT_LIGHT:
             return 1.0f / (4.0f * M_PI_F);
         case AREA_LIGHT:
-            return dot(w, n) / M_PI_F;
+            return max(dot(w, n), 0.0f) / M_PI_F;
         case DIRECTIONAL_LIGHT:
             return 1.0f;
         case ENVIRONMENT_MAP:
@@ -392,7 +393,7 @@ LightEmissionSample sampleLightEmission(constant Light& light,
 }
 
 float infiniteLightDensity(float3 w, constant Light* lights, constant Uniforms& uniforms, constant float *environmentMapCDF) {
-    float PDF = 0.0f;
+    float PDF = 0.0f; // TODO: needs to be tested with multiple environment maps
     float2 uv = getEnvironmentMapUV(w);
 
     for (unsigned int i = 0; i < uniforms.lightCount; i++) {

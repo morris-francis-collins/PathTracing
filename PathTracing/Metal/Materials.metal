@@ -22,11 +22,23 @@ BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, SampledMaterial material, floa
     return BSDFSample{BSDF, wo, PDF};
 }
 
-float3 diffuseBRDF(float3 wi, float3 wo, SampledMaterial material) {
+float3 diffuseBRDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
+    float cosIN = dot(wi, n);
+    float cosON = dot(wo, n);
+    
+    if (cosIN <= 0.0f || cosON <= 0.0f)
+        return float3(0.0f);
+    
     return material.color / M_PI_F;
 }
 
 float diffusePDF(float3 wi, float3 wo, float3 n) {
+    float cosIN = dot(wi, n);
+    float cosON = dot(wo, n);
+    
+    if (cosIN <= 0.0f || cosON <= 0.0f)
+        return 0.0f;
+
     return max(dot(wo, n), 0.0f) / M_PI_F;
 }
 
@@ -36,7 +48,7 @@ BSDFSample sampleConductorBRDF(float3 wi, float3 n, SampledMaterial material, fl
     float cosIN = dot(wi, n);
     
     if (material.roughness < 0.01f) {
-        float3 wo = reflect(-wi, n); // wi pointing into surface
+        float3 wo = reflect(-wi, n); // wi needs to point into surface for reflect
         float3 fresnel = conductorFresnel(cosIN, material);
         float3 BSDF = fresnel / dot(wo, n);
         return BSDFSample{BSDF, wo, 1.0f, true};
@@ -83,7 +95,7 @@ float3 conductorBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
     float3 woLocal = float3(dot(wo, T), dot(wo, B), dot(wo, n));
     float3 wm = normalize(wiLocal + woLocal);
     
-    if (wiLocal.z * woLocal.z < 0.0f)
+    if (wiLocal.z <= 0.0f || woLocal.z <= 0.0f)
         return float3(0.0f);
 
     float cosIN = dot(wi, n);
@@ -109,7 +121,7 @@ float conductorPDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
     float3 woLocal = float3(dot(wo, T), dot(wo, B), dot(wo, n));
     float3 wm = normalize(wiLocal + woLocal);
     
-    if (wiLocal.z * woLocal.z < 0.0f)
+    if (wiLocal.z <= 0.0f || woLocal.z <= 0.0f)
         return 0.0f;
     
     float alpha = material.roughness * material.roughness;
@@ -198,7 +210,7 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
         float PDF = pr * specPDF;
         
         if (!allowTransmission) {
-            float3 diffBSDF = (1.0f - fresnel_R) * diffuseBRDF(wi, wo, material);
+            float3 diffBSDF = (1.0f - fresnel_R) * diffuseBRDF(wi, wo, n, material);
             float diffPDF = diffusePDF(wi, wo, n);
             PDF += pd * diffPDF;
             return BSDFSample{specBSDF + diffBSDF, wo, PDF};
@@ -253,7 +265,7 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
             float G1 = G1_Smith(wiLocal, alpha);
             
             float3 specBSDF = float3(fresnel_R) * D * G / (4.0f * cosIN * cosON);
-            float3 diffBSDF = (1.0f - fresnel_R) * diffuseBRDF(wi, wo, material);
+            float3 diffBSDF = (1.0f - fresnel_R) * diffuseBRDF(wi, wo, n, material);
             
             float specPDF = (D * G1) / (4.0f * cosIN);
             float diffPDF = diffusePDF(wi, wo, n);
@@ -263,7 +275,6 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
         }
     }
 }
-
 
 float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
     if (material.roughness < 0.01f) {
@@ -279,7 +290,7 @@ float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material) 
                 return float3(0.0f);
             
             float fresnel_R = dielectricFresnel(abs(cosIN), eta);
-            return (1.0f - fresnel_R) * diffuseBRDF(wi, wo, material);
+            return (1.0f - fresnel_R) * diffuseBRDF(wi, wo, n, material);
         }
         
         return float3(0.0f);
@@ -313,7 +324,7 @@ float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material) 
         BSDF += float3(fresnel_R) * D * G / (4.0f * cosIN * abs(cosON));
 
         if (!allowTransmission)
-            BSDF += (1.0f - fresnel_R) * diffuseBRDF(wi, wo, material);
+            BSDF += (1.0f - fresnel_R) * diffuseBRDF(wi, wo, n, material);
     }
 
     if (!sameHemisphere && allowTransmission) {
@@ -433,7 +444,7 @@ float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
     float3 BXDF;
     
     if (material.BXDFs == DIFFUSE) {
-        BXDF = diffuseBRDF(wi, wo, material);
+        BXDF = diffuseBRDF(wi, wo, n, material);
     } else if (material.BXDFs == CONDUCTOR) {
         BXDF = conductorBSDF(wi, wo, n, material);
     } else if (material.BXDFs & (DIELECTRIC_TRANSMISSION | DIELECTRIC_REFLECTION)) {

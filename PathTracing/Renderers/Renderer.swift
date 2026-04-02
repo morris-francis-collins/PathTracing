@@ -41,11 +41,16 @@ class Renderer: NSObject, MTKViewDelegate {
     var uniformBufferOffset: Int = 0
     var uniformBufferIndex: Int = 0
     
+    var referenceTexture: MTLTexture?
+    var displayMode: UInt32 = 0
+    
     var frameIndex: UInt = 0
     var bufferPixels: Int = 0
     
     var scene: GameScene
     var keysPressed = Set<UInt16>()
+    
+    var blackTexture: MTLTexture
     
     init(device: MTLDevice, scene: GameScene) {
         self.device = device
@@ -59,6 +64,16 @@ class Renderer: NSObject, MTKViewDelegate {
             fatalError("Failed to create default library.")
         }
         self.library = library
+                
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: 1, height: 1, mipmapped: false)
+        textureDescriptor.usage = .shaderRead
+        
+        blackTexture = device.makeTexture(descriptor: textureDescriptor)!
+        var black: [Float] = [0, 0, 0, 0]
+        blackTexture.replace(region: MTLRegionMake2D(0, 0, 1, 1),
+                                   mipmapLevel: 0,
+                                   withBytes: &black,
+                                   bytesPerRow: 16)
         
         super.init()
         
@@ -292,6 +307,29 @@ class Renderer: NSObject, MTKViewDelegate {
         
     func draw(in view: MTKView) {
         fatalError("Draw called on base Renderer")
+    }
+    
+    func presentDrawable(view: MTKView, commandBuffer: MTLCommandBuffer) {
+        if let currentDrawable = view.currentDrawable {
+            
+            let renderPassDescriptor = MTLRenderPassDescriptor()
+            renderPassDescriptor.colorAttachments[0].texture = currentDrawable.texture
+            renderPassDescriptor.colorAttachments[0].loadAction = .clear
+            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0)
+            
+            if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
+                renderEncoder.setRenderPipelineState(copyPipeline)
+                
+                renderEncoder.setFragmentTexture(finalImage, index: 0)
+                renderEncoder.setFragmentTexture(referenceTexture ?? blackTexture, index: 1)
+                renderEncoder.setFragmentBytes(&displayMode, length: MemoryLayout<UInt32>.stride, index: 0)
+                
+                renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+                renderEncoder.endEncoding()
+            }
+            
+            commandBuffer.present(currentDrawable)
+        }
     }
 }
 

@@ -156,23 +156,7 @@ class MegaKernelRenderer: Renderer {
         (accumulationTargets[0], accumulationTargets[1]) = (accumulationTargets[1], accumulationTargets[0])
         (splatTargets[0], splatTargets[1]) = (splatTargets[1], splatTargets[0])
         
-        if let currentDrawable = view.currentDrawable {
-            
-            let renderPassDescriptor = MTLRenderPassDescriptor()
-            renderPassDescriptor.colorAttachments[0].texture = currentDrawable.texture
-            renderPassDescriptor.colorAttachments[0].loadAction = .clear
-            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0)
-            
-            if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
-                renderEncoder.setRenderPipelineState(copyPipeline)
-                renderEncoder.setFragmentTexture(finalImage, index: 0)
-                renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-                renderEncoder.endEncoding()
-            }
-            
-            commandBuffer.present(currentDrawable)
-        }
-        
+        presentDrawable(view: view, commandBuffer: commandBuffer)
         commandBuffer.commit()
     }
 

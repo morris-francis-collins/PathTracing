@@ -26,10 +26,6 @@
 #define MAX_TEXTURES 500
 #define EPSILON 1e-3f
 
-#define PIXEL_WIDTH 800.0f
-#define PIXEL_HEIGHT 600.0f
-#define ASPECT_RATIO (PIXEL_WIDTH / PIXEL_HEIGHT)
-
 struct Camera {
     vector_float3 position;
     vector_float3 right;
@@ -84,6 +80,10 @@ inline float powerHeuristic(float main, float other) {
 
 inline bool isBlack(float3 w) {
     return all(w < 1e-20f);
+}
+
+inline float3 reinhardTonemap(float3 x) {
+    return x / (1.0f + x);
 }
 
 void cameraRayPDF(constant Uniforms& uniforms, float3 w, thread float& positionPDF, thread float& directionPDF);

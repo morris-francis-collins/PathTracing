@@ -72,6 +72,7 @@ class AssimpGeometry: Geometry {
 
             if isEmissive {
                 let averageEmission = material.emissionValue * material.emissiveStrength
+//                print("assimp emission stats", material.emissionValue, material.emissiveStrength)
                 areaLights.append(AreaLight(emission: averageEmission,
                                             emissionTextureIndex: material.emissionTextureIndex,
                                             averageEmission: averageEmission,
