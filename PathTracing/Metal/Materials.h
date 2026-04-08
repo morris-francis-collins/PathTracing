@@ -168,11 +168,11 @@ inline float D_GGX(float3 wm, float alpha_x, float alpha_y) {
 
 inline void createOrthonormalBasis(float3 n, thread float3& t, thread float3& b) {
     float sign = copysign(1.0f, n.z);
-    const float a = -1.0f / (sign + n.z);
-    const float b_val = n.x * n.y * a;
+    float a = -1.0f / (sign + n.z);
+    float b_val = n.x * n.y * a;
     t = float3(1.0f + sign * n.x * n.x * a, sign * b_val, -sign * n.x);
     b = float3(b_val, sign + n.y * n.y * a, -n.y);
-    t = normalize(t);
+    t = normalize(t); // seems to improve performance despite being redundant
     b = normalize(b);
 }
 
@@ -226,10 +226,10 @@ inline float dielectricFresnel(float cosI, float eta) {
     
     float cosT = sqrt(1.0f - sinT2);
     
-    float Rs = pow((cosI - eta * cosT) / (cosI + eta * cosT), 2.0f);
-    float Rp = pow((eta * cosI - cosT) / (eta * cosI + cosT), 2.0f);
+    float Rs = (cosI - eta * cosT) / (cosI + eta * cosT);
+    float Rp = (eta * cosI - cosT) / (eta * cosI + cosT);
     
-    return 0.5f * (Rs + Rp);
+    return 0.5f * (Rs * Rs + Rp * Rp);
 }
 
 #endif

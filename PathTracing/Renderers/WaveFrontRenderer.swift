@@ -151,6 +151,8 @@ class WaveFrontRenderer: Renderer {
             textureArgumentBuffer,
             MaterialRegistry.shared.getBuffer(),
             scene.instanceLightIndicesBuffer,
+            
+            instanceBuffer,
         ]
         
         for (i, buffer) in buffers.enumerated() {
@@ -216,6 +218,8 @@ class WaveFrontRenderer: Renderer {
             textureArgumentBuffer,
             MaterialRegistry.shared.getBuffer(),
             scene.instanceLightIndicesBuffer,
+            
+            instanceBuffer,
         ]
         
         for (i, buffer) in buffers.enumerated() {

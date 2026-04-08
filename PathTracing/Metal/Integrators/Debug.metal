@@ -34,11 +34,7 @@ kernel void debugSurfaceProperties(uint2 tid [[thread_position_in_grid]],
     ray ray = generateRay(static_cast<float2>(tid), uniforms);
     float3 color = float3(0.0f);
 
-    IntersectionResult intersection = intersect(ray,
-                                                RAY_MASK_PRIMARY,
-                                                instances,
-                                                accelerationStructure,
-                                                false);
+    IntersectionResult intersection = intersect<false>(ray, accelerationStructure);
     
     if (intersection.type == intersection_type::none) {
         float2 uv = getEnvironmentMapUV(ray.direction);

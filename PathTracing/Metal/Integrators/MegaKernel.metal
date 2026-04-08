@@ -37,11 +37,7 @@ float3 pathIntegrator(float2 pixel,
     float attenuationDistance = 0.0f;
     
     for (int bounce = 0; bounce < MAX_PATH_LENGTH; bounce++) {
-        IntersectionResult intersection = intersect(ray,
-                                                    RAY_MASK_PRIMARY,
-                                                    instances,
-                                                    accelerationStructure,
-                                                    false);
+        IntersectionResult intersection = intersect<false>(ray, accelerationStructure);
         
         if (intersection.type == intersection_type::none) {
             float2 uv = getEnvironmentMapUV(ray.direction);
@@ -64,7 +60,7 @@ float3 pathIntegrator(float2 pixel,
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = surfaceInteraction.material;
         
-        if (material.BXDFs == DIFFUSE || material.BXDFs == CONDUCTOR || material.BXDFs == DIELECTRIC_REFLECTION) {
+        if (material.BXDFs == DIFFUSE || material.BXDFs == CONDUCTOR || material.BXDFs == DIELECTRIC_REFLECTION) { // TODO: move to surface interaction
             if (dot(-ray.direction, surfaceInteraction.normal) < 0.0f)
                 surfaceInteraction.normal = -surfaceInteraction.normal;
         }
@@ -182,11 +178,7 @@ int tracePath(float2 pixel,
         thread PathVertex& vx = vertices[bounces];
         thread PathVertex& prev = vertices[bounces - 1];
         
-        IntersectionResult intersection = intersect(ray,
-                                                    RAY_MASK_PRIMARY,
-                                                    instances,
-                                                    accelerationStructure,
-                                                    false);
+        IntersectionResult intersection = intersect<false>(ray, accelerationStructure);
         
         if (intersection.type == intersection_type::none) {
             if (type == CAMERA_VERTEX) {

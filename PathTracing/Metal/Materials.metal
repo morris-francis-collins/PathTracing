@@ -181,7 +181,8 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
     float3 wiLocal = normalize(float3(dot(wi, T), dot(wi, B), dot(wi, n)));
     float alpha = material.roughness * material.roughness;
     
-    float F0 = pow((material.ior - 1.0f) / (material.ior + 1.0f), 2.0f);
+    float F0 = (material.ior - 1.0f) / (material.ior + 1.0f);
+    F0 *= F0;
     float avgR = F0 + (1.0f - F0) * 0.15f;
     
     float pr = allowTransmission ? 0.5f : avgR; // need to use rough importance sampling here since we dont know GGX normal yet

@@ -52,19 +52,12 @@ struct SurfaceInteraction {
 };
 
 struct IntersectionResult {
-    float4x3 object_to_world_transform;
     const device void* primitive_data;
     float2 triangle_barycentric_coord;
     float distance;
     uint instance_id;
     intersection_type type;
 };
-
-IntersectionResult intersect(ray ray,
-                             unsigned int mask,
-                             device MTLAccelerationStructureInstanceDescriptor *instances,
-                             instance_acceleration_structure accelerationStructure,
-                             bool accept_any_intersection);
 
 SurfaceInteraction getSurfaceInteraction(ray ray,
                                          IntersectionResult intersection,
@@ -74,6 +67,25 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
                                          constant Textures* textures,
                                          constant Material* materials
                                          );
+
+template <bool acceptAnyIntersection>
+IntersectionResult intersect(ray ray, instance_acceleration_structure accelerationStructure) {
+    intersector<triangle_data, instancing> i;
+    i.assume_geometry_type(geometry_type::triangle);
+    i.force_opacity(forced_opacity::opaque);
+    i.accept_any_intersection(acceptAnyIntersection);
+
+    auto result = i.intersect(ray, accelerationStructure, RAY_MASK_PRIMARY);
+
+    IntersectionResult intersection;
+    intersection.triangle_barycentric_coord = result.triangle_barycentric_coord;
+    intersection.instance_id               = result.instance_id;
+    intersection.primitive_data            = result.primitive_data;
+    intersection.distance                  = result.distance;
+    intersection.type                      = result.type;
+
+    return intersection;
+}
 
 inline float3 transformPoint(float3 p, float4x3 transform) {
     return transform * float4(p.x, p.y, p.z, 1.0f);

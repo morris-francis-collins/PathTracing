@@ -11,37 +11,6 @@
 using namespace metal;
 using namespace raytracing;
 
-IntersectionResult intersect(ray ray,
-                             unsigned int mask,
-                             device MTLAccelerationStructureInstanceDescriptor *instances,
-                             instance_acceleration_structure accelerationStructure,
-                             bool accept_any_intersection)
-{
-    intersection_params params;
-    
-    intersection_query<triangle_data, instancing> i;
-    
-    params.assume_geometry_type(geometry_type::triangle);
-    params.force_opacity(forced_opacity::opaque);
-
-    params.accept_any_intersection(accept_any_intersection); // get any, not just the closest
-
-    i.reset(ray, accelerationStructure, mask, params);
-
-    i.next();
-    
-    IntersectionResult intersection;
-    
-    intersection.triangle_barycentric_coord = i.get_committed_triangle_barycentric_coord();
-    intersection.instance_id = i.get_committed_instance_id();
-    intersection.object_to_world_transform = i.get_committed_object_to_world_transform();
-    intersection.primitive_data = i.get_committed_primitive_data();
-    intersection.distance = i.get_committed_distance();
-    intersection.type = i.get_committed_intersection_type();
-    
-    return intersection;
-}
-
 void sampleBXDF(thread SampledMaterial& material) {
     if (material.transmission > 0.01f) {
         material.BXDFs = DIELECTRIC_TRANSMISSION;
@@ -129,7 +98,15 @@ SurfaceInteraction getSurfaceInteraction(ray ray,
     surfaceInteraction.position = ray.origin + ray.direction * intersection.distance;
     
     unsigned int instanceIndex = intersection.instance_id;
-    float4x3 objectToWorldTransform = intersection.object_to_world_transform;
+    
+    auto p = instances[instanceIndex].transformationMatrix;
+    float4x3 objectToWorldTransform = float4x3(
+        float3(p[0].x, p[0].y, p[0].z),
+        float3(p[1].x, p[1].y, p[1].z),
+        float3(p[2].x, p[2].y, p[2].z),
+        float3(p[3].x, p[3].y, p[3].z)
+    );
+    
     float2 barycentric_coords = intersection.triangle_barycentric_coord;
     
     const device PrimitiveData* primitiveData = static_cast<const device PrimitiveData*>(intersection.primitive_data);
@@ -193,11 +170,6 @@ bool isVisible(float3 pos1, float3 normal1,
     shadowRay.min_distance = 0.0f;
     shadowRay.max_distance = len - 1e-4f;
     
-    IntersectionResult intersection = intersect(shadowRay,
-                                                RAY_MASK_SHADOW,
-                                                instances,
-                                                accelerationStructure,
-                                                true);
-
+    IntersectionResult intersection = intersect<true>(shadowRay, accelerationStructure);
     return intersection.type == intersection_type::none;
 }

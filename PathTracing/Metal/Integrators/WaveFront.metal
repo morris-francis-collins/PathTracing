@@ -73,6 +73,7 @@ kernel void calculateIntersections(device float3* rayOrigins,
                                    constant Material* materials,
                                    constant int* instanceLightIndices,
                                    
+                                   device MTLAccelerationStructureInstanceDescriptor* instances,
                                    constant Uniforms& uniforms,
                                    instance_acceleration_structure accelerationStructure,
                                    
@@ -92,7 +93,7 @@ kernel void calculateIntersections(device float3* rayOrigins,
     r.min_distance = 0.001f;
     r.max_distance = INFINITY;
         
-    IntersectionResult intres = intersect(r, RAY_MASK_PRIMARY, nullptr, accelerationStructure, false);
+    IntersectionResult intres = intersect<false>(r, accelerationStructure);
             
     if (intres.type == intersection_type::none) {
         rayAlive[rayIndex] = false;
@@ -101,7 +102,7 @@ kernel void calculateIntersections(device float3* rayOrigins,
     
     rayAlive[rayIndex] = true;
     
-    SurfaceInteraction si = getSurfaceInteraction(r, intres, nullptr, accelerationStructure, instanceLightIndices, textures, materials);
+    SurfaceInteraction si = getSurfaceInteraction(r, intres, instances, accelerationStructure, instanceLightIndices, textures, materials);
     intersectionPositions[rayIndex] = si.position;
     intersectionNormals[rayIndex] = si.normal;
     intersectionSampledMaterials[rayIndex] = si.material;
@@ -136,6 +137,7 @@ kernel void calculateIntersectionsWithCompaction(device float3* rayOrigins,
                                                  constant Material* materials,
                                                  constant int* instanceLightIndices,
                                    
+                                                 device MTLAccelerationStructureInstanceDescriptor* instances,
                                                  constant Uniforms& uniforms,
                                                  instance_acceleration_structure accelerationStructure,
                                                  
@@ -155,7 +157,7 @@ kernel void calculateIntersectionsWithCompaction(device float3* rayOrigins,
     r.min_distance = 0.001f;
     r.max_distance = INFINITY;
         
-    IntersectionResult intres = intersect(r, RAY_MASK_PRIMARY, nullptr, accelerationStructure, false);
+    IntersectionResult intres = intersect<false>(r, accelerationStructure);
             
     if (intres.type == intersection_type::none) {
         return;
@@ -170,7 +172,8 @@ kernel void calculateIntersectionsWithCompaction(device float3* rayOrigins,
     nextRngStates[intersectionIndex] = rngStates[rayIndex];
     nextRayAlive[intersectionIndex] = true;
     
-    SurfaceInteraction si = getSurfaceInteraction(r, intres, nullptr, accelerationStructure, instanceLightIndices, textures, materials);
+    SurfaceInteraction si = getSurfaceInteraction(r, intres, instances, accelerationStructure, instanceLightIndices, textures, materials);
+    // TODO: add alpha interactions and normal flipping for thin surfaces
     intersectionPositions[intersectionIndex] = si.position;
     intersectionNormals[intersectionIndex] = si.normal;
     intersectionSampledMaterials[intersectionIndex] = si.material;

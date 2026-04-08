@@ -47,7 +47,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createKoenigseggScene()
+        createTheWhiteRoomScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -915,6 +915,46 @@ class GameScene: ObservableObject {
 //                            color: 50 * SIMD3<Float>(1.0, 0.7, 0.3))
     }
     
+    func createKitchenScene() {
+        cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
+                           (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
+                           (SIMD3<Float>(0.17043182, 0.72948277, -0.16555624), SIMD3<Float>(0.6853374, -1.058545, 8.639974))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let kitchenGeometry = addAssimpGeometry(fileName: "country_kitchen", fileExtension: "obj")
+        addInstance(with: kitchenGeometry)
+
+//        addEnvironmentMap(textureURL: skyURL)
+//        addDirectionalLight(direction: normalize(SIMD3<Float>(-5.179535, 2.3451493, 1.7693316) - SIMD3<Float>(-2.4023888, 7.42692, -5.1199884)),
+//                            color: 50 * SIMD3<Float>(1.0, 0.7, 0.3))
+    }
+    
+    func createPorscheScene() {
+        cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
+                           (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
+                           (SIMD3<Float>(0.17043182, 0.72948277, -0.16555624), SIMD3<Float>(0.6853374, -1.058545, 8.639974))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(6, 0.1, 6))
+        
+        let porscheGeometry = addGLTFGeometry(fileName: "porsche", fileExtension: "glb")
+        addInstance(with: porscheGeometry, translation: SIMD3<Float>(2.5, 0.15, 0))
+
+        addEnvironmentMap(textureURL: duskURL)
+//        addDirectionalLight(direction: normalize(SIMD3<Float>(-5.179535, 2.3451493, 1.7693316) - SIMD3<Float>(-2.4023888, 7.42692, -5.1199884)),
+//                            color: 50 * SIMD3<Float>(1.0, 0.7, 0.3))
+    }
+
+
+
+    
     func createBedroomScene() {
         cameraLocations = [(SIMD3<Float>(0, 3, 9), SIMD3<Float>(0, 3, 0)),
                            (SIMD3<Float>(2.8985946, 1.0271178, -1.9204926), SIMD3<Float>(-3.6789668, -0.76090455, 3.9564571)),
@@ -1052,6 +1092,54 @@ class GameScene: ObservableObject {
 //        addDirectionalLight(direction: simd_normalize(SIMD3<Float>(-1.0, -0.5, 1.0)), color: SIMD3<Float>(0, 0, 10))
 //        ddDirectionalLight(direction: simd_normalize(SIMD3<Float>(0.5, -0.5, 0.75)), color: 10 * .one)
     }
+    
+    func createCausticScene() {
+        cameraLocations = [(SIMD3<Float>(0.0, 3.95, 0.0), SIMD3<Float>(0.0, 1.0, -0.01)),
+                           (SIMD3<Float>(-4.7358356, 0.8316741, -0.24047767), SIMD3<Float>(-1.8881888, 1.2216821, 0.42390215)),
+                           (SIMD3<Float>(3.3002243, 1.739783, 3.0232406), SIMD3<Float>(1.4852387, -0.08613372, 1.5829433)),
+                           (SIMD3<Float>(-0.58075345, 1.6034509, 3.8094723), SIMD3<Float>(-0.05752662, 0.27425483, 1.2283735)),
+                           (SIMD3<Float>(-0.25849676, 1.2781403, -1.3962265), SIMD3<Float>(0.80470467, -0.3073362, 0.8528768)),
+                           (SIMD3<Float>(0.9514366, 1.4333981, 3.8511183), SIMD3<Float>(0.42823184, 0.10420242, 1.2700162)),
+                           (SIMD3<Float>(-2.2035198, 1.7945361, -4.0881658), SIMD3<Float>(-1.0779829, 0.4653412, -1.7072012))
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[6]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(6, 0.1, 6))
+        
+                let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
+//                let angelGeometry = addAssimpGeometry(fileName: "lucy", fileExtension: "obj", defaultMaterial: GLASS)
+//                let saintGeometry = addAssimpGeometry(fileName: "saint", fileExtension: "obj", defaultMaterial: GLASS)
+                        
+                addInstance(with: dragonGeometry,
+                            translation: SIMD3<Float>(0, -0.5, 0),
+                            rotation: SIMD3<Float>(0, .pi, 0),
+                            scale: SIMD3<Float>(0.1, 0.1, 0.1)
+                )
+        
+//                addInstance(with: angelGeometry,
+//                            translation: SIMD3<Float>(0, 0, 0),
+//                            rotation: SIMD3<Float>(.pi, 0, 0),
+//                            scale: SIMD3<Float>(0.0015, 0.0015, 0.0015)
+//                )
+        
+//                addInstance(with: saintGeometry,
+//                                    translation: SIMD3<Float>(1.5, 0, 2.2),
+//                                    rotation: SIMD3<Float>(-.pi/2, 0, 0),
+//                                    scale: SIMD3<Float>(0.01, 0.01, 0.01)
+//                )
+
+        
+//        addDirectionalLight(direction: simd_normalize(SIMD3<Float>(0.0, -0.5, 0.3)), color: SIMD3<Float>(10, 10, 10))
+//        addDirectionalLight(direction: simd_normalize(SIMD3<Float>(1.0, -0.5, 1.0)), color: SIMD3<Float>(0, 10, 0))
+//        addDirectionalLight(direction: simd_normalize(SIMD3<Float>(-1.0, -0.5, 1.0)), color: SIMD3<Float>(0, 0, 10))
+//        ddDirectionalLight(direction: simd_normalize(SIMD3<Float>(0.5, -0.5, 0.75)), color: 10 * .one)
+        
+        addEnvironmentMap(textureURL: skyURL)
+    }
+
 
     func addInstance(with geometry: Geometry, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one,
                      mask: UInt32 = GEOMETRY_MASK_OPAQUE) {
@@ -1160,6 +1248,8 @@ class GameScene: ObservableObject {
         
         let (CDF, averageColor) = getEnvironmentMapCDF(texture: environmentMapTexture!)
         environmentMapCDF = CDF
+        
+//        let t = TestLight(type: ENVIRONMENT_MAP, delta: false, color: .one, .init(environment: .init(textureIndex: -1)))
         
         let newEnvironmentLight = Light(type: ENVIRONMENT_MAP,
                                         index: UInt32(lights.count),

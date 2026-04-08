@@ -12,13 +12,13 @@
 #include "Interactions.h"
 
 #define MAX_LIGHTS 16
-#define SCENE_RADIUS 200.0f
+#define SCENE_RADIUS 8.0f
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
 #define ENVIRONMENT_MAP_SCALE 10
 
-enum LightType : unsigned int {
+enum LightType : uint8_t {
     POINT_LIGHT = 0,
     AREA_LIGHT = 1,
     DIRECTIONAL_LIGHT = 2,
@@ -36,6 +36,11 @@ struct Light {
     float totalArea;
     vector_float3 direction; // directional lights only
 };
+
+//struct NewLight {
+//    enum LightType type;
+//    unsigned int index;
+//]};
 
 struct LightTriangle {
     vector_float3 v0, v1, v2;
