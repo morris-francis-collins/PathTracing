@@ -83,15 +83,7 @@ class MegaKernelRenderer: Renderer {
         let width = Int(drawableSize.width)
         let height = Int(drawableSize.height)
         
-        let threadWidth = raytracingPipeline.threadExecutionWidth
-        let threadHeight = raytracingPipeline.maxTotalThreadsPerThreadgroup / threadWidth
-//        let threadWidth = 16
-//        let threadHeight = 16
-        
-        let threadsPerThreadgroup = MTLSize(width: threadWidth, height: threadHeight, depth: 1)
-        let threadgroups = MTLSize(width: (width + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
-                                   height: (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
-                                   depth: 1)
+        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: raytracingPipeline)
         
         // clearAtomicBuffer
         guard let clearEncoder = commandBuffer.makeComputeCommandEncoder() else {
@@ -159,5 +151,4 @@ class MegaKernelRenderer: Renderer {
         presentDrawable(view: view, commandBuffer: commandBuffer)
         commandBuffer.commit()
     }
-
 }

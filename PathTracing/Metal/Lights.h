@@ -16,7 +16,7 @@
 
 #define ENVIRONMENT_MAP_HEIGHT 2048
 #define ENVIRONMENT_MAP_WIDTH 4096
-#define ENVIRONMENT_MAP_SCALE 10
+#define ENVIRONMENT_MAP_SCALE 2
 
 enum LightType : uint8_t {
     POINT_LIGHT = 0,
@@ -37,10 +37,33 @@ struct Light {
     vector_float3 direction; // directional lights only
 };
 
-//struct NewLight {
-//    enum LightType type;
-//    unsigned int index;
-//]};
+struct PointLight {
+    vector_float3 position;
+    vector_float3 color;
+};
+
+struct AreaLight {
+    unsigned int firstTriangleIndex;
+    unsigned int triangleCount;
+    float totalArea;
+};
+
+struct DirectionalLight {
+    vector_float3 direction;
+    vector_float3 color;
+};
+
+struct EnvironmentMap {
+    unsigned int firstPixelIndex;
+    unsigned int pixelCount;
+};
+
+struct LightContext {
+    unsigned int areaLightCount;
+    unsigned int pointLightCount;
+    unsigned int directionalLightCount;
+    unsigned int enviromentMapCount;
+};
 
 struct LightTriangle {
     vector_float3 v0, v1, v2;

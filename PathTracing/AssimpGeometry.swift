@@ -20,7 +20,6 @@ class AssimpGeometry: Geometry {
         self.emissionAmplifier = emissionAmplifier
         super.init(device: device)
         textureLoader = MTKTextureLoader(device: device)
-        lightGeometry = LightGeometry(device: device)
         
         sceneData = loadModel(modelPath.cString(using: .utf8))
         
@@ -73,7 +72,7 @@ class AssimpGeometry: Geometry {
             if isEmissive {
                 let averageEmission = material.emissionValue * material.emissiveStrength
 //                print("assimp emission stats", material.emissionValue, material.emissiveStrength)
-                areaLights.append(AreaLight(emission: averageEmission,
+                areaLights.append(AreaLightData(emission: averageEmission,
                                             emissionTextureIndex: material.emissionTextureIndex,
                                             averageEmission: averageEmission,
                                             vertices: vertices.suffix(Int(mesh.indexCount)),
@@ -188,9 +187,5 @@ class AssimpGeometry: Geometry {
         if let pi = primitiveLightIndicesBuffer { resourceArray.append(pi) }
         
         return resourceArray
-    }
-        
-    override func getLightGeometry() -> LightGeometry? {
-        return lightGeometry
     }
 }

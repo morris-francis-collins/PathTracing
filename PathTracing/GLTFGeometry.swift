@@ -15,7 +15,6 @@ class GLTFGeometry: Geometry {
     init(device: MTLDevice, modelPath: String, emissionAmplifier: Float = 1.0) {
         modelName = URL(fileURLWithPath: modelPath).lastPathComponent
         super.init(device: device)
-        lightGeometry = LightGeometry(device: device)
 
         guard let sceneData = loadGLTFScene(modelPath.cString(using: .utf8)) else {
             print("[GLTFGeometry] Failed to load: \(modelPath)")
@@ -82,7 +81,7 @@ class GLTFGeometry: Geometry {
                 let emissionUVs = Array(texCoords.suffix(vCount))
                 let avgEmission = material.emissionValue * material.emissiveStrength
                 
-                areaLights.append(AreaLight(
+                areaLights.append(AreaLightData(
                     emission: material.emissionValue * material.emissiveStrength,
                     emissionTextureIndex: material.emissionTextureIndex,
                     averageEmission: avgEmission,

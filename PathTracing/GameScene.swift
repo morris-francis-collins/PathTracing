@@ -25,6 +25,11 @@ class GameScene: ObservableObject {
     var geometries: [Geometry] = []
     var instances: [GeometryInstance] = []
     
+    var areaLights: [AreaLight] = []
+    var pointLights: [PointLight] = []
+    var directionalLights: [DirectionalLight] = []
+    var environmentMaps: [EnvironmentMap] = []
+    
     var lights: [Light] = []
     var lightTriangles: [LightTriangle] = []
     var instanceLightIndices: [Int32] = []
@@ -47,7 +52,7 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
-        createTheWhiteRoomScene()
+        createLightTestScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -1079,8 +1084,8 @@ class GameScene: ObservableObject {
             )
         }
         
-        let lightBallGeometry = ObjGeometry(device: device, objURL: ballURL, emissionColor: SIMD3<Float>(0.1, 0.0, 0.0))
-        
+        let lightBallGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: createEmissiveMaterial(color: 0.01 * .one))
+
         addInstance(with: lightBallGeometry,
                     translation: SIMD3<Float>(0, 10, 0),
                     scale: 0.01 * SIMD3<Float>(1, 1, 1)
@@ -1140,6 +1145,49 @@ class GameScene: ObservableObject {
         addEnvironmentMap(textureURL: skyURL)
     }
 
+    func createLightTestScene() {
+        cameraLocations = [
+            (SIMD3<Float>(0.0, 3.6248431, 7.4968815), SIMD3<Float>(0.0, 3.3748434, 2.4968812)),
+            (SIMD3<Float>(2.7844641, 4.46681, 2.5086281), SIMD3<Float>(-0.11846131, 3.2280407, -1.3773706))
+        ]
+
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        buildCornellBox(width: 6, height: 6, depth: 6)
+        
+        let goldMaterial = createStaticMaterial(color: SIMD3<Float>(1.0, 0.84, 0.6), roughness: 0.35, metallic: 1.0, emission: .zero)
+        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: goldMaterial)
+        
+        addInstance(with: dragonGeometry,
+                    translation: SIMD3<Float>(0.0, 2.0, 0.0),
+                    rotation: SIMD3<Float>(0, .pi + 0.5, 0),
+                    scale: SIMD3<Float>(0.15, 0.15, 0.15)
+        )
+        
+        let blueLightGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj",
+                                                  defaultMaterial: createEmissiveMaterial(color: SIMD3<Float>(0.2, 0.4, 1.0)), emissionAmplifier: 5.0)
+        
+        let redlightGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj",
+                                                 defaultMaterial: createEmissiveMaterial(color: SIMD3<Float>(1.0, 0.8, 0.1)), emissionAmplifier: 10.0)
+
+
+        addInstance(with: blueLightGeometry,
+                    translation: SIMD3<Float>(0.0, 6, -1.0),
+                    scale: SIMD3<Float>(3.99, 0.01, 2.0))
+        addInstance(with: redlightGeometry,
+                    translation: SIMD3<Float>(0.0, 6, 1.0),
+                    scale: SIMD3<Float>(3.99, 0.01, 1.0))
+
+
+        addPointLight(position: SIMD3<Float>(-1.8138629, 5.254886, -1.3284518), color: 250 * SIMD3<Float>(0, 0.2, 1))
+        
+        addDirectionalLight(direction: normalize(SIMD3<Float>(1.51, 1.29, 1.10) - SIMD3<Float>(0.095, 2.52, 3.37)), color: 15 * SIMD3<Float>(0.2, 0.3, 1.0));
+        addDirectionalLight(direction: normalize(SIMD3<Float>(-0.84, 4.13, -1.39) - SIMD3<Float>(-1.01, 4.23, 1.54)), color: 10 * SIMD3<Float>(1.0, 0.2, 0.0));
+
+        addEnvironmentMap(textureURL: skyURL)
+    }
+
 
     func addInstance(with geometry: Geometry, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one,
                      mask: UInt32 = GEOMETRY_MASK_OPAQUE) {
@@ -1166,14 +1214,21 @@ class GameScene: ObservableObject {
                                   totalArea: totalArea,
                                   direction: .zero
             )
-
+            
             lightTriangles.append(contentsOf: instanceLightTriangles)
             lights.append(areaLight)
             print("new light", light.averageEmission, totalArea, length(light.averageEmission / totalArea), instanceLightTriangles.count, lightTriangles[0].emission)
+            
+            
+            let areaLight1 = AreaLight(firstTriangleIndex: UInt32(lightTriangles.count),
+                                       triangleCount: UInt32(instanceLightTriangles.count),
+                                       totalArea: totalArea)
+            
+            areaLights.append(areaLight1)
         }
     }
     
-    func getLightTriangles(areaLight: AreaLight, transform: simd_float4x4) -> ([LightTriangle], Float) {
+    func getLightTriangles(areaLight: AreaLightData, transform: simd_float4x4) -> ([LightTriangle], Float) {
         let vertices = areaLight.vertices
         let UVs = areaLight.UVs
         var instanceLightTriangles: [LightTriangle] = []
@@ -1219,6 +1274,9 @@ class GameScene: ObservableObject {
         )
         
         lights.append(newPointLight)
+        
+        let pointLight = PointLight(position: position, color: color)
+        pointLights.append(pointLight)
     }
     
     func addDirectionalLight(direction: SIMD3<Float>, color: SIMD3<Float>) {
@@ -1233,6 +1291,9 @@ class GameScene: ObservableObject {
                                         direction: direction)
         
         lights.append(newDirectionalLight)
+        
+        let directionalLight = DirectionalLight(direction: direction, color: color)
+        directionalLights.append(directionalLight)
     }
     
     func addEnvironmentMap(textureURL: URL) {

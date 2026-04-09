@@ -331,6 +331,18 @@ class Renderer: NSObject, MTKViewDelegate {
             commandBuffer.present(currentDrawable)
         }
     }
+    
+    func getDispatchSize2D(pipeline: MTLComputePipelineState) -> (MTLSize, MTLSize) {
+        let threadWidth = pipeline.threadExecutionWidth
+        let threadHeight = pipeline.maxTotalThreadsPerThreadgroup / threadWidth
+        
+        let threadsPerThreadGroup = MTLSize(width: threadWidth, height: threadHeight, depth: 1)
+        let threadGroups = MTLSize(width: (Int(drawableSize.width) + threadWidth - 1) / threadWidth,
+                                   height: (Int(drawableSize.height) + threadHeight - 1) / threadHeight,
+                                   depth: 1)
+
+        return (threadsPerThreadGroup, threadGroups)
+    }
 }
 
 func getManagedBufferStorageMode() -> MTLResourceOptions {
