@@ -160,14 +160,11 @@ class GeometryInstance {
                LinearAlgebra.scale(scale: scale)
     }
     
-    let mask: UInt32
-
-    init(geometry: Geometry, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one, mask: UInt32) {
+    init(geometry: Geometry, translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero, scale: SIMD3<Float> = .one) {
         self.geometry = geometry
         self.translation = translation
         self.rotation = rotation
         self.scale = scale
-        self.mask = mask
     }
     
     func getPackedTransform() -> MTLPackedFloat4x3 {

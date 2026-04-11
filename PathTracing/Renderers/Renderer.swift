@@ -226,7 +226,7 @@ class Renderer: NSObject, MTKViewDelegate {
             instanceDescriptors[instanceIndex].accelerationStructureIndex = UInt32(geometryIndex)
             instanceDescriptors[instanceIndex].options = MTLAccelerationStructureInstanceOptions(rawValue: MTLAccelerationStructureInstanceOptions.opaque.rawValue)
             instanceDescriptors[instanceIndex].intersectionFunctionTableOffset = 0
-            instanceDescriptors[instanceIndex].mask = UInt32(instance.mask)
+            instanceDescriptors[instanceIndex].mask = UINT32_MAX
             instanceDescriptors[instanceIndex].transformationMatrix = instance.getPackedTransform()
         }
         
@@ -300,6 +300,7 @@ class Renderer: NSObject, MTKViewDelegate {
         frameIndex += 1
         
         uniforms.lightCount = UInt32(scene.lights.count)
+        uniforms.environmentMapLightIndex = scene.environmentMapLightIndex
         uniformsPointer.pointee = uniforms
         
         uniformBufferIndex = (uniformBufferIndex + 1) % maxFramesInFlight

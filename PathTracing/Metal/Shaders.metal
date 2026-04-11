@@ -42,9 +42,11 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
                              texture2d<float> environmentMapTexture,
                              constant LightTriangle *lightTriangles,
                              constant int* instanceLightIndices,
-                             constant float *environmentMapCDF,
                              constant Textures* textures,
-                             constant Material* materials
+                             constant Material* materials,
+                             constant AliasEntry* lightAliasEntries,
+                             constant AliasEntry* lightTriangleAliasEntries,
+                             constant AliasEntry* environmentMapAliasEntries
                              )
 {
     unsigned int offset = randomTex.read(tid).x;
@@ -57,10 +59,10 @@ kernel void raytracingKernel(uint2 tid [[thread_position_in_grid]],
         return;
 
     float3 ptContribution = float3(0.0f);
-    ptContribution = pathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, sampler, textures, materials);
+    ptContribution = pathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, sampler, textures, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
     
     float3 bdptContribution = float3(0.0f);
-//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, splatTex, splatBuffer, materials);
+//    bdptContribution = bidirectionalPathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, splatTex, splatBuffer, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
     
     float3 contribution = ptContribution + bdptContribution;
     float3 totalSplat = splatTex.read(tid).xyz;

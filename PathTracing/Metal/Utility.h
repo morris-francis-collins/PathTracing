@@ -10,18 +10,6 @@
 
 #define DEBUG(...) os_log_default.log_info(__VA_ARGS__)
 
-#define GEOMETRY_MASK_TRIANGLE 1
-#define GEOMETRY_MASK_SPHERE   2
-#define GEOMETRY_MASK_LIGHT    4
-#define GEOMETRY_MASK_TRANSPARENT 8
-#define GEOMETRY_MASK_OPAQUE 16
-
-#define GEOMETRY_MASK_GEOMETRY (GEOMETRY_MASK_TRIANGLE | GEOMETRY_MASK_SPHERE)
-
-#define RAY_MASK_PRIMARY   (GEOMETRY_MASK_GEOMETRY | GEOMETRY_MASK_LIGHT | GEOMETRY_MASK_TRANSPARENT | GEOMETRY_MASK_OPAQUE)
-#define RAY_MASK_SHADOW    GEOMETRY_MASK_OPAQUE | GEOMETRY_MASK_LIGHT
-#define RAY_MASK_SECONDARY GEOMETRY_MASK_GEOMETRY | GEOMETRY_MASK_TRANSPARENT | GEOMETRY_MASK_OPAQUE
-
 #define CAMERA_FOV_ANGLE 60.0f
 #define MAX_TEXTURES 500
 #define EPSILON 1e-3f
@@ -34,11 +22,18 @@ struct Camera {
 };
 
 struct Uniforms {
+    struct Camera camera;
     unsigned int width;
     unsigned int height;
     unsigned int frameIndex;
-    struct Camera camera;
     unsigned int lightCount;
+    int environmentMapLightIndex;
+};
+
+struct AliasEntry {
+    float acceptanceProbability;
+    unsigned int alias;
+    float PMF;
 };
 
 #ifdef __METAL_VERSION__

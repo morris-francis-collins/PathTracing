@@ -15,10 +15,11 @@ using namespace raytracing;
 // MARK: Point Lights
 
 LightSample samplePointLight(float3 position, constant Light& pointLight) {
-    float3 wo = pointLight.position - position;
+    float3 wo = pointLight.point.position - position;
     float d = length(wo);
     wo /= d;
-    return LightSample(pointLight.position, float3(0.0f), wo, pointLight.color, d, 1.0f);
+    
+    return LightSample(pointLight.point.position, float3(0.0f), wo, pointLight.point.color, d, 1.0f);
 }
 
 LightEmissionSample samplePointLightEmission(constant Light& pointLight, float2 r2) {
@@ -28,45 +29,50 @@ LightEmissionSample samplePointLightEmission(constant Light& pointLight, float2 
     float3 wo = float3(radius * cos(phi), radius * sin(phi), z);
     float directionPDF = 1.0f / (4.0f * M_PI_F);
     
-    return LightEmissionSample(pointLight.position, float3(0.0f), wo, pointLight.color, 1.0f, directionPDF);
+    return LightEmissionSample(pointLight.point.position, float3(0.0f), wo, pointLight.point.color, 1.0f, directionPDF);
 }
 
 // MARK: Area Lights
 
-LightTriangle getLightTriangle(constant Light& areaLight, constant LightTriangle *lightTriangles, float r) {
-    int left = areaLight.firstTriangleIndex;
-    int right = areaLight.firstTriangleIndex + areaLight.triangleCount - 1;
+static LightTriangle getLightTriangle(constant Light& areaLight, constant LightTriangle *lightTriangles, constant AliasEntry* lightTriangleAliasEntries, float2 r2) {
     
-    while (left < right) {
-        int mid = (left + right) / 2;
-
-        if (r < lightTriangles[mid].CDF) {
-            right = mid;
-        } else {
-            left = mid + 1;
-        }
+    unsigned int index = areaLight.area.firstTriangleIndex + floor(areaLight.area.triangleCount * r2.x);
+    
+    if (lightTriangleAliasEntries[index].acceptanceProbability > r2.y) {
+        return lightTriangles[index];
+    } else {
+        return lightTriangles[lightTriangleAliasEntries[index].alias];
     }
-    
-    return lightTriangles[left];
+}
+
+static void getTriangleSamplingCoordinates(float2 r2, thread float& u, thread float& v, thread float& w) {
+    if (r2.x + r2.y > 1.0f) {
+        r2.x = 1.0f - r2.x;
+        r2.y = 1.0f - r2.y;
+    }
+
+    u = 1.0f - r2.x - r2.y;
+    v = r2.x;
+    w = r2.y;
+}
+
+static float3 sampleEmissionTexture(constant Textures *textures, thread LightTriangle& triangle, float2 uv) {
+    constexpr sampler textureSampler(address::repeat, filter::linear);
+    return triangle.emissionTextureIndex != -1 ? textures->textures[triangle.emissionTextureIndex].sample(textureSampler, uv).rgb : float3(1.0f);
 }
 
 LightSample sampleAreaLight(float3 position,
                             constant Light& areaLight,
                             constant LightTriangle *lightTriangles,
+                            constant AliasEntry* lightTriangleAliasEntries,
                             constant Textures* textures,
-                            float3 r3
-                            )
+                            float2 r2_0,
+                            float2 r2_1)
 {
-    LightTriangle triangle = getLightTriangle(areaLight, lightTriangles, r3.x);
+    LightTriangle triangle = getLightTriangle(areaLight, lightTriangles, lightTriangleAliasEntries, r2_0);
     
-    if (r3.y + r3.z > 1.0f) {
-        r3.y = 1 - r3.y;
-        r3.z = 1 - r3.z;
-    }
-
-    float u = 1.0f - r3.y - r3.z;
-    float v = r3.y;
-    float w = r3.z;
+    float u, v, w;
+    getTriangleSamplingCoordinates(r2_1, u, v, w);
     
     float3 edge1 = triangle.v1 - triangle.v0;
     float3 edge2 = triangle.v2 - triangle.v0;
@@ -78,92 +84,106 @@ LightSample sampleAreaLight(float3 position,
     float d = length(wo);
     wo /= d;
     
-    float3 emission = triangle.emission;
-    constexpr sampler textureSampler(address::repeat, filter::linear);
+    float3 emission = triangle.emission * sampleEmissionTexture(textures, triangle, lightUV);
     
-    if (triangle.emissionTextureIndex != -1) {
-        emission *= textures->textures[triangle.emissionTextureIndex].sample(textureSampler, lightUV).rgb;
-    }
-
-    return LightSample(lightPosition, normal, wo, emission, d, 1.0f / areaLight.totalArea);
+    return LightSample(lightPosition, normal, wo, emission, d, 1.0f / areaLight.area.totalArea);
 }
 
-LightEmissionSample sampleAreaLightEmission(constant Light& areaLight, constant LightTriangle *lightTriangles, float2 r2, float3 r3) {
-    LightTriangle triangle = getLightTriangle(areaLight, lightTriangles, r3.x);
+LightEmissionSample sampleAreaLightEmission(constant Light& areaLight,
+                                            constant LightTriangle *lightTriangles,
+                                            constant AliasEntry* lightTriangleAliasEntries,
+                                            constant Textures* textures,
+                                            float2 r2_0,
+                                            float2 r2_1,
+                                            float2 r2_2)
+{
+    LightTriangle triangle = getLightTriangle(areaLight, lightTriangles, lightTriangleAliasEntries, r2_0);
     
-    if (r3.y + r3.z > 1.0f) {
-        r3.y = 1 - r3.y;
-        r3.z = 1 - r3.z;
-    }
+    float u, v, w;
+    getTriangleSamplingCoordinates(r2_1, u, v, w);
 
-    float u = 1.0f - r3.y - r3.z;
-    float v = r3.y;
-    float w = r3.z;
-    
     float3 edge1 = triangle.v1 - triangle.v0;
     float3 edge2 = triangle.v2 - triangle.v0;
     float3 lightPosition = u * triangle.v0 + v * triangle.v1 + w * triangle.v2;
+    float2 lightUV = u * triangle.uv0 + v * triangle.uv1 + w * triangle.uv2;
     float3 normal = normalize(cross(edge1, edge2));
 
-    float3 woLocal = sampleCosineWeightedHemisphere(r2);
+    float3 woLocal = sampleCosineWeightedHemisphere(r2_2);
     float3 wo = alignHemisphereWithNormal(woLocal, normal);
     
-    float positionPDF = 1.0f / areaLight.totalArea;
+    float positionPDF = 1.0f / areaLight.area.totalArea;
     float directionPDF = dot(wo, normal) / M_PI_F;
     
-    return LightEmissionSample(lightPosition, normal, wo, triangle.emission, positionPDF, directionPDF);
+    float3 emission = triangle.emission * sampleEmissionTexture(textures, triangle, lightUV);
+    
+    return LightEmissionSample(lightPosition, normal, wo, emission, positionPDF, directionPDF);
 }
 
 // MARK: Directional Lights
 
 LightSample sampleDirectionalLight(float3 position, constant Light& directionalLight) {
-    float3 wo = -directionalLight.direction;
+    float3 wo = -directionalLight.directional.direction;
     float3 lightPosition = position + 2.0f * SCENE_RADIUS * wo;
-    return LightSample(lightPosition, float3(0.0f), wo, directionalLight.color, 1.0f, 1.0f);
+    return LightSample(lightPosition, float3(0.0f), wo, directionalLight.directional.color, 1.0f, 1.0f);
 }
 
 LightEmissionSample sampleDirectionalLightEmission(constant Light& directionalLight, float2 r2) {
-    float3 T, B; createOrthonormalBasis(directionalLight.direction, T, B);
+    float3 T, B; createOrthonormalBasis(directionalLight.directional.direction, T, B);
     float2 diskSample = concentricSampleDisk(r2) * SCENE_RADIUS;
-    float3 position = float3(0.0f) - 2.0f * directionalLight.direction * SCENE_RADIUS + T * diskSample.x + B * diskSample.y;
+    float3 position = float3(0.0f) - 2.0f * directionalLight.directional.direction * SCENE_RADIUS + T * diskSample.x + B * diskSample.y;
     float positionPDF = 1.0f / (M_PI_F * SCENE_RADIUS * SCENE_RADIUS);
     
-    return LightEmissionSample(position, float3(0.0f), directionalLight.direction, directionalLight.color, positionPDF, 1.0f);
+    return LightEmissionSample(position, float3(0.0f), directionalLight.directional.direction, directionalLight.directional.color, positionPDF, 1.0f);
 }
 
 // MARK: Environment Maps
 
-float3 environmentMapEmission(float2 uv, texture2d<float> environmentMapTexture) {
+float3 environmentMapEmission(texture2d<float> environmentMapTexture, float2 uv) {
     constexpr sampler textureSampler(min_filter::linear, mag_filter::linear, mip_filter::none, s_address::repeat, t_address::repeat);
-    return ENVIRONMENT_MAP_SCALE * environmentMapTexture.sample(textureSampler, uv).rgb;
+    return environmentMapTexture.sample(textureSampler, uv).rgb;
+}
+
+struct EnvironmentMapSample {
+    unsigned int index;
+    float PMF;
+};
+
+static EnvironmentMapSample sampleEnvironmentMapAliasTable(constant Light& environmentMap, constant AliasEntry* environmentMapAliasEntries, float2 r2) {
+    unsigned int pixels = environmentMap.environment.width * environmentMap.environment.height;
+    unsigned int index = floor(pixels * r2.x);
+    
+    if (environmentMapAliasEntries[index].acceptanceProbability > r2.y) {
+        return {index, environmentMapAliasEntries[index].PMF};
+    } else {
+        unsigned int aliasIndex = environmentMapAliasEntries[index].alias;
+        return {aliasIndex, environmentMapAliasEntries[aliasIndex].PMF};
+    }
+}
+
+float environmentLightSamplePDF(constant Light& environmentMap, constant AliasEntry* environmentMapAliasEntries, float2 uv) {
+    unsigned int x = clamp(uint(uv.x * environmentMap.environment.width), 0u, environmentMap.environment.width - 1u);
+    unsigned int y = clamp(uint(uv.y * environmentMap.environment.height), 0u, environmentMap.environment.height - 1u);
+    unsigned int i = y * environmentMap.environment.width + x;
+    
+    float pixelPDF = environmentMapAliasEntries[i].PMF;
+    return max(pixelPDF * float(environmentMap.environment.width * environmentMap.environment.height) / (2.0f * M_PI_F * M_PI_F * sin(uv.y * M_PI_F)), 1e-30f);
 }
 
 LightSample sampleEnvironmentMap(float3 position,
                                  constant Light& environmentMap,
                                  texture2d<float> environmentMapTexture,
-                                 constant float *environmentMapCDF,
-                                 float r1
-                                 )
+                                 constant AliasEntry* environmentMapAliasEntries,
+                                 float2 r2)
 {
-    int l = 0, r = ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT - 1;
+    EnvironmentMapSample environmentMapSample = sampleEnvironmentMapAliasTable(environmentMap, environmentMapAliasEntries, r2);
     
-    while (l < r) {
-        int m = l + (r - l) / 2;
-        
-        if (environmentMapCDF[m] < r1) {
-            l = m + 1;
-        } else {
-            r = m;
-        }
-    }
-    
-    int y = l / ENVIRONMENT_MAP_WIDTH;
-    int x = l % ENVIRONMENT_MAP_WIDTH;
+    int y = environmentMapSample.index / environmentMap.environment.width;
+    int x = environmentMapSample.index % environmentMap.environment.width;
 
-    float u = (float(x) + 0.5f) / float(ENVIRONMENT_MAP_WIDTH);
-    float v = (float(y) + 0.5f) / float(ENVIRONMENT_MAP_HEIGHT);
+    float u = (float(x) + 0.5f) / float(environmentMap.environment.width);
+    float v = (float(y) + 0.5f) / float(environmentMap.environment.height);
     
-    float3 emission = environmentMapEmission(float2(u, v), environmentMapTexture);
+    float3 emission = environmentMapEmission(environmentMapTexture, float2(u, v));
 
     float phi = u * 2.0f * M_PI_F;
     float theta = v * M_PI_F;
@@ -178,141 +198,75 @@ LightSample sampleEnvironmentMap(float3 position,
     wo.y = cosTheta;             // y is up
     wo.z = -sinTheta * sinPhi;
     
-    float pixelPDF = environmentMapCDF[l] - (l > 0 ? environmentMapCDF[l - 1] : 0.0f);
-    float solidAnglePDF = pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sinTheta);
+    float pixelPDF = environmentMapSample.PMF;
+    float solidAnglePDF = pixelPDF * float(environmentMap.environment.width * environmentMap.environment.height) / (2.0f * M_PI_F * M_PI_F * sinTheta);
     float3 lightPosition = position + 2.0f * SCENE_RADIUS * wo;
     
-    return LightSample(lightPosition, float3(0.0f), wo, emission, 1.0f, solidAnglePDF);
-}
-
-float environmentLightSamplePDF(float2 uv, constant float *environmentMapCDF) {
-    int x = clamp(int(uv.x * float(ENVIRONMENT_MAP_WIDTH)), 0, ENVIRONMENT_MAP_WIDTH - 1);
-    int y = clamp(int(uv.y * float(ENVIRONMENT_MAP_HEIGHT)), 0, ENVIRONMENT_MAP_HEIGHT - 1);
-    int i = y * ENVIRONMENT_MAP_WIDTH + x;
-    
-    float pixelPDF = environmentMapCDF[i] - (i > 0 ? environmentMapCDF[i - 1] : 0.0f);
-    
-    return max(pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sin(uv.y * M_PI_F)), 1e-30f);
+    return LightSample(lightPosition, float3(0.0f), wo, emission, 1.0, solidAnglePDF); // TODO: 1.0 distance since we dont want fall off; adjust so infinte lights no fall off  for clarity
 }
 
 LightEmissionSample sampleEnvironmentMapEmission(constant Light& environmentMap,
                                                  texture2d<float> environmentMapTexture,
-                                                 constant float *environmentMapCDF,
-                                                 float r1,
-                                                 float2 r2
-                                                 )
+                                                 constant AliasEntry* environmentMapAliasEntries,
+                                                 float2 r2_0,
+                                                 float2 r2_1)
 {
-    int l = 0, r = ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT - 1;
+    EnvironmentMapSample environmentMapSample = sampleEnvironmentMapAliasTable(environmentMap, environmentMapAliasEntries, r2_0);
     
-    while (l < r) {
-        int m = l + (r - l) / 2;
-        
-        if (environmentMapCDF[m] < r1) {
-            l = m + 1;
-        } else {
-            r = m;
-        }
-    }
-    
-    int y = l / ENVIRONMENT_MAP_WIDTH;
-    int x = l % ENVIRONMENT_MAP_WIDTH;
+    int y = environmentMapSample.index / environmentMap.environment.width;
+    int x = environmentMapSample.index % environmentMap.environment.width;
 
-    float u = (float(x) + 0.5f) / float(ENVIRONMENT_MAP_WIDTH);
-    float v = (float(y) + 0.5f) / float(ENVIRONMENT_MAP_HEIGHT);
-    
-    float3 emission = environmentMapEmission(float2(u, v), environmentMapTexture);
+    float u = (float(x) + 0.5f) / float(environmentMap.environment.width);
+    float v = (float(y) + 0.5f) / float(environmentMap.environment.height);
+
+    float3 emission = environmentMapEmission(environmentMapTexture, float2(u, v));
 
     float phi = u * 2.0f * M_PI_F;
     float theta = v * M_PI_F;
-        
+    
     float sinTheta = sin(theta);
     float cosTheta = cos(theta);
     float sinPhi = sin(phi);
     float cosPhi = cos(phi);
-    
+
     float3 wo;
     wo.x = -sinTheta * cosPhi;
     wo.y = cosTheta;             // y is up
     wo.z = -sinTheta * sinPhi;
     
     float3 T, B; createOrthonormalBasis(wo, T, B);
-    float2 diskSample = concentricSampleDisk(r2) * SCENE_RADIUS;
+    float2 diskSample = concentricSampleDisk(r2_1) * SCENE_RADIUS;
     float3 position = float3(0.0f) + 2.0f * wo * SCENE_RADIUS + T * diskSample.x + B * diskSample.y;
 
     float positionPDF = 1.0f / (M_PI_F * SCENE_RADIUS * SCENE_RADIUS);
-    float pixelPDF = environmentMapCDF[l] - (l > 0 ? environmentMapCDF[l - 1] : 0.0f);
-    float directionPDF = pixelPDF * float(ENVIRONMENT_MAP_WIDTH * ENVIRONMENT_MAP_HEIGHT) / (2.0f * M_PI_F * M_PI_F * sinTheta);
+    float pixelPDF = environmentMapSample.PMF;
+    float directionPDF = pixelPDF * float(environmentMap.environment.width * environmentMap.environment.height) / (2.0f * M_PI_F * M_PI_F * sinTheta);
     
     return LightEmissionSample(position, float3(0.0f), -wo, emission, positionPDF, max(1e-30f, directionPDF));
 }
 
 // MARK: Other
 
-float getLightPower(constant Light& light) {
-    switch (light.type) {
-        case POINT_LIGHT:
-            return 4.0f * M_PI_F * calculateLuminance(light.color);
-        case AREA_LIGHT:
-            return calculateLuminance(light.color) * light.totalArea;
-        case DIRECTIONAL_LIGHT:
-            return M_PI_F * SCENE_RADIUS * SCENE_RADIUS * calculateLuminance(light.color);
-        case ENVIRONMENT_MAP:
-            return 4.0f * M_PI_F * M_PI_F * SCENE_RADIUS * SCENE_RADIUS * ENVIRONMENT_MAP_SCALE * calculateLuminance(light.color);
-        default:
-            return 0.0f;
-    }
-}
-
-constant Light& selectLight(constant Light *lights,
+constant Light& selectLight(constant Light* lights,
+                            constant AliasEntry* lightAliasEntries,
                             constant Uniforms& uniforms,
-                            float r,
-                            thread float& selectionPDF)
+                            thread float& selectionPDF,
+                            float2 r2)
 {
-    float weights[MAX_LIGHTS];
-    float totalWeight = 0.0f;
+    unsigned int index = floor(uniforms.lightCount * r2.x);
     
-    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-        float power = getLightPower(lights[i]);
-        
-        weights[i] = max(power, 0.0f);
-        totalWeight += weights[i];
+    if (lightAliasEntries[index].acceptanceProbability > r2.y) {
+        selectionPDF = lightAliasEntries[index].PMF;
+        return lights[index];
+    } else {
+        unsigned int aliasIndex = lightAliasEntries[index].alias;
+        selectionPDF = lightAliasEntries[aliasIndex].PMF;
+        return lights[aliasIndex];
     }
-    
-    if (totalWeight < 1e-8f || isnan(totalWeight)) {
-        unsigned int idx = min((unsigned int)(r * float(uniforms.lightCount)), uniforms.lightCount - 1);
-        selectionPDF = 1.0f / float(uniforms.lightCount);
-        return lights[idx];
-    }
-    
-    float random = r * totalWeight;
-    float accumWeight = 0.0f;
-    unsigned int idx = uniforms.lightCount - 1;
-    selectionPDF = weights[idx] / totalWeight;
-    
-    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-        accumWeight += weights[i];
-        
-        if (accumWeight >= random) {
-            idx = i;
-            selectionPDF = weights[i] / totalWeight;
-            break;
-        }
-    }
-    
-    selectionPDF = max(selectionPDF, 1e-8f);
-    
-    return lights[idx];
 }
 
-float getLightSelectionPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms) {
-    float targetPower = getLightPower(light);
-    float totalPower = 0.0f;
-    
-    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-        totalPower += getLightPower(lights[i]);
-    }
-    
-    return targetPower / totalPower;
+float getLightSelectionPDF(constant Light& light, constant AliasEntry* lightAliasEntries) {
+    return lightAliasEntries[light.index].PMF;
 }
 
 LightSample sampleLight(float3 position,
@@ -320,19 +274,19 @@ LightSample sampleLight(float3 position,
                         constant LightTriangle *lightTriangles,
                         constant Textures* textures,
                         texture2d<float> environmentMapTexture,
-                        constant float *environmentMapCDF,
-                        float3 r3
-                        )
+                        constant AliasEntry* lightTriangleAliasEntries,
+                        constant AliasEntry* environmentMapAliasEntries,
+                        thread Sampler& sampler)
 {
     switch (light.type) {
         case POINT_LIGHT:
             return samplePointLight(position, light);
         case AREA_LIGHT:
-            return sampleAreaLight(position, light, lightTriangles, textures, r3);
+            return sampleAreaLight(position, light, lightTriangles, lightTriangleAliasEntries, textures, sampler.r2(), sampler.r2());
         case DIRECTIONAL_LIGHT:
             return sampleDirectionalLight(position, light);
         case ENVIRONMENT_MAP:
-            return sampleEnvironmentMap(position, light, environmentMapTexture, environmentMapCDF, r3.x);
+            return sampleEnvironmentMap(position, light, environmentMapTexture, environmentMapAliasEntries, sampler.r2());
         default:
             return LightSample(float3(0.0f), float3(0.0f), float3(0.0f), float3(0.0f), 0.0f, 0.0f);
     }
@@ -343,7 +297,7 @@ float getLightSamplePDF(constant Light& light) {
         case POINT_LIGHT:
             return 0.0f;
         case AREA_LIGHT:
-            return 1.0f / light.totalArea;
+            return 1.0f / light.area.totalArea;
         case DIRECTIONAL_LIGHT:
             return 1.0f / (M_PI_F * SCENE_RADIUS * SCENE_RADIUS);
         case ENVIRONMENT_MAP:
@@ -353,7 +307,7 @@ float getLightSamplePDF(constant Light& light) {
     }
 }
 
-float getLightDirectionPDF(constant Light& light, float3 w, float3 n, constant float* environmentMapCDF) {
+float getLightDirectionPDF(float3 w, float3 n, constant Light& light, constant AliasEntry* environmentMapAliasEntries) {
     switch (light.type) {
         case POINT_LIGHT:
             return 1.0f / (4.0f * M_PI_F);
@@ -362,7 +316,7 @@ float getLightDirectionPDF(constant Light& light, float3 w, float3 n, constant f
         case DIRECTIONAL_LIGHT:
             return 1.0f;
         case ENVIRONMENT_MAP:
-            return environmentLightSamplePDF(getEnvironmentMapUV(w), environmentMapCDF);
+            return environmentLightSamplePDF(light, environmentMapAliasEntries, getEnvironmentMapUV(w));
         default:
             DEBUG("getLightDirectionPDF: NOT IMPLEMENTED");
             return 0.0f;
@@ -371,36 +325,28 @@ float getLightDirectionPDF(constant Light& light, float3 w, float3 n, constant f
 
 LightEmissionSample sampleLightEmission(constant Light& light,
                                         constant LightTriangle *lightTriangles,
+                                        constant Textures* textures,
                                         texture2d<float> environmentMapTexture,
-                                        constant float *environmentMapCDF,
-                                        float2 r2,
-                                        float3 r3
-                                        )
+                                        constant AliasEntry* lightTriangleAliasEntries,
+                                        constant AliasEntry* environmentMapAliasEntries,
+                                        thread Sampler& sampler)
 {
     switch (light.type) {
         case POINT_LIGHT:
-            return samplePointLightEmission(light, r2);
+            return samplePointLightEmission(light, sampler.r2());
         case AREA_LIGHT:
-            return sampleAreaLightEmission(light, lightTriangles, r2, r3);
+            return sampleAreaLightEmission(light, lightTriangles, lightTriangleAliasEntries, textures, sampler.r2(), sampler.r2(), sampler.r2());
         case DIRECTIONAL_LIGHT:
-            return sampleDirectionalLightEmission(light, r2);
+            return sampleDirectionalLightEmission(light, sampler.r2());
         case ENVIRONMENT_MAP:
-            return sampleEnvironmentMapEmission(light, environmentMapTexture, environmentMapCDF, r3.x, r2);
+            return sampleEnvironmentMapEmission(light, environmentMapTexture, environmentMapAliasEntries, sampler.r2(), sampler.r2());
         default:
             DEBUG("sampleLightEmission: NOT IMPLEMENTED");
             return LightEmissionSample(float3(0.0f), float3(0.0f), float3(0.0f), float3(0.0f), 0.0f, 0.0f);
     }
 }
 
-float infiniteLightDensity(float3 w, constant Light* lights, constant Uniforms& uniforms, constant float *environmentMapCDF) {
-    float PDF = 0.0f; // TODO: needs to be tested with multiple environment maps
+float infiniteLightDensity(float3 w, constant Light& environmentLight, constant AliasEntry* lightAliasEntries, constant AliasEntry* environmentMapAliasEntries) {
     float2 uv = getEnvironmentMapUV(w);
-
-    for (unsigned int i = 0; i < uniforms.lightCount; i++) {
-        if (lights[i].type == ENVIRONMENT_MAP) {
-            PDF += environmentLightSamplePDF(uv, environmentMapCDF) * getLightSelectionPDF(lights[i], lights, uniforms);
-        }
-    }
-
-    return PDF;
+    return environmentLightSamplePDF(environmentLight, environmentMapAliasEntries, uv) * lightAliasEntries[environmentLight.index].PMF;
 }

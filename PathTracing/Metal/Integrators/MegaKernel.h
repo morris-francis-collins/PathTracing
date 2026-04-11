@@ -36,12 +36,13 @@ float3 pathIntegrator(float2 pixel,
                       constant Light *lights,
                       constant LightTriangle *lightTriangles,
                       constant int* instanceLightIndices,
-                      texture2d<float> environmentMapTexture,
-                      constant float *environmentMapCDF,
                       thread Sampler& sampler,
                       constant Textures* textures,
-                      constant Material* materials
-                      );
+                      constant Material* materials,
+                      constant AliasEntry* lightAliasEntries,
+                      constant AliasEntry* lightTriangleAliasEntries,
+                      texture2d<float> environmentMapTexture,
+                      constant AliasEntry* environmentMapAliasEntries);
 
 float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant Uniforms& uniforms,
@@ -50,14 +51,15 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant Light *lights,
                                    constant LightTriangle *lightTriangles,
                                    constant int* instanceLightIndices,
-                                   texture2d<float> environmentMapTexture,
-                                   constant float *environmentMapCDF,
                                    constant Textures* textures,
                                    thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer,
-                                   constant Material* materials
-                                   );
+                                   constant Material* materials,
+                                   constant AliasEntry* lightAliasEntries,
+                                   constant AliasEntry* lightTriangleAliasEntries,
+                                   texture2d<float> environmentMapTexture,
+                                   constant AliasEntry* environmentMapAliasEntries);
 
 struct EndpointInteraction {
     float3 position;
@@ -142,10 +144,10 @@ struct PathVertex {
         }
     }
     
-    float PDF(thread PathVertex& prev, thread PathVertex& nxt, constant float* environmentMapCDF, constant Uniforms& uniforms) {
+    float PDF(thread PathVertex& prev, thread PathVertex& nxt, constant AliasEntry* environmentMapAliasEntries, constant Uniforms& uniforms) {
         if (type == LIGHT_VERTEX) {
             if (!ei.light) DEBUG("NO LIGHT");
-            return lightDirectionPDF(*ei.light, nxt, environmentMapCDF);
+            return lightDirectionPDF(*ei.light, nxt, environmentMapAliasEntries);
         }
         
         float3 wo = normalize(nxt.position() - position());
@@ -165,19 +167,19 @@ struct PathVertex {
         return convertDensity(PDF, nxt);
     }
         
-    float lightOriginPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms, thread PathVertex& nxt, constant float* environmentMapCDF) {
+    float lightOriginPDF(constant Light& light, constant Light *lights, constant Uniforms& uniforms, thread PathVertex& nxt, constant AliasEntry* lightAliasEntries, constant AliasEntry* environmentMapAliasEntries) {
         float3 w = normalize(nxt.position() - position());
         
         if (isInfiniteLight()) {
-            return infiniteLightDensity(-w, lights, uniforms, environmentMapCDF);
+            return infiniteLightDensity(-w, lights[uniforms.environmentMapLightIndex], lightAliasEntries, environmentMapAliasEntries);
         }
 
-        float selectionPDF = getLightSelectionPDF(light, lights, uniforms);
+        float selectionPDF = getLightSelectionPDF(light, lightAliasEntries);
         float positionPDF = getLightSamplePDF(light);
         return selectionPDF * positionPDF;
     }
     
-    float lightDirectionPDF(constant Light& light, thread PathVertex& nxt, constant float* environmentMapCDF) {
+    float lightDirectionPDF(constant Light& light, thread PathVertex& nxt, constant AliasEntry* environmentMapAliasEntries) {
         float3 wo = nxt.position() - position();
         float d2_inv = 1.0f / length_squared(wo);
         wo *= sqrt(d2_inv);
@@ -187,7 +189,7 @@ struct PathVertex {
         if (isInfiniteLight()) {
             directionPDF = 1.0f / (M_PI_F * SCENE_RADIUS * SCENE_RADIUS);
         } else {
-            directionPDF = d2_inv * getLightDirectionPDF(light, wo, normal(), environmentMapCDF);
+            directionPDF = d2_inv * getLightDirectionPDF(wo, normal(), light, environmentMapAliasEntries);
         }
                 
         if (nxt.isOnSurface())
@@ -204,7 +206,7 @@ struct PathVertex {
         
         if (type == LIGHT_VERTEX) {
             float2 uv = getEnvironmentMapUV(w);
-            return environmentMapEmission(uv, environmentMapTexture);
+            return environmentMapEmission(environmentMapTexture, uv);
         } else if (si.hitLight()) {
             return si.emission; // TODO: needs to sample from texture
         }
@@ -240,7 +242,7 @@ struct PathVertex {
     }
     
     inline bool isDeltaLight() {
-        return type == LIGHT_VERTEX && (ei.light && ei.light->delta);
+        return type == LIGHT_VERTEX && (ei.light && ei.light->isDelta());
     }
             
     inline float3 position() {

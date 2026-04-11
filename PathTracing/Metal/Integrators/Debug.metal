@@ -38,7 +38,7 @@ kernel void debugSurfaceProperties(uint2 tid [[thread_position_in_grid]],
     
     if (intersection.type == intersection_type::none) {
         float2 uv = getEnvironmentMapUV(ray.direction);
-        color = environmentMapEmission(uv, environmentMapTexture);
+        color = environmentMapEmission(environmentMapTexture, uv);
         image.write(float4(color, 1.0f), tid);
         return;
     }

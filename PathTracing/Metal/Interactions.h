@@ -75,14 +75,14 @@ IntersectionResult intersect(ray ray, instance_acceleration_structure accelerati
     i.force_opacity(forced_opacity::opaque);
     i.accept_any_intersection(acceptAnyIntersection);
 
-    auto result = i.intersect(ray, accelerationStructure, RAY_MASK_PRIMARY);
+    auto result = i.intersect(ray, accelerationStructure, __UINT32_MAX__);
 
     IntersectionResult intersection;
     intersection.triangle_barycentric_coord = result.triangle_barycentric_coord;
-    intersection.instance_id               = result.instance_id;
-    intersection.primitive_data            = result.primitive_data;
-    intersection.distance                  = result.distance;
-    intersection.type                      = result.type;
+    intersection.instance_id                = result.instance_id;
+    intersection.primitive_data             = result.primitive_data;
+    intersection.distance                   = result.distance;
+    intersection.type                       = result.type;
 
     return intersection;
 }

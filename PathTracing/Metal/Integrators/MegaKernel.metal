@@ -19,12 +19,13 @@ float3 pathIntegrator(float2 pixel,
                       constant Light *lights,
                       constant LightTriangle *lightTriangles,
                       constant int* instanceLightIndices,
-                      texture2d<float> environmentMapTexture,
-                      constant float *environmentMapCDF,
                       thread Sampler& sampler,
                       constant Textures* textures,
-                      constant Material* materials
-                      )
+                      constant Material* materials,
+                      constant AliasEntry* lightAliasEntries,
+                      constant AliasEntry* lightTriangleAliasEntries,
+                      texture2d<float> environmentMapTexture,
+                      constant AliasEntry* environmentMapAliasEntries)
 {
     ray ray = generateRay(pixel, uniforms);
 
@@ -40,16 +41,18 @@ float3 pathIntegrator(float2 pixel,
         IntersectionResult intersection = intersect<false>(ray, accelerationStructure);
         
         if (intersection.type == intersection_type::none) {
-            float2 uv = getEnvironmentMapUV(ray.direction);
-            float3 emission = environmentMapEmission(uv, environmentMapTexture);
+            int environmentMapLightIndex = uniforms.environmentMapLightIndex;
 
-            if (all(emission < 1e-10f))
+            if (environmentMapLightIndex == -1)
                 break;
+            
+            float2 uv = getEnvironmentMapUV(ray.direction);
+            float3 emission = environmentMapEmission(environmentMapTexture, uv);
 
             if (prevSpecular) {
                 contribution += throughput * emission;
             } else {
-                float lightPDF = environmentLightSamplePDF(uv, environmentMapCDF);
+                float lightPDF = environmentLightSamplePDF(lights[environmentMapLightIndex], environmentMapAliasEntries, uv);
                 float weight = powerHeuristic(PDF, lightPDF);
                 contribution += throughput * emission * weight;
             }
@@ -84,7 +87,7 @@ float3 pathIntegrator(float2 pixel,
             if (prevSpecular) {
                 contribution += throughput * color;
             } else {
-                float lightPDF = getLightSelectionPDF(light, lights, uniforms) * getLightSamplePDF(light);
+                float lightPDF = getLightSelectionPDF(light, lightAliasEntries) * getLightSamplePDF(light);
                 float weight = powerHeuristic(PDF, lightPDF);
                 contribution += throughput * color * weight;
             }
@@ -108,8 +111,8 @@ float3 pathIntegrator(float2 pixel,
 
         if (!bsdfSample.delta) {
             float selectionPDF;
-            constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, textures, environmentMapTexture, environmentMapCDF, sampler.r3());
+            constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
+            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
             
             float3 wi = -ray.direction, wo = lightSample.wo;
             float3 pos1 = surfaceInteraction.position, pos2 = lightSample.position;
@@ -124,7 +127,7 @@ float3 pathIntegrator(float2 pixel,
                 float G = cosCamera * cosLight / (distance * distance);
                 float lightPDF = selectionPDF * lightSample.PDF;
 
-                if (light.delta) {
+                if (light.isDelta()) {
                     contribution += throughput * BSDF * lightSample.emission * G / lightPDF;
                 } else {
                     float bsdfPDF = getPDF(wi, wo, n, material);
@@ -159,8 +162,6 @@ int tracePath(float2 pixel,
               constant Light *lights,
               constant LightTriangle *lightTriangles,
               constant int* instanceLightIndices,
-              texture2d<float> environmentMapTexture,
-              constant float *environmentMapCDF,
               constant Textures* textures,
               thread Sampler& sampler,
               ray ray,
@@ -169,8 +170,11 @@ int tracePath(float2 pixel,
               VertexType type,
               float3 throughput,
               float forwardPDF,
-              constant Material* materials
-              )
+              constant Material* materials,
+              constant AliasEntry* lightAliasEntries,
+              constant AliasEntry* lightTriangleAliasEntries,
+              texture2d<float> environmentMapTexture,
+              constant AliasEntry* environmentMapAliasEntries)
 {
     int bounces = 1;
     
@@ -251,13 +255,14 @@ int traceCameraPath(float2 pixel,
                     constant Light *lights,
                     constant LightTriangle *lightTriangles,
                     constant int* instanceLightIndices,
-                    texture2d<float> environmentMapTexture,
-                    constant float *environmentMapCDF,
                     constant Textures* textures,
                     thread Sampler& sampler,
                     thread PathVertex *cameraVertices,
-                    constant Material* materials
-                    )
+                    constant Material* materials,
+                    constant AliasEntry* lightAliasEntries,
+                    constant AliasEntry* lightTriangleAliasEntries,
+                    texture2d<float> environmentMapTexture,
+                    constant AliasEntry* environmentMapAliasEntries)
 {
     constant Camera& camera = uniforms.camera;
     ray ray = generateRay(pixel, uniforms);
@@ -272,7 +277,7 @@ int traceCameraPath(float2 pixel,
 
     float3 throughput = float3(1.0f);
 
-    return tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF, materials);
+    return tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, ray, MAX_CAMERA_PATH_LENGTH, cameraVertices, CAMERA_VERTEX, throughput, directionPDF, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
 }
 
 int traceLightPath(float2 pixel,
@@ -282,17 +287,18 @@ int traceLightPath(float2 pixel,
                    constant Light *lights,
                    constant LightTriangle *lightTriangles,
                    constant int* instanceLightIndices,
-                   texture2d<float> environmentMapTexture,
-                   constant float *environmentMapCDF,
                    constant Textures* textures,
                    thread Sampler& sampler,
                    thread PathVertex *lightVertices,
-                   constant Material* materials
-                   )
+                   constant Material* materials,
+                   constant AliasEntry* lightAliasEntries,
+                   constant AliasEntry* lightTriangleAliasEntries,
+                   texture2d<float> environmentMapTexture,
+                   constant AliasEntry* environmentMapAliasEntries)
 {
     float selectionPDF;
-    constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
-    LightEmissionSample lightEmissionSample = sampleLightEmission(light, lightTriangles, environmentMapTexture, environmentMapCDF, sampler.r2(), sampler.r3());
+    constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
+    LightEmissionSample lightEmissionSample = sampleLightEmission(light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
     float positionPDF = lightEmissionSample.positionPDF;
     float directionPDF = lightEmissionSample.directionPDF;
     float3 normal = lightEmissionSample.normal;
@@ -303,14 +309,14 @@ int traceLightPath(float2 pixel,
     ray.direction = lightEmissionSample.wo;
     ray.min_distance = epsilon;
     ray.max_distance = INFINITY;
-    // TODO: light.color needs to be sampled from texture
-    lightVertices[0] = createLightVertex(&light, lightEmissionSample.position, normal, light.color, positionPDF * selectionPDF);
+    
+    lightVertices[0] = createLightVertex(&light, lightEmissionSample.position, normal, lightEmissionSample.emission, positionPDF * selectionPDF);
     float3 throughput = lightEmissionSample.emission / (selectionPDF * positionPDF * directionPDF);
 
     if (light.type == AREA_LIGHT)
         throughput *= abs(dot(lightVertices[0].normal(), ray.direction));
 
-    int numVertices = tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF, materials);
+    int numVertices = tracePath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, ray, MAX_LIGHT_PATH_LENGTH, lightVertices, LIGHT_VERTEX, throughput, directionPDF, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
 
     if (lightVertices[0].isInfiniteLight()) {
         if (numVertices > 0) {
@@ -318,7 +324,7 @@ int traceLightPath(float2 pixel,
             if (lightVertices[1].isOnSurface())
                 lightVertices[1].forwardPDF *= abs(dot(ray.direction, lightVertices[1].normal()));
         }
-        lightVertices[0].forwardPDF = infiniteLightDensity(-ray.direction, lights, uniforms, environmentMapCDF);
+        lightVertices[0].forwardPDF = infiniteLightDensity(-ray.direction, lights[uniforms.environmentMapLightIndex], lightAliasEntries, environmentMapAliasEntries);
     }
     
     return numVertices;
@@ -362,7 +368,10 @@ float3 calculateGeometricTerm(thread PathVertex& cameraVertex,
 
 float calculateMISWeight(constant Uniforms& uniforms,
                          constant Light* lights,
-                         constant float *environmentMapCDF,
+                         constant AliasEntry* lightAliasEntries,
+                         constant AliasEntry* lightTriangleAliasEntries,
+                         texture2d<float> environmentMapTexture,
+                         constant AliasEntry* environmentMapAliasEntries,
                          thread PathVertex *cameraVertices,
                          thread PathVertex *lightVertices,
                          int c, int l,
@@ -396,30 +405,35 @@ float calculateMISWeight(constant Uniforms& uniforms,
                 
     if (ci >= 0) {
         if (li >= 0) {
-            cameraVertices[ci].reversePDF = lightVertices[li].PDF(lightVertices[lip], cameraVertices[ci], environmentMapCDF, uniforms);
+            cameraVertices[ci].reversePDF = lightVertices[li].PDF(lightVertices[lip], cameraVertices[ci], environmentMapAliasEntries, uniforms);
         } else { // l = 0 case
             constant Light& light = lights[cameraVertices[ci].si.lightIndex]; // originally origin
-            cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms, cameraVertices[cip], environmentMapCDF);
+//            cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms, cameraVertices[cip], environmentMapAliasEntries);
+            cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms, cameraVertices[cip], lightAliasEntries, environmentMapAliasEntries);
         }
         cameraVertices[ci].delta = false;
     }
     
     if (cip >= 0) {
         if (li >= 0) {
-            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapCDF, uniforms);
+//            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapCDF, uniforms);
+            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapAliasEntries, uniforms);
+
         } else { // l = 0 case
             constant Light& light = lights[cameraVertices[ci].si.lightIndex]; // originally direction
-            cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip], environmentMapCDF);
+//            cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip], environmentMapCDF);
+            cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip], environmentMapAliasEntries);
+
         }
     }
     
     if (li >= 0) {
-        lightVertices[li].reversePDF = cameraVertices[ci].PDF(cameraVertices[cip], lightVertices[li], environmentMapCDF, uniforms);
+        lightVertices[li].reversePDF = cameraVertices[ci].PDF(cameraVertices[cip], lightVertices[li], environmentMapAliasEntries, uniforms);
         lightVertices[li].delta = false;
     }
     
     if (lip >= 0) {
-        lightVertices[lip].reversePDF = lightVertices[li].PDF(cameraVertices[ci], lightVertices[lip], environmentMapCDF, uniforms);
+        lightVertices[lip].reversePDF = lightVertices[li].PDF(cameraVertices[ci], lightVertices[lip], environmentMapAliasEntries, uniforms);
     }
     
     float sum = 0.0f;
@@ -520,9 +534,11 @@ float3 connectVertices(constant Uniforms& uniforms,
                        constant Light *lights,
                        constant LightTriangle *lightTriangles,
                        constant int *lightIndices,
-                       texture2d<float> environmentMapTexture,
-                       constant float *environmentMapCDF,
                        constant Textures *textures,
+                       constant AliasEntry* lightAliasEntries,
+                       constant AliasEntry* lightTriangleAliasEntries,
+                       texture2d<float> environmentMapTexture,
+                       constant AliasEntry* environmentMapAliasEntries,
                        thread Sampler& sampler,
                        thread PathVertex *cameraVertices,
                        thread PathVertex *lightVertices,
@@ -559,8 +575,8 @@ float3 connectVertices(constant Uniforms& uniforms,
 //        return contribution;
         if (cameraVertex.isConnectible()) {
             float selectionPDF;
-            constant Light& light = selectLight(lights, uniforms, sampler.r(), selectionPDF);
-            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, textures, environmentMapTexture, environmentMapCDF, sampler.r3());
+            constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
+            LightSample lightSample = sampleLight(cameraVertex.position(), light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
             sampled = createLightVertex(&light, lightSample.position, lightSample.normal, lightSample.emission / (selectionPDF * lightSample.PDF), selectionPDF * lightSample.PDF);
 
             contribution = cameraVertex.throughput * cameraVertex.BXDF(-normalize(cameraVertex.position() - cameraVertices[c - 2].position()), sampled) * sampled.throughput;
@@ -582,7 +598,7 @@ float3 connectVertices(constant Uniforms& uniforms,
         }
     }
     
-    float MISWeight = !isBlack(contribution) ? calculateMISWeight(uniforms, lights, environmentMapCDF, cameraVertices, lightVertices, c, l, sampled) : 0.0f;
+    float MISWeight = !isBlack(contribution) ? calculateMISWeight(uniforms, lights, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, cameraVertices, lightVertices, c, l, sampled) : 0.0f;
     contribution *= MISWeight;
 
     return contribution;
@@ -595,21 +611,22 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant Light *lights,
                                    constant LightTriangle *lightTriangles,
                                    constant int* instanceLightIndices,
-                                   texture2d<float> environmentMapTexture,
-                                   constant float *environmentMapCDF,
                                    constant Textures* textures,
                                    thread Sampler& sampler,
                                    texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer,
-                                   constant Material* materials
-                                   )
+                                   constant Material* materials,
+                                   constant AliasEntry* lightAliasEntries,
+                                   constant AliasEntry* lightTriangleAliasEntries,
+                                   texture2d<float> environmentMapTexture,
+                                   constant AliasEntry* environmentMapAliasEntries)
 {
     PathVertex cameraVertices[MAX_CAMERA_PATH_LENGTH];
     PathVertex lightVertices[MAX_LIGHT_PATH_LENGTH];
     
-    int cameraPathLength = traceCameraPath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, materials);
+    int cameraPathLength = traceCameraPath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, cameraVertices, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
     
-    int lightPathLength = traceLightPath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, lightVertices, materials);
+    int lightPathLength = traceLightPath(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, lightVertices, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
 
     float3 totalContribution = float3(0.0f);
     
@@ -619,7 +636,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
             if ((c == 1 && l == 1) || depth < 0 || depth > MAX_PATH_LENGTH)
                 continue;
 
-            float3 contribution = connectVertices(uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, environmentMapTexture, environmentMapCDF, textures, sampler, cameraVertices, lightVertices, c, l);
+            float3 contribution = connectVertices(uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, sampler, cameraVertices, lightVertices, c, l);
             
             if (any(contribution < 0.0f) || any(isnan(contribution)) || any(isinf(contribution))) {
 //                DEBUG("Invalid contribution - c: %d, l: %d, float3(%f, %f, %f)", c, l, contribution.x, contribution.y, contribution.z);
