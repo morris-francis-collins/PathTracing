@@ -15,7 +15,7 @@
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
 #define CAMERA_FOV_ANGLE 60.0f
-#define MAX_TEXTURES 500
+#define MAX_TEXTURES 512
 #define EPSILON 1e-3f
 
 struct Camera {

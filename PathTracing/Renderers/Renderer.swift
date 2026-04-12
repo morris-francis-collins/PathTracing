@@ -135,34 +135,25 @@ class Renderer: NSObject, MTKViewDelegate {
         let textures = TextureRegistry.shared.getTextures()
         textureCount = textures.count
         
-        var argumentDescriptors: [MTLArgumentDescriptor] = []
-        
         let desc = MTLArgumentDescriptor()
         desc.index = 0
         desc.dataType = .texture
         desc.textureType = .type2D
         desc.arrayLength = Int(MAX_TEXTURES)
         desc.access = .readOnly
-        argumentDescriptors.append(desc)
         
-        guard let encoder = device.makeArgumentEncoder(arguments: argumentDescriptors) else {
+        guard let encoder = device.makeArgumentEncoder(arguments: [desc]) else {
             fatalError("Failed to create texture argument encoder")
         }
         
-        let length = encoder.encodedLength
         textureArgumentBuffer = device.makeBuffer(
-            length: length,
+            length: encoder.encodedLength,
             options: .storageModeShared
         )
         
         encoder.setArgumentBuffer(textureArgumentBuffer, offset: 0)
-        
-        for i in 0..<Int(MAX_TEXTURES) {
-            if i < textures.count {
-                encoder.setTexture(textures[i], index: i)
-            } else {
-                encoder.setTexture(nil, index: i)
-            }
+        for i in 0..<textureCount {
+            encoder.setTexture(textures[i], index: i)
         }
     }
     
