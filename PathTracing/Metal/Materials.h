@@ -19,7 +19,6 @@
 #define ALPHA_MASK 1
 #define ALPHA_BLEND 2
 
-
 struct Material {
     vector_float3 colorValue;
     int colorTextureIndex;
@@ -95,6 +94,11 @@ struct SampledMaterial {
 using namespace metal;
 using namespace raytracing;
 
+enum TransportMode: uint8_t {
+    Radiance,
+    Importance
+};
+
 struct BSDFSample {
     float3 BSDF;
     float3 wo;
@@ -103,22 +107,9 @@ struct BSDFSample {
     bool transmitted;
 };
 
-BSDFSample sampleDiffuseBRDF(float3 wi, float3 n, SampledMaterial material, float2 r2);
-float3 diffuseBRDF(SampledMaterial material);
-float diffusePDF(float3 wi, float3 wo, float3 n);
-
-BSDFSample sampleConductorBRDF(float3 wi, float3 n, SampledMaterial material, float2 r2);
-float3 conductorBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
-float conductorPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
-
-BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, float r, float2 r2);
-float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
-float dielectricPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
-
-BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, float3 r3);
-float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
+BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, TransportMode transportMode, float3 r3);
+float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material, TransportMode transportMode);
 float getPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
-
 
 inline float3 sampleCosineWeightedHemisphere(float2 u) {
     float phi = 2.0f * M_PI_F * u.x;

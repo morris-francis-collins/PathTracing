@@ -279,7 +279,6 @@ class Renderer: NSObject, MTKViewDelegate {
             accumulationBuffer = device.makeBuffer(length: bufferSize, options: .storageModeShared)
             bufferPixels = requiredPixels
         }
-
     }
     
     func updateUniforms() {

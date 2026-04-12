@@ -35,8 +35,7 @@ LightEmissionSample samplePointLightEmission(constant Light& pointLight, float2 
 // MARK: Area Lights
 
 static LightTriangle getLightTriangle(constant Light& areaLight, constant LightTriangle *lightTriangles, constant AliasEntry* lightTriangleAliasEntries, float2 r2) {
-    
-    unsigned int index = areaLight.area.firstTriangleIndex + floor(areaLight.area.triangleCount * r2.x);
+    unsigned int index = areaLight.area.firstTriangleIndex + clamp(uint(areaLight.area.triangleCount * r2.x), 0u, areaLight.area.triangleCount - 1u);
     
     if (lightTriangleAliasEntries[index].acceptanceProbability > r2.y) {
         return lightTriangles[index];
@@ -253,7 +252,7 @@ constant Light& selectLight(constant Light* lights,
                             thread float& selectionPDF,
                             float2 r2)
 {
-    unsigned int index = floor(uniforms.lightCount * r2.x);
+    unsigned int index = clamp(uint(uniforms.lightCount * r2.x), 0u, uniforms.lightCount - 1u);
     
     if (lightAliasEntries[index].acceptanceProbability > r2.y) {
         selectionPDF = lightAliasEntries[index].PMF;

@@ -533,8 +533,9 @@ extension GameScene {
         (cameraPosition, cameraTarget) = cameraLocations[2]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
-        buildBox(width: 6.0, height: 4.0, depth: 6.0)
-        
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(6, 0.1, 6))
+
 //        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
 //        let angelGeometry = addAssimpGeometry(fileName: "lucy", fileExtension: "obj", defaultMaterial: GLASS)
 //        let saintGeometry = addAssimpGeometry(fileName: "saint", fileExtension: "obj", defaultMaterial: GLASS)

@@ -53,7 +53,7 @@ class GameScene: ObservableObject {
         self.device = device
         TextureRegistry.shared.reset()
         MaterialRegistry.shared.reset()
-        createColorfulDragonScene()
+        createMaterialScene()
     }
         
     func addGeometry(_ mesh: Geometry) {

@@ -127,12 +127,12 @@ struct PathVertex {
         return PDF * d2_inv;
     }
     
-    float3 BXDF(float3 wi, PathVertex nxt) {
+    float3 BXDF(float3 wi, PathVertex nxt, TransportMode transportMode) {
         float3 wo = normalize(nxt.position() - position());
 
         switch (type) {
             case SURFACE_VERTEX:
-                return getBXDF(wi, wo, normal(), si.material);
+                return getBXDF(wi, wo, normal(), si.material, transportMode);
             default:
                 DEBUG("Vertex BXDF unimplemented.");
                 return float3(0.0f);

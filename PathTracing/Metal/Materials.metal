@@ -134,7 +134,7 @@ float conductorPDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
 
 // MARK: Dielectric
 
-BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, float r, float2 r2) {
+BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, TransportMode transportMode, float r, float2 r2) {
     float cosIN = dot(wi, n);
     bool entering = cosIN > 0.0f;
     n = entering ? n : -n;
@@ -161,10 +161,14 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
         } else {
             if (allowTransmission) {
                 float3 wo = refract(-wi, n, eta);
+                
                 if (length_squared(wo) < 1e-5f) // should never happen
                     return BSDFSample{float3(0.0f), float3(0.0f), 0.0f, false, false};
+                
                 float cosON = abs(dot(wo, n));
-                float3 BSDF = fresnel_T / cosON;
+                float etaScale = (transportMode == Radiance) ? (eta * eta) : 1.0f;
+
+                float3 BSDF = etaScale * fresnel_T / cosON;
                 return BSDFSample{BSDF, wo, pt / sum, true, true};
                 
             } else {
@@ -228,6 +232,7 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
             float fresnel_T = 1.0f - dielectricFresnel(abs(cosIH), eta);
             
             float3 wo = refract(-wi, H, eta);
+            
             if (length_squared(wo) < 1e-5f)
                 return BSDFSample{float3(0.0f), float3(0.0f), 1.0f};
             
@@ -238,12 +243,13 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
             float D = D_GGX(localH, alpha, alpha);
             float G1 = G1_Smith(wiLocal, alpha);
             float G = G_Smith(wiLocal, woLocal, alpha);
+            float etaScale = (transportMode == Radiance) ? (eta * eta) : 1.0f;
             
             float denom = eta * cosIH + cosOH;
             float dwm_dwi = abs(cosOH) / (denom * denom);
             float transPDF = D * G1 * abs(cosIH) / cosIN * dwm_dwi;
-            float jacobian = eta * eta * abs(cosIH * cosOH) / (denom * denom);
-            float3 BSDF = float3(fresnel_T) * D * G * jacobian / (cosIN * cosON);
+            float jacobian = abs(cosIH * cosOH) / (denom * denom);
+            float3 BSDF = etaScale * float3(fresnel_T) * D * G * jacobian / (cosIN * cosON);
             
             return BSDFSample{BSDF, wo, pt * transPDF, false, true};
             
@@ -277,7 +283,7 @@ BSDFSample sampleDielectricBSDF(float3 wi, float3 n, SampledMaterial material, f
     }
 }
 
-float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
+float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material, TransportMode transportMode) {
     if (material.roughness < 0.01f) {
         if (material.BXDFs == DIELECTRIC_REFLECTION) {
             float cosIN = dot(wi, n);
@@ -336,8 +342,10 @@ float3 dielectricBSDF(float3 wi, float3 wo, float3 n, SampledMaterial material) 
         float fresnel_T = 1.0f - dielectricFresnel(abs(cosIH), eta);
         float D = D_GGX(wm, alpha, alpha);
         float G = G_Smith(wiLocal, woLocal, alpha);
+        float etaScale = (transportMode == Radiance) ? (eta * eta) : 1.0f;
+
         float denom = eta * cosIH + cosOH;
-        float jacobian = eta * eta * abs(cosIH * cosOH) / (denom * denom);
+        float jacobian = etaScale * abs(cosIH * cosOH) / (denom * denom);
         
         BSDF += float3(fresnel_T) * D * G * jacobian / (cosIN * abs(cosON));
     }
@@ -418,7 +426,7 @@ float dielectricPDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
 
 // MARK: Dispatch
 
-BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, float3 r3) {
+BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, TransportMode transportMode, float3 r3) {
     BSDFSample bsdfSample;
     
     if (material.BXDFs == DIFFUSE) {
@@ -426,7 +434,7 @@ BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, float3 r3) 
     } else if (material.BXDFs == CONDUCTOR) {
         bsdfSample = sampleConductorBRDF(wi, n, material, r3.xy);
     } else if (material.BXDFs & (DIELECTRIC_TRANSMISSION | DIELECTRIC_REFLECTION)) {
-        bsdfSample = sampleDielectricBSDF(wi, n, material, r3.x, r3.yz);
+        bsdfSample = sampleDielectricBSDF(wi, n, material, transportMode, r3.x, r3.yz);
     } else {
         DEBUG("sampleBXDF - BXDF not found. BXDF: %d", material.BXDFs);
         bsdfSample = BSDFSample{float3(0.0f), float3(0.0f), 1.0f};
@@ -441,7 +449,7 @@ BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, float3 r3) 
     return bsdfSample;
 }
 
-float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
+float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material, TransportMode transportMode) {
     float3 BXDF;
     
     if (material.BXDFs == DIFFUSE) {
@@ -449,7 +457,7 @@ float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material) {
     } else if (material.BXDFs == CONDUCTOR) {
         BXDF = conductorBSDF(wi, wo, n, material);
     } else if (material.BXDFs & (DIELECTRIC_TRANSMISSION | DIELECTRIC_REFLECTION)) {
-        BXDF = dielectricBSDF(wi, wo, n, material);
+        BXDF = dielectricBSDF(wi, wo, n, material, transportMode);
     } else {
         DEBUG("getBXDF - BXDF not found. BXDF: %d", material.BXDFs);
         BXDF = float3(0.0f);

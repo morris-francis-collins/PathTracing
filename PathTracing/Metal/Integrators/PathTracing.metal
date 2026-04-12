@@ -93,7 +93,7 @@ float3 pathIntegrator(float2 pixel,
             }
         }
         
-        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
+        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, Radiance, sampler.r3());
         
         PDF = bsdfSample.PDF;
         float3 wo = bsdfSample.wo;
@@ -122,7 +122,7 @@ float3 pathIntegrator(float2 pixel,
             float cosLight = light.type == AREA_LIGHT ? dot(-wo, lightSample.normal) : 1.0f;
         
             if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, instances, accelerationStructure)) {
-                float3 BSDF = getBXDF(wi, wo, n, material);
+                float3 BSDF = getBXDF(wi, wo, n, material, Radiance);
 
                 float G = cosCamera * cosLight / (distance * distance);
                 float lightPDF = selectionPDF * lightSample.PDF;
@@ -174,15 +174,15 @@ kernel void pathTracingKernel(device float3* accmulationBuffer,
                               
                               uint2 tid [[thread_position_in_grid]])
 {
+    if (tid.x >= uniforms.width || tid.y >= uniforms.height)
+        return;
+
     unsigned int offset = randomTex.read(tid).x;
     Sampler sampler(offset, uniforms.frameIndex);
     
     float2 pixel = (float2) tid;
     pixel += sampler.r2() - 0.5f;
     
-    if (pixel.x >= uniforms.width || pixel.y >= uniforms.height)
-        return;
-
     float3 contribution = pathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, sampler, textures, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
         
     accmulationBuffer[tid.y * uniforms.width + tid.x] += contribution;

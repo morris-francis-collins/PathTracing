@@ -236,7 +236,7 @@ kernel void sampleBXDFs(device float3* rayOrigins,
     }
     
     SampledMaterial material = intersectionSampledMaterials[rayIndex];
-    BSDFSample bsdfSample = sampleBXDF(wi, normal, material, float3(prng(rng_state), prng(rng_state), prng(rng_state)));
+    BSDFSample bsdfSample = sampleBXDF(wi, normal, material, Radiance, float3(prng(rng_state), prng(rng_state), prng(rng_state)));
     
     if (bsdfSample.PDF <= 0.0f || isBlack(bsdfSample.BSDF)) {
         rayAlive[rayIndex] = false;
