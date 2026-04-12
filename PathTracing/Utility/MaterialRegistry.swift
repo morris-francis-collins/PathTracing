@@ -61,8 +61,13 @@ class MaterialRegistry {
             )
         }
     }
-
+    
     func getBuffer() -> MTLBuffer? {
         return materialBuffer
+    }
+    
+    func reset() {
+        materials.removeAll()
+        materialBuffer = nil
     }
 }

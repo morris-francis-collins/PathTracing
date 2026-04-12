@@ -36,4 +36,9 @@ class TextureRegistry {
     func getTextures() -> [MTLTexture] {
         return textures
     }
+    
+    func reset() {
+        textures.removeAll()
+        textureMap.removeAll()
+    }
 }

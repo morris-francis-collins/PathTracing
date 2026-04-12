@@ -16,7 +16,6 @@ class WaveFrontRenderer: Renderer {
     private var calculateIntersectionsPipeline: MTLComputePipelineState!
     private var calculateIntersectionsWithCompactionPipeline: MTLComputePipelineState!
     private var sampleBXDFsPipeline: MTLComputePipelineState!
-    private var finalizeAccumulationPipeline: MTLComputePipelineState!
     
     private var rayBuffers: [RayBuffers] = []
     private var currentBuffer: Int = 0
@@ -24,8 +23,6 @@ class WaveFrontRenderer: Renderer {
     private var rayCountBuffer: MTLBuffer!
     private var nextRayCountBuffer: MTLBuffer!
     private var intersectionCountBuffer: MTLBuffer!
-    
-    private var accumulationBuffer: MTLBuffer!
     
     private var intersectionPositionsBuffer: MTLBuffer!
     private var intersectionNormalsBuffer: MTLBuffer!
@@ -52,9 +49,6 @@ class WaveFrontRenderer: Renderer {
         
         let sampleBXDFsFunction = library.makeFunction(name: "sampleBXDFs")!
         sampleBXDFsPipeline = newComputePipelineState(function: sampleBXDFsFunction)
-        
-        let finalizeAccumulationFunction = library.makeFunction(name: "finalizeAccumulation")!
-        finalizeAccumulationPipeline = newComputePipelineState(function: finalizeAccumulationFunction)
     }
     
     private func createWaveFrontBuffers(maxRays: Int) {
@@ -303,24 +297,7 @@ class WaveFrontRenderer: Renderer {
         )
         commandEncoder.endEncoding()
     }
-    
-    private func finalizeAccumulation(commandBuffer: MTLCommandBuffer, threadgroups: MTLSize, threadsPerThreadgroup: MTLSize) {
-        guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else {
-            return
-        }
         
-        commandEncoder.setComputePipelineState(finalizeAccumulationPipeline)
-        
-        
-        commandEncoder.setBuffer(accumulationBuffer, offset: 0, index: 0)
-        commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
-        
-        commandEncoder.setTexture(finalImage, index: 0)
-        
-        commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
-        commandEncoder.endEncoding()
-    }
-    
     override func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         super.mtkView(view, drawableSizeWillChange: size)
         

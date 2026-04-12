@@ -7,153 +7,10 @@
 
 #include <metal_stdlib>
 #include <simd/simd.h>
-#include "MegaKernel.h"
+#include "BDPT.h"
 
 using namespace metal;
 using namespace raytracing;
-
-float3 pathIntegrator(float2 pixel,
-                      constant Uniforms& uniforms,
-                      device MTLAccelerationStructureInstanceDescriptor *instances,
-                      instance_acceleration_structure accelerationStructure,
-                      constant Light *lights,
-                      constant LightTriangle *lightTriangles,
-                      constant int* instanceLightIndices,
-                      thread Sampler& sampler,
-                      constant Textures* textures,
-                      constant Material* materials,
-                      constant AliasEntry* lightAliasEntries,
-                      constant AliasEntry* lightTriangleAliasEntries,
-                      texture2d<float> environmentMapTexture,
-                      constant AliasEntry* environmentMapAliasEntries)
-{
-    ray ray = generateRay(pixel, uniforms);
-
-    float3 contribution = float3(0.0f);
-    float3 throughput = float3(1.0f);
-    float PDF = 0.0f;
-    bool prevSpecular = true;
-    
-    bool inMedium = false;
-    float attenuationDistance = 0.0f;
-    
-    for (int bounce = 0; bounce < MAX_PATH_LENGTH; bounce++) {
-        IntersectionResult intersection = intersect<false>(ray, accelerationStructure);
-        
-        if (intersection.type == intersection_type::none) {
-            int environmentMapLightIndex = uniforms.environmentMapLightIndex;
-
-            if (environmentMapLightIndex == -1)
-                break;
-            
-            float2 uv = getEnvironmentMapUV(ray.direction);
-            float3 emission = environmentMapEmission(environmentMapTexture, uv);
-
-            if (prevSpecular) {
-                contribution += throughput * emission;
-            } else {
-                float lightPDF = environmentLightSamplePDF(lights[environmentMapLightIndex], environmentMapAliasEntries, uv);
-                float weight = powerHeuristic(PDF, lightPDF);
-                contribution += throughput * emission * weight;
-            }
-
-            break;
-        }
-        
-        SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
-        SampledMaterial material = surfaceInteraction.material;
-        
-        if (material.BXDFs == DIFFUSE || material.BXDFs == CONDUCTOR || material.BXDFs == DIELECTRIC_REFLECTION) { // TODO: move to surface interaction
-            if (dot(-ray.direction, surfaceInteraction.normal) < 0.0f)
-                surfaceInteraction.normal = -surfaceInteraction.normal;
-        }
-        
-        if (material.alphaMode == ALPHA_MASK && material.alpha < material.alphaCutoff) {
-            ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
-            continue;
-        }
-        
-        if (material.alphaMode == ALPHA_BLEND && sampler.r() > material.alpha) {
-            ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
-            continue;
-        }
-
-        float3 n = surfaceInteraction.normal;
-
-        if (surfaceInteraction.hitLight()) {
-            constant Light& light = lights[surfaceInteraction.lightIndex];
-            float3 color = surfaceInteraction.emission;
-
-            if (prevSpecular) {
-                contribution += throughput * color;
-            } else {
-                float lightPDF = getLightSelectionPDF(light, lightAliasEntries) * getLightSamplePDF(light);
-                float weight = powerHeuristic(PDF, lightPDF);
-                contribution += throughput * color * weight;
-            }
-        }
-        
-        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, sampler.r3());
-        
-        PDF = bsdfSample.PDF;
-        float3 wo = bsdfSample.wo;
-        inMedium ^= bsdfSample.transmitted;
-        float epsilon = calculateEpsilon(surfaceInteraction.position);
-        prevSpecular = bsdfSample.delta;
-        
-//        if (inMedium) {
-//            attenuationDistance += length(surfaceInteraction.position - ray.origin);
-//        } else if (bsdfSample.transmitted) {
-//            float3 absorption = log(1 - material.color);
-//            throughput *= exp(absorption * attenuationDistance);
-//            attenuationDistance = 0.0f;
-//        }
-
-        if (!bsdfSample.delta) {
-            float selectionPDF;
-            constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
-            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
-            
-            float3 wi = -ray.direction, wo = lightSample.wo;
-            float3 pos1 = surfaceInteraction.position, pos2 = lightSample.position;
-            float distance = lightSample.distance;
-            
-            float cosCamera = dot(wo, n);
-            float cosLight = light.type == AREA_LIGHT ? dot(-wo, lightSample.normal) : 1.0f;
-        
-            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, instances, accelerationStructure)) {
-                float3 BSDF = getBXDF(wi, wo, n, material);
-
-                float G = cosCamera * cosLight / (distance * distance);
-                float lightPDF = selectionPDF * lightSample.PDF;
-
-                if (light.isDelta()) {
-                    contribution += throughput * BSDF * lightSample.emission * G / lightPDF;
-                } else {
-                    float bsdfPDF = getPDF(wi, wo, n, material);
-                    float weight = powerHeuristic(lightPDF, bsdfPDF);
-                    contribution += throughput * BSDF * lightSample.emission * G * weight / lightPDF;
-                }
-            }
-        }
-                
-        throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
-        
-        if (isBlack(throughput))
-            break;
-        if (bounce > 4) {
-            float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
-            if (sampler.r() > q) break;
-            throughput /= q;
-        }
-        
-        ray.origin = surfaceInteraction.position + wo * 1e-4f;
-        ray.direction = wo;
-        ray.min_distance = epsilon;
-    }
-
-    return contribution;
-}
 
 int tracePath(float2 pixel,
               constant Uniforms& uniforms,
@@ -268,12 +125,11 @@ int traceCameraPath(float2 pixel,
     ray ray = generateRay(pixel, uniforms);
     
     float positionPDF, directionPDF;
-//    cameraRayPDF(uniforms, ray.direction, positionPDF, directionPDF); // better results when directionPDF = 0? possibly due to pinhole
-    positionPDF = 1.0f, directionPDF = 0.0f;
+    cameraRayPDF(uniforms, ray.direction, positionPDF, directionPDF);
     
     cameraVertices[0] = createCameraVertex(&camera, camera.position, camera.forward, float3(1.0f));
-//    cameraVertices[0].forwardPDF = positionPDF;
-//    cameraVertices[0].delta = true;
+    cameraVertices[0].forwardPDF = positionPDF;
+    cameraVertices[0].delta = true;
 
     float3 throughput = float3(1.0f);
 
@@ -394,21 +250,20 @@ float calculateMISWeight(constant Uniforms& uniforms,
     }
 
     float originalCameraReverse = cameraVertices[ci].reversePDF;
-    bool  origCamDelta   = cameraVertices[ci].delta;
+    bool origCamDelta = cameraVertices[ci].delta;
     float origCamPrevRev = (cip >= 0) ? cameraVertices[cip].reversePDF : 0.0f;
-    bool  origCamPrevDel = (cip >= 0) ? cameraVertices[cip].delta   : false;
+    bool origCamPrevDel = (cip >= 0) ? cameraVertices[cip].delta   : false;
 
-    float origLgtRev   = (li >= 0) ? lightVertices[li].reversePDF : 0.0f;
-    bool  origLgtDelta = (li >= 0) ? lightVertices[li].delta : false;
+    float origLgtRev = (li >= 0) ? lightVertices[li].reversePDF : 0.0f;
+    bool origLgtDelta = (li >= 0) ? lightVertices[li].delta : false;
     float origLgtPrevRev = (lip >= 0) ? lightVertices[lip].reversePDF : 0.0f;
-    bool  origLgtPrevDel = (lip >= 0) ? lightVertices[lip].delta   : false;
+    bool origLgtPrevDel = (lip >= 0) ? lightVertices[lip].delta   : false;
                 
     if (ci >= 0) {
         if (li >= 0) {
             cameraVertices[ci].reversePDF = lightVertices[li].PDF(lightVertices[lip], cameraVertices[ci], environmentMapAliasEntries, uniforms);
         } else { // l = 0 case
             constant Light& light = lights[cameraVertices[ci].si.lightIndex]; // originally origin
-//            cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms, cameraVertices[cip], environmentMapAliasEntries);
             cameraVertices[ci].reversePDF = cameraVertices[ci].lightOriginPDF(light, lights, uniforms, cameraVertices[cip], lightAliasEntries, environmentMapAliasEntries);
         }
         cameraVertices[ci].delta = false;
@@ -416,12 +271,10 @@ float calculateMISWeight(constant Uniforms& uniforms,
     
     if (cip >= 0) {
         if (li >= 0) {
-//            cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapCDF, uniforms);
             cameraVertices[cip].reversePDF = cameraVertices[ci].PDF(lightVertices[li], cameraVertices[cip], environmentMapAliasEntries, uniforms);
 
         } else { // l = 0 case
             constant Light& light = lights[cameraVertices[ci].si.lightIndex]; // originally direction
-//            cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip], environmentMapCDF);
             cameraVertices[cip].reversePDF = cameraVertices[ci].lightDirectionPDF(light, cameraVertices[cip], environmentMapAliasEntries);
 
         }
@@ -439,7 +292,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
     float sum = 0.0f;
     float r = 1.0f;
 
-    for (int i = ci; i > 1; i--) {
+    for (int i = ci; i > 0; i--) {
         r *= remap0(cameraVertices[i].reversePDF) / remap0(cameraVertices[i].forwardPDF);
 
         if (!cameraVertices[i].delta && !cameraVertices[i - 1].delta)
@@ -457,10 +310,10 @@ float calculateMISWeight(constant Uniforms& uniforms,
     }
         
     cameraVertices[ci].reversePDF = originalCameraReverse;
-    cameraVertices[ci].delta   = origCamDelta;
+    cameraVertices[ci].delta = origCamDelta;
     if (cip >= 0) {
         cameraVertices[cip].reversePDF = origCamPrevRev;
-        cameraVertices[cip].delta   = origCamPrevDel;
+        cameraVertices[cip].delta = origCamPrevDel;
     }
 
     if (li >= 0) {
@@ -469,7 +322,7 @@ float calculateMISWeight(constant Uniforms& uniforms,
     }
     if (lip >= 0) {
         lightVertices[lip].reversePDF = origLgtPrevRev;
-        lightVertices[lip].delta   = origLgtPrevDel;
+        lightVertices[lip].delta = origLgtPrevDel;
     }
     
     if (l == 1) {
@@ -509,8 +362,7 @@ uint2 projectToScreen(float3 worldPos, constant Uniforms& uniforms)
     return uint2(px, py);
 }
 
-void splat(texture2d<float, access::read_write> splatTex,
-           constant Uniforms& uniforms,
+void splat(constant Uniforms& uniforms,
            uint2 pixelCoordinate,
            float3 color,
            device atomic_float* splatBuffer
@@ -613,7 +465,6 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant int* instanceLightIndices,
                                    constant Textures* textures,
                                    thread Sampler& sampler,
-                                   texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer,
                                    constant Material* materials,
                                    constant AliasEntry* lightAliasEntries,
@@ -645,7 +496,7 @@ float3 bidirectionalPathIntegrator(float2 pixel,
 
             if (c == 1) {
                 uint2 pixelCoord = projectToScreen(lightVertices[l - 1].position(), uniforms);
-                splat(splatTex, uniforms, pixelCoord, contribution, splatBuffer);
+                splat(uniforms, pixelCoord, contribution, splatBuffer);
             } else {
                 totalContribution += contribution;
             }
@@ -653,4 +504,38 @@ float3 bidirectionalPathIntegrator(float2 pixel,
     }
     
     return totalContribution;
+}
+
+kernel void bidirectionalPathTracingKernel(device float3* accmulationBuffer,
+                                           device atomic_float* splatBuffer,
+                                           constant Light* lights,
+                                           constant LightTriangle* lightTriangles,
+                                           constant int* instanceLightIndices,
+                                           constant AliasEntry* lightAliasEntries,
+                                           constant AliasEntry* lightTriangleAliasEntries,
+                                           constant AliasEntry* environmentMapAliasEntries,
+                                           constant Material* materials,
+                                           constant Textures* textures,
+                             
+                                           texture2d<unsigned int> randomTex,
+                                           texture2d<float> environmentMapTexture,
+                             
+                                           constant Uniforms& uniforms,
+                                           device MTLAccelerationStructureInstanceDescriptor* instances,
+                                           instance_acceleration_structure accelerationStructure,
+                             
+                                           uint2 tid [[thread_position_in_grid]])
+{
+    unsigned int offset = randomTex.read(tid).x;
+    Sampler sampler(offset, uniforms.frameIndex);
+    
+    float2 pixel = (float2) tid;
+    pixel += sampler.r2() - 0.5f;
+    
+    if (pixel.x >= uniforms.width || pixel.y >= uniforms.height)
+        return;
+    
+    float3 contribution = bidirectionalPathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, splatBuffer, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
+    
+    accmulationBuffer[tid.y * uniforms.width + tid.x] += contribution;
 }

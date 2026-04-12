@@ -10,6 +10,10 @@
 
 #define DEBUG(...) os_log_default.log_info(__VA_ARGS__)
 
+#define MAX_PATH_LENGTH 20
+#define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
+#define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
+
 #define CAMERA_FOV_ANGLE 60.0f
 #define MAX_TEXTURES 500
 #define EPSILON 1e-3f

@@ -51,6 +51,8 @@ class GameScene: ObservableObject {
     
     init(device: MTLDevice) {
         self.device = device
+        TextureRegistry.shared.reset()
+        MaterialRegistry.shared.reset()
         createColorfulDragonScene()
     }
         
@@ -63,6 +65,10 @@ class GameScene: ObservableObject {
     }
     
     func uploadToBuffers() {
+        lights.removeAll() // for when we switch renderers
+        lightAliasEntries.removeAll()
+        lightTriangleAliasEntries.removeAll()
+        
         for geometry in geometries {
             geometry.uploadToBuffers()
         }
@@ -93,7 +99,7 @@ class GameScene: ObservableObject {
                                               scale: scale)
         addInstance(opaqueInstance)
         
-        instanceLightIndices.append(Int32(lights.count))
+        instanceLightIndices.append(Int32(lightInfo.count))
         
         for light in geometry.areaLights {
             let (instanceLightTriangles, totalArea) = getLightTriangles(areaLight: light, transform: opaqueInstance.transform)

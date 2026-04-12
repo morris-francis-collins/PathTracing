@@ -266,24 +266,3 @@ kernel void sampleBXDFs(device float3* rayOrigins,
     nextPixelIndices[nextRayIndex] = pixelIndex;
     nextRngStates[nextRayIndex] = rng_state;
 }
-
-kernel void finalizeAccumulation(device float3* accumulator [[buffer(0)]],
-                                 constant Uniforms& uniforms [[buffer(1)]],
-                                 texture2d<float, access::read_write> finalImage [[texture(0)]],
-                                 uint2 tid [[thread_position_in_grid]])
-{
-    if (tid.x >= uniforms.width || tid.y >= uniforms.height)
-        return;
-    
-    uint pixelIndex = tid.y * uniforms.width + tid.x;
-    float3 contribution = accumulator[pixelIndex];
-    
-    if (uniforms.frameIndex > 0) {
-        float3 prev = finalImage.read(tid).rgb;
-        float weight = float(uniforms.frameIndex);
-        contribution = (prev * weight + contribution) / (weight + 1.0f);
-    }
-    
-    finalImage.write(float4(contribution, 1.0f), tid);
-    accumulator[pixelIndex] = float3(0.0f);
-}

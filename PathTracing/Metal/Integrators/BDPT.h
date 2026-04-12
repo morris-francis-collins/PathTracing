@@ -14,16 +14,6 @@
 #include "Materials.h"
 #include "Samplers.h"
 
-#define MAX_PATH_LENGTH 10
-#define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
-#define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
-
-enum VertexType : unsigned int {
-    CAMERA_VERTEX = 0,
-    LIGHT_VERTEX = 1,
-    SURFACE_VERTEX = 2
-};
-
 #ifdef __METAL_VERSION__
 #include <metal_stdlib>
 using namespace metal;
@@ -53,13 +43,18 @@ float3 bidirectionalPathIntegrator(float2 pixel,
                                    constant int* instanceLightIndices,
                                    constant Textures* textures,
                                    thread Sampler& sampler,
-                                   texture2d<float, access::read_write> splatTex,
                                    device atomic_float* splatBuffer,
                                    constant Material* materials,
                                    constant AliasEntry* lightAliasEntries,
                                    constant AliasEntry* lightTriangleAliasEntries,
                                    texture2d<float> environmentMapTexture,
                                    constant AliasEntry* environmentMapAliasEntries);
+
+enum VertexType : unsigned int {
+    CAMERA_VERTEX = 0,
+    LIGHT_VERTEX = 1,
+    SURFACE_VERTEX = 2
+};
 
 struct EndpointInteraction {
     float3 position;
@@ -155,7 +150,7 @@ struct PathVertex {
         float PDF, unused;
         if (type == CAMERA_VERTEX) {
             PDF = 0.0f;
-//            cameraRayPDF(uniforms, wo, unused, PDF);
+//            cameraRayPDF(uniforms, wo, unused, PDF); // TODO: investigate why this commented out is better
         } else if (type == SURFACE_VERTEX) {
             float3 wi = normalize(position() - prev.position());
             PDF = getPDF(-wi, wo, normal(), si.material);
@@ -198,17 +193,21 @@ struct PathVertex {
         return directionPDF;
     }
     
-    float3 getLightEmission(thread PathVertex& prev, constant Light* lights, texture2d<float> environmentMapTexture) {
+    float3 getLightEmission(thread PathVertex& prev, constant Light* lights,
+                            texture2d<float> environmentMapTexture) {
         if (!isLight())
             return float3(0.0f);
         
         float3 w = normalize(position() - prev.position());
         
         if (type == LIGHT_VERTEX) {
-            float2 uv = getEnvironmentMapUV(w);
-            return environmentMapEmission(environmentMapTexture, uv);
+            if (!ei.light || ei.light->type == ENVIRONMENT_MAP) {
+                float2 uv = getEnvironmentMapUV(w);
+                return environmentMapEmission(environmentMapTexture, uv);
+            }
+            return throughput; // area light — emission stored at creation
         } else if (si.hitLight()) {
-            return si.emission; // TODO: needs to sample from texture
+            return si.emission;
         }
         
         return float3(0.0f);

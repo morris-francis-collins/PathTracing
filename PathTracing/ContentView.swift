@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 import ImageIO
 
 struct ContentView: View {
-    @State private var rendererType: RendererType = .megaKernel
+    @State private var rendererType: RendererType = .pathTracing
     @State private var debugType: DebugType = Color
     @State private var widthText: String = ""
     @State private var heightText: String = ""
@@ -95,7 +95,8 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
             
             Picker("", selection: $rendererType) {
-                Text(RendererType.megaKernel.displayName).tag(RendererType.megaKernel)
+                Text(RendererType.pathTracing.displayName).tag(RendererType.pathTracing)
+                Text(RendererType.bdpt.displayName).tag(RendererType.bdpt)
                 Text(RendererType.waveFront.displayName).tag(RendererType.waveFront)
                 Text(RendererType.debug.displayName).tag(RendererType.debug)
             }
@@ -382,8 +383,10 @@ struct MetalView: NSViewRepresentable {
             
             let newRenderer: Renderer
             switch type {
-            case .megaKernel:
-                newRenderer = MegaKernelRenderer(device: device, scene: scene)
+            case .pathTracing:
+                newRenderer = PathTracingRenderer(device: device, scene: scene)
+            case .bdpt:
+                newRenderer = BDPTRenderer(device: device, scene: scene)
             case .waveFront:
                 newRenderer = WaveFrontRenderer(device: device, scene: scene)
             case .debug:
@@ -442,13 +445,15 @@ struct MetalView: NSViewRepresentable {
 }
 
 enum RendererType: Equatable {
-    case megaKernel
+    case pathTracing
+    case bdpt
     case waveFront
     case debug
     
     var displayName: String {
         switch self {
-        case .megaKernel: return "Mega Kernel"
+        case .pathTracing: return "Path Tracing"
+        case .bdpt: return "BDPT"
         case .waveFront: return "Wave Front"
         case .debug: return "Debug"
         }

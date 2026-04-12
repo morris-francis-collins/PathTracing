@@ -18,11 +18,14 @@ class Renderer: NSObject, MTKViewDelegate {
     let library: MTLLibrary
     
     var copyPipeline: MTLRenderPipelineState!
+    var finalizeAccumulationPipeline: MTLComputePipelineState!
     
     var uniformBuffer: MTLBuffer!
     
     var instanceAccelerationStructure: MTLAccelerationStructure?
     var primitiveAccelerationStructures: [MTLAccelerationStructure] = []
+    
+    var accumulationBuffer: MTLBuffer!
         
     var finalImage: MTLTexture?
     var randomTexture: MTLTexture!
@@ -93,6 +96,9 @@ class Renderer: NSObject, MTKViewDelegate {
         } catch {
             fatalError("Failed to create render pipeline state: \(error)")
         }
+        
+        let finalizeAccumulationFunction = library.makeFunction(name: "finalizeAccumulation")!
+        finalizeAccumulationPipeline = newComputePipelineState(function: finalizeAccumulationFunction)
     }
     
     func newComputePipelineState(function: MTLFunction) -> MTLComputePipelineState {
@@ -266,6 +272,14 @@ class Renderer: NSObject, MTKViewDelegate {
         }
         
         frameIndex = 0
+        
+        let requiredPixels = Int(size.width) * Int(size.height)
+        if requiredPixels > bufferPixels || requiredPixels < bufferPixels / 2 {
+            let bufferSize = requiredPixels * MemoryLayout<SIMD3<Float>>.stride
+            accumulationBuffer = device.makeBuffer(length: bufferSize, options: .storageModeShared)
+            bufferPixels = requiredPixels
+        }
+
     }
     
     func updateUniforms() {
@@ -344,7 +358,24 @@ class Renderer: NSObject, MTKViewDelegate {
 
         return (threadsPerThreadGroup, threadGroups)
     }
+    
+    func finalizeAccumulation(commandBuffer: MTLCommandBuffer, threadgroups: MTLSize, threadsPerThreadgroup: MTLSize) {
+        guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else {
+            return
+        }
+        
+        commandEncoder.setComputePipelineState(finalizeAccumulationPipeline)
+        
+        commandEncoder.setBuffer(accumulationBuffer, offset: 0, index: 0)
+        commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
+        commandEncoder.setTexture(finalImage, index: 0)
+        
+        commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        commandEncoder.endEncoding()
+    }
 }
+
+
 
 func getManagedBufferStorageMode() -> MTLResourceOptions {
 #if os(iOS)

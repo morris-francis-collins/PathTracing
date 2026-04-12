@@ -626,46 +626,7 @@ extension GameScene {
                     translation: SIMD3<Float>(0.0, 3.95, 1.0),
                     scale: SIMD3<Float>(3.99, 0.01, 0.8))
     }
-    
-    func createMISScene() {
-        cameraLocations = [
-            (SIMD3<Float>(0.0, 2.25, 2.95), SIMD3<Float>(0.0, 1.4, 0.0))
-        ]
-
-        (cameraPosition, cameraTarget) = cameraLocations[0]
-        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
-
-        buildBox(width: 6.0, height: 4.0, depth: 6.0)
-
-        var mirrorMaterial = MIRROR
-        let roughnesses: [Float] = [0.5, 0.3, 0.1, 0.0]
-        let elevations: [Float] = [0.5, 0.7, 1.05, 1.55]
-        let rotations: [Float] = [.pi/24, .pi/12, .pi/6, .pi/3.1]
-
-        for i in 0..<4 {
-            mirrorMaterial.roughnessValue = roughnesses[i]
-
-            let mirrorSlabGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: mirrorMaterial)
-
-            addInstance(with: mirrorSlabGeometry,
-                        translation: SIMD3<Float>(0, elevations[i], 0.5 - 0.85 * Float(i)),
-                        rotation: SIMD3<Float>(rotations[i], 0, 0),
-                        scale: SIMD3<Float>(4.0, 0.05, 0.75))
-        }
-    
-        let sizes: [Float] = [0.025, 0.15, 0.4, 1.0]
-
-        for i in 0..<4 {
-            let lightBallGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj",
-                                                      defaultMaterial: createEmissiveMaterial(color: colors[i * 3]),
-                                                      emissionAmplifier: 200.0)
-
-            addInstance(with: lightBallGeometry,
-                        translation: SIMD3<Float>(-1.5 + Float(i), 2.5, -1.5),
-                        scale: sizes[i] * SIMD3<Float>(1.0, 1.0, 1.0))
-        }
-    }
-        
+            
     func createBistroScene() {
         cameraLocations = [
             (SIMD3<Float>(-14.601961, 3.1426682, -1.5453186), SIMD3<Float>(-5.979579, 1.3546469, 0.31400716)),
@@ -686,7 +647,7 @@ extension GameScene {
 //                            color: 30 * SIMD3<Float>(1.0, 0.9, 0.7))
     }
     
-    func createCornellScene() {
+    func createMISScene() {
         cameraLocations = [
             (SIMD3<Float>(-1.0515742e-08, 2.1341612, -2.5105686), SIMD3<Float>(-6.5451777e-09, 1.8385572, -1.5556743))
         ]

@@ -1,13 +1,10 @@
 //
-//  Shaders.h
+//  PathTracing.h
 //  PathTracing
 //
-//  Created on 3/21/25.
+//  Created on 4/11/26.
 //
 
-#pragma once
-
-#include <simd/simd.h>
 #include "Utility.h"
 #include "Lights.h"
 #include "Interactions.h"
