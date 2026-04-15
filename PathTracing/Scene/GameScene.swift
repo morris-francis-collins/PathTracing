@@ -53,7 +53,7 @@ class GameScene: ObservableObject {
         self.device = device
         TextureRegistry.shared.reset()
         MaterialRegistry.shared.reset()
-        createBistroScene()
+        createSPPMCausticTestScene()
     }
         
     func addGeometry(_ mesh: Geometry) {

@@ -22,50 +22,67 @@
 struct Material {
     vector_float3 colorValue;
     int colorTextureIndex;
-
     float roughnessValue;
     int roughnessTextureIndex;
-
     float metallicValue;
     int metallicTextureIndex;
-
+    
     vector_float3 emissionValue;
     int emissionTextureIndex;
     float emissiveStrength;
-
+    
+    float specularFactor;
+    int specularTextureIndex;
+    vector_float3 specularColor;
+    int specularColorTextureIndex;
+    
     float ior;
-
-    unsigned int alphaMode;
-    float alphaCutoff;
-
     float transmissionValue;
     int transmissionTextureIndex;
     
     float thicknessFactor;
+    int thicknessTextureIndex;
     vector_float3 attenuationColor;
     float attenuationDistance;
- 
+    
+    float diffuseTransmissionFactor;
+    int diffuseTransmissionTextureIndex;
+    vector_float3 diffuseTransmissionColor;
+    int diffuseTransmissionColorTextureIndex;
+    
     int normalTextureIndex;
     float normalScale;
- 
+    
     float clearcoatValue;
     int clearcoatTextureIndex;
-
     float clearcoatRoughnessValue;
     int clearcoatRoughnessTextureIndex;
-
     int clearcoatNormalTextureIndex;
     
     float anisotropyStrength;
     float anisotropyRotation;
     int anisotropyTextureIndex;
- 
+    
     vector_float3 sheenColor;
+    int sheenColorTextureIndex;
     float sheenRoughness;
- 
+    int sheenRoughnessTextureIndex;
+    
+    float iridescenceFactor;
+    int iridescenceTextureIndex;
+    float iridescenceIor;
+    float iridescenceThicknessMin;
+    float iridescenceThicknessMax;
+    int iridescenceThicknessTextureIndex;
+    
+    float dispersion;
+    
+    unsigned int alphaMode;
+    float alphaCutoff;
+    
     unsigned int doubleSided;
 };
-  
+
 struct SampledMaterial {
     vector_float3 color;
     float ior;
@@ -87,6 +104,11 @@ struct SampledMaterial {
     vector_float3 emission;
  
     int BXDFs;
+#ifdef __METAL_VERSION__
+    bool isPerfectSpecular() {
+        return roughness < 0.01f and (transmission > 0.01f or metallic > 0.5f);
+    }
+#endif
 };
 
 #ifdef __METAL_VERSION__

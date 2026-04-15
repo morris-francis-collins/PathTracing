@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 import ImageIO
 
 struct ContentView: View {
-    @State private var rendererType: RendererType = .pathTracing
+    @State private var rendererType: RendererType = .sppm
     @State private var debugType: DebugType = Color
     @State private var widthText: String = ""
     @State private var heightText: String = ""
@@ -97,6 +97,7 @@ struct ContentView: View {
             Picker("", selection: $rendererType) {
                 Text(RendererType.pathTracing.displayName).tag(RendererType.pathTracing)
                 Text(RendererType.bdpt.displayName).tag(RendererType.bdpt)
+                Text(RendererType.sppm.displayName).tag(RendererType.sppm)
                 Text(RendererType.waveFront.displayName).tag(RendererType.waveFront)
                 Text(RendererType.debug.displayName).tag(RendererType.debug)
             }
@@ -387,6 +388,8 @@ struct MetalView: NSViewRepresentable {
                 newRenderer = PathTracingRenderer(device: device, scene: scene)
             case .bdpt:
                 newRenderer = BDPTRenderer(device: device, scene: scene)
+            case .sppm:
+                newRenderer = SPPMRenderer(device: device, scene: scene)
             case .waveFront:
                 newRenderer = WaveFrontRenderer(device: device, scene: scene)
             case .debug:
@@ -447,6 +450,7 @@ struct MetalView: NSViewRepresentable {
 enum RendererType: Equatable {
     case pathTracing
     case bdpt
+    case sppm
     case waveFront
     case debug
     
@@ -454,6 +458,7 @@ enum RendererType: Equatable {
         switch self {
         case .pathTracing: return "Path Tracing"
         case .bdpt: return "BDPT"
+        case .sppm: return "SPPM"
         case .waveFront: return "Wave Front"
         case .debug: return "Debug"
         }

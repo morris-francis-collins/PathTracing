@@ -38,7 +38,7 @@ class BDPTRenderer: Renderer {
         )
     }
     
-    override func finalizeAccumulation(commandBuffer: MTLCommandBuffer, threadgroups: MTLSize, threadsPerThreadgroup: MTLSize) {
+    override func finalizeAccumulation(commandBuffer: MTLCommandBuffer) {
         guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return
         }
@@ -50,6 +50,7 @@ class BDPTRenderer: Renderer {
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 2)
         commandEncoder.setTexture(finalImage, index: 0)
         
+        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
         commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         commandEncoder.endEncoding()
     }
@@ -122,7 +123,7 @@ class BDPTRenderer: Renderer {
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
                 
-        finalizeAccumulation(commandBuffer: commandBuffer, threadgroups: threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        finalizeAccumulation(commandBuffer: commandBuffer)
         presentDrawable(view: view, commandBuffer: commandBuffer)
         
         commandBuffer.commit()

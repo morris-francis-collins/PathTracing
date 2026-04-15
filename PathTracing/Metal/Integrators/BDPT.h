@@ -224,8 +224,7 @@ struct PathVertex {
             case LIGHT_VERTEX:
                 return ei.light->type != DIRECTIONAL_LIGHT;
             case SURFACE_VERTEX:
-                // TODO: change to test if pure specular lobe. should only return false if all lobes are perfect interactions
-                return !(si.material.roughness < 0.01f and (si.material.transmission > 0.01f or si.material.metallic > 0.5f));
+                return !si.material.isPerfectSpecular();
             default:
                 DEBUG("Vertex type not found.");
                 return false;

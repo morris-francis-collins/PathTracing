@@ -272,19 +272,19 @@ extension GameScene {
             scale: SIMD3<Float>(width, epsilon, depth)
         )
         
-        addInstance( // left box
-            with: whiteCubeGeometry,
-            translation: SIMD3<Float>(-1.2, 0.75, 0.5),
-            rotation: SIMD3<Float>(0, -0.7, 0),
-            scale: SIMD3<Float>(1.5, 1.5, 1.5)
-        )
-        
-        addInstance( // right box
-            with: whiteCubeGeometry,
-            translation: SIMD3<Float>(1.65, 1.25, -0.1),
-            rotation: SIMD3<Float>(0, 1, 0),
-            scale: SIMD3<Float>(1.35, 2.5, 1.35)
-        )
+//        addInstance( // left box
+//            with: whiteCubeGeometry,
+//            translation: SIMD3<Float>(-1.2, 0.75, 0.5),
+//            rotation: SIMD3<Float>(0, -0.7, 0),
+//            scale: SIMD3<Float>(1.5, 1.5, 1.5)
+//        )
+//        
+//        addInstance( // right box
+//            with: whiteCubeGeometry,
+//            translation: SIMD3<Float>(1.65, 1.25, -0.1),
+//            rotation: SIMD3<Float>(0, 1, 0),
+//            scale: SIMD3<Float>(1.35, 2.5, 1.35)
+//        )
     }
     
     func createBasicScene() {
@@ -456,7 +456,7 @@ extension GameScene {
         let torusGeometry = addAssimpGeometry(fileName: "torus", fileExtension: "obj", defaultMaterial: PLASTIC)
         let lightBallGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj",
                                                    defaultMaterial: createEmissiveMaterial(color: .one),
-                                                   emissionAmplifier: 5)
+                                                   emissionAmplifier: 50)
         
         // Ring on floor
         addInstance(with: ringGeometry,
@@ -617,7 +617,7 @@ extension GameScene {
 //        }
         
         let lightStripGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj",
-                                                   defaultMaterial: createEmissiveMaterial(color: .one), emissionAmplifier: 10.0)
+                                                   defaultMaterial: createEmissiveMaterial(color: .one), emissionAmplifier: 10)
 
         addInstance(with: lightStripGeometry,
                     translation: SIMD3<Float>(0.0, 3.95, -1.0),
@@ -934,16 +934,11 @@ extension GameScene {
     }
     
     func createCausticScene() {
-        cameraLocations = [(SIMD3<Float>(0.0, 3.95, 0.0), SIMD3<Float>(0.0, 1.0, -0.01)),
-                           (SIMD3<Float>(-4.7358356, 0.8316741, -0.24047767), SIMD3<Float>(-1.8881888, 1.2216821, 0.42390215)),
-                           (SIMD3<Float>(3.3002243, 1.739783, 3.0232406), SIMD3<Float>(1.4852387, -0.08613372, 1.5829433)),
-                           (SIMD3<Float>(-0.58075345, 1.6034509, 3.8094723), SIMD3<Float>(-0.05752662, 0.27425483, 1.2283735)),
-                           (SIMD3<Float>(-0.25849676, 1.2781403, -1.3962265), SIMD3<Float>(0.80470467, -0.3073362, 0.8528768)),
-                           (SIMD3<Float>(0.9514366, 1.4333981, 3.8511183), SIMD3<Float>(0.42823184, 0.10420242, 1.2700162)),
-                           (SIMD3<Float>(-2.2035198, 1.7945361, -4.0881658), SIMD3<Float>(-1.0779829, 0.4653412, -1.7072012))
+        cameraLocations = [
+            (SIMD3<Float>(-1.2508309, 1.326115, -1.929358), SIMD3<Float>(0.10678327, -0.003080368, 0.3273437)),
         ]
         
-        (cameraPosition, cameraTarget) = cameraLocations[6]
+        (cameraPosition, cameraTarget) = cameraLocations[0]
         cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
         
         let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
@@ -1022,5 +1017,65 @@ extension GameScene {
         addDirectionalLight(direction: normalize(SIMD3<Float>(-0.84, 4.13, -1.39) - SIMD3<Float>(-1.01, 4.23, 1.54)), color: 10 * SIMD3<Float>(1.0, 0.2, 0.0));
 
         addEnvironmentMap(textureURL: skyURL, emissionAmplifier: 2)
+    }
+    
+    func createBasicCausticScene() {
+        cameraLocations = [
+            (SIMD3<Float>(0.37873796, 1.9951366, -2.342358), SIMD3<Float>(0.824108, -0.1386801, 0.48579955)),
+        ]
+        
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        buildBox()
+        
+        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
+                
+        addInstance(with: dragonGeometry,
+                    translation: SIMD3<Float>(0, -0.5, 0),
+                    rotation: SIMD3<Float>(0, .pi, 0),
+                    scale: SIMD3<Float>(0.1, 0.1, 0.1)
+        )
+                
+        addPointLight(position: SIMD3<Float>(-1.9035219, 2.8296075, 1.8515409), color: 10 * .one)
+    }
+
+    func createSPPMCausticTestScene() {
+        cameraLocations = [
+            (SIMD3<Float>(0.0, 2.5, 5.5), SIMD3<Float>(0.0, 0.8, 0.0)),
+            (SIMD3<Float>(0.0, 4.5, 0.0), SIMD3<Float>(0.0, 0.0, -0.01)),
+            (SIMD3<Float>(-2.5, 1.5, 3.0), SIMD3<Float>(0.0, 0.5, 0.0)),
+        ]
+
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+
+        buildCornellBox(width: 6, height: 5, depth: 6)
+
+        let glassBallGeometry = addAssimpGeometry(fileName: "ball", fileExtension: "obj", defaultMaterial: GLASS)
+        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: GLASS)
+        let torusGeometry  = addAssimpGeometry(fileName: "torus", fileExtension: "obj", defaultMaterial: GLASS)
+
+        addInstance(with: glassBallGeometry,
+                    translation: SIMD3<Float>(0.0, 1.4, 0.0),
+                    scale: SIMD3<Float>(2.0, 2.0, 2.0))
+
+        addInstance(with: glassBallGeometry,
+                    translation: SIMD3<Float>(-1.5, 0.6, 1.5),
+                    scale: SIMD3<Float>(0.8, 0.8, 0.8))
+        
+        addInstance(with: torusGeometry,
+                    translation: SIMD3<Float>(1.5, 1.4, 0.5),
+                    rotation: SIMD3<Float>(0, -0.6, .pi/2),
+                    scale: 4 * SIMD3<Float>(0.5, 0.1, 0.5))
+//
+//        addInstance(with: dragonGeometry,
+//                    translation: SIMD3<Float>(0, 0.4, 0),
+//                    rotation: SIMD3<Float>(0, .pi, 0),
+//                    scale: 0.225 * .one
+//        )
+
+        // single point light high up — clean directional illumination for sharp caustics
+        addPointLight(position: SIMD3<Float>(0.0, 4.5, 0.0), color: 50 * .one)
     }
 }

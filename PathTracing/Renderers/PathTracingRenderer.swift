@@ -90,7 +90,7 @@ class PathTracingRenderer: Renderer {
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
         
-        finalizeAccumulation(commandBuffer: commandBuffer, threadgroups: threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        finalizeAccumulation(commandBuffer: commandBuffer)
         presentDrawable(view: view, commandBuffer: commandBuffer)
         
         commandBuffer.commit()

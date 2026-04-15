@@ -365,7 +365,7 @@ class WaveFrontRenderer: Renderer {
         
         guard let finalCommandBuffer = queue.makeCommandBuffer() else { return }
         finalCommandBuffer.addCompletedHandler { _ in self.semaphore.signal() }
-        finalizeAccumulation(commandBuffer: finalCommandBuffer, threadgroups: threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        finalizeAccumulation(commandBuffer: finalCommandBuffer)
         
         presentDrawable(view: view, commandBuffer: finalCommandBuffer)
         finalCommandBuffer.commit()

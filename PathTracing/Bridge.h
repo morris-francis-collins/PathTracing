@@ -12,6 +12,9 @@
 #include "Materials.h"
 #include "Samplers.h"
 
+#include "BDPT.h"
+#include "SPPM.h"
+
 #import "Debug.h"
 
 // Asset Loading

@@ -99,15 +99,33 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
         out.clearcoatRoughnessTextureIndex = -1;
         out.clearcoatNormalTextureIndex = -1;
         out.anisotropyTextureIndex = -1;
+        out.specularTextureIndex = -1;
+        out.specularColorTextureIndex = -1;
+        out.thicknessTextureIndex = -1;
+        out.diffuseTransmissionTextureIndex = -1;
+        out.diffuseTransmissionColorTextureIndex = -1;
+        out.sheenColorTextureIndex = -1;
+        out.sheenRoughnessTextureIndex = -1;
+        out.iridescenceTextureIndex = -1;
+        out.iridescenceThicknessTextureIndex = -1;
 
         out.emissiveStrength = 1.0f;
         out.ior = 1.5f;
-        out.alphaMode = 0; // OPAQUE
+        out.alphaMode = 0;
         out.alphaCutoff = 0.5f;
         out.attenuationColor = simd_make_float3(1.0f, 1.0f, 1.0f);
         out.attenuationDistance = INFINITY;
         out.normalScale = 1.0f;
         out.doubleSided = 0;
+        out.specularFactor = 1.0f;
+        out.specularColor = simd_make_float3(1.0f, 1.0f, 1.0f);
+        out.diffuseTransmissionFactor = 0.0f;
+        out.diffuseTransmissionColor = simd_make_float3(1.0f, 1.0f, 1.0f);
+        out.iridescenceFactor = 0.0f;
+        out.iridescenceIor = 1.3f;
+        out.iridescenceThicknessMin = 100.0f;
+        out.iridescenceThicknessMax = 400.0f;
+        out.dispersion = 0.0f;
 
         if (mat.has_pbr_metallic_roughness) {
             cgltf_pbr_metallic_roughness& pbr = mat.pbr_metallic_roughness;
@@ -125,7 +143,6 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
             out.metallicValue = pbr.metallic_factor;
             out.roughnessValue = pbr.roughness_factor;
 
-            // packed texture, green = metallic, blue = roughness
             int32_t mrIdx = resolveTextureIndex(data, pbr.metallic_roughness_texture.texture);
             out.metallicTextureIndex = mrIdx;
             out.roughnessTextureIndex = mrIdx;
@@ -158,18 +175,35 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
             case cgltf_alpha_mode_opaque: out.alphaMode = 0; break;
             case cgltf_alpha_mode_mask:   out.alphaMode = 1; break;
             case cgltf_alpha_mode_blend:  out.alphaMode = 2; break;
-            default: printf("[GLTF Loader] Warning: Alpha mode not found");
+            default: printf("[GLTFLoader] Warning: Alpha mode not found\n");
         }
         out.alphaCutoff = mat.alpha_cutoff;
+        out.doubleSided = mat.double_sided ? 1 : 0;
 
         if (mat.has_ior) {
             out.ior = mat.ior.ior;
         }
 
+        if (mat.has_specular) {
+            out.specularFactor = mat.specular.specular_factor;
+            out.specularColor = simd_make_float3(
+                mat.specular.specular_color_factor[0],
+                mat.specular.specular_color_factor[1],
+                mat.specular.specular_color_factor[2]
+            );
+
+            int32_t specIdx = resolveTextureIndex(data, mat.specular.specular_texture.texture);
+            out.specularTextureIndex = specIdx;
+            tagImageUsage(images, specIdx, GLTFImageUsage::Linear);
+
+            int32_t specColorIdx = resolveTextureIndex(data, mat.specular.specular_color_texture.texture);
+            out.specularColorTextureIndex = specColorIdx;
+            tagImageUsage(images, specColorIdx, GLTFImageUsage::BaseColor);
+        }
+
         if (mat.has_transmission) {
             out.transmissionValue = mat.transmission.transmission_factor;
-            int32_t transIdx = resolveTextureIndex(data,
-                mat.transmission.transmission_texture.texture);
+            int32_t transIdx = resolveTextureIndex(data, mat.transmission.transmission_texture.texture);
             out.transmissionTextureIndex = transIdx;
             tagImageUsage(images, transIdx, GLTFImageUsage::Transmission);
         }
@@ -182,23 +216,42 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
                 mat.volume.attenuation_color[2]
             );
             out.attenuationDistance = mat.volume.attenuation_distance;
+
+            int32_t thickIdx = resolveTextureIndex(data, mat.volume.thickness_texture.texture);
+            out.thicknessTextureIndex = thickIdx;
+            tagImageUsage(images, thickIdx, GLTFImageUsage::Linear);
+        }
+
+        if (mat.has_diffuse_transmission) {
+            out.diffuseTransmissionFactor = mat.diffuse_transmission.diffuse_transmission_factor;
+            out.diffuseTransmissionColor = simd_make_float3(
+                mat.diffuse_transmission.diffuse_transmission_color_factor[0],
+                mat.diffuse_transmission.diffuse_transmission_color_factor[1],
+                mat.diffuse_transmission.diffuse_transmission_color_factor[2]
+            );
+
+            int32_t dtIdx = resolveTextureIndex(data, mat.diffuse_transmission.diffuse_transmission_texture.texture);
+            out.diffuseTransmissionTextureIndex = dtIdx;
+            tagImageUsage(images, dtIdx, GLTFImageUsage::Linear);
+
+            int32_t dtcIdx = resolveTextureIndex(data, mat.diffuse_transmission.diffuse_transmission_color_texture.texture);
+            out.diffuseTransmissionColorTextureIndex = dtcIdx;
+            tagImageUsage(images, dtcIdx, GLTFImageUsage::BaseColor);
         }
 
         if (mat.has_clearcoat) {
             out.clearcoatValue = mat.clearcoat.clearcoat_factor;
-            int32_t ccIdx = resolveTextureIndex(data,
-                mat.clearcoat.clearcoat_texture.texture);
+            out.clearcoatRoughnessValue = mat.clearcoat.clearcoat_roughness_factor;
+
+            int32_t ccIdx = resolveTextureIndex(data, mat.clearcoat.clearcoat_texture.texture);
             out.clearcoatTextureIndex = ccIdx;
             tagImageUsage(images, ccIdx, GLTFImageUsage::Clearcoat);
 
-            out.clearcoatRoughnessValue = mat.clearcoat.clearcoat_roughness_factor;
-            int32_t ccrIdx = resolveTextureIndex(data,
-                mat.clearcoat.clearcoat_roughness_texture.texture);
+            int32_t ccrIdx = resolveTextureIndex(data, mat.clearcoat.clearcoat_roughness_texture.texture);
             out.clearcoatRoughnessTextureIndex = ccrIdx;
             tagImageUsage(images, ccrIdx, GLTFImageUsage::Clearcoat);
 
-            int32_t ccnIdx = resolveTextureIndex(data,
-                mat.clearcoat.clearcoat_normal_texture.texture);
+            int32_t ccnIdx = resolveTextureIndex(data, mat.clearcoat.clearcoat_normal_texture.texture);
             out.clearcoatNormalTextureIndex = ccnIdx;
             tagImageUsage(images, ccnIdx, GLTFImageUsage::Normal);
         }
@@ -206,9 +259,9 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
         if (mat.has_anisotropy) {
             out.anisotropyStrength = mat.anisotropy.anisotropy_strength;
             out.anisotropyRotation = mat.anisotropy.anisotropy_rotation;
-            int32_t aniIdx = resolveTextureIndex(data,
-                mat.anisotropy.anisotropy_texture.texture);
+            int32_t aniIdx = resolveTextureIndex(data, mat.anisotropy.anisotropy_texture.texture);
             out.anisotropyTextureIndex = aniIdx;
+            tagImageUsage(images, aniIdx, GLTFImageUsage::Linear);
         }
 
         if (mat.has_sheen) {
@@ -218,38 +271,34 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
                 mat.sheen.sheen_color_factor[2]
             );
             out.sheenRoughness = mat.sheen.sheen_roughness_factor;
+
+            int32_t scIdx = resolveTextureIndex(data, mat.sheen.sheen_color_texture.texture);
+            out.sheenColorTextureIndex = scIdx;
+            tagImageUsage(images, scIdx, GLTFImageUsage::BaseColor);
+
+            int32_t srIdx = resolveTextureIndex(data, mat.sheen.sheen_roughness_texture.texture);
+            out.sheenRoughnessTextureIndex = srIdx;
+            tagImageUsage(images, srIdx, GLTFImageUsage::Linear);
         }
 
-        out.doubleSided = mat.double_sided ? 1 : 0;
+        if (mat.has_iridescence) {
+            out.iridescenceFactor = mat.iridescence.iridescence_factor;
+            out.iridescenceIor = mat.iridescence.iridescence_ior;
+            out.iridescenceThicknessMin = mat.iridescence.iridescence_thickness_min;
+            out.iridescenceThicknessMax = mat.iridescence.iridescence_thickness_max;
 
-        printf("\n[GLTFLoader] Material %zu: \"%s\"\n"
-                "  baseColor:    (%.3f, %.3f, %.3f) tex=%d\n"
-                "  metallic:     %.3f tex=%d\n"
-                "  roughness:    %.3f tex=%d\n"
-                "  normal:       tex=%d scale=%.3f\n"
-                "  emission:     (%.3f, %.3f, %.3f) strength=%.3f tex=%d\n"
-                "  alpha:        mode=%d cutoff=%.3f\n"
-                "  ior:          %.3f\n"
-                "  transmission: %.3f tex=%d\n"
-                "  volume:       thickness=%.3f attenColor=(%.3f, %.3f, %.3f) attenDist=%.3f\n"
-                "  clearcoat:    %.3f roughness=%.3f tex=%d/%d normal=%d\n"
-                "  anisotropy:   strength=%.3f rotation=%.3f tex=%d\n"
-                "  sheen:        color=(%.3f, %.3f, %.3f) roughness=%.3f\n"
-                "  doubleSided:  %d\n",
-                i, mat.name ? mat.name : "",
-                out.colorValue.x, out.colorValue.y, out.colorValue.z, out.colorTextureIndex,
-                out.metallicValue, out.metallicTextureIndex,
-                out.roughnessValue, out.roughnessTextureIndex,
-                out.normalTextureIndex, out.normalScale,
-                out.emissionValue.x, out.emissionValue.y, out.emissionValue.z, out.emissiveStrength, out.emissionTextureIndex,
-                out.alphaMode, out.alphaCutoff,
-                out.ior,
-                out.transmissionValue, out.transmissionTextureIndex,
-                out.thicknessFactor, out.attenuationColor.x, out.attenuationColor.y, out.attenuationColor.z, out.attenuationDistance,
-                out.clearcoatValue, out.clearcoatRoughnessValue, out.clearcoatTextureIndex, out.clearcoatRoughnessTextureIndex, out.clearcoatNormalTextureIndex,
-                out.anisotropyStrength, out.anisotropyRotation, out.anisotropyTextureIndex,
-                out.sheenColor.x, out.sheenColor.y, out.sheenColor.z, out.sheenRoughness,
-                out.doubleSided);
+            int32_t irIdx = resolveTextureIndex(data, mat.iridescence.iridescence_texture.texture);
+            out.iridescenceTextureIndex = irIdx;
+            tagImageUsage(images, irIdx, GLTFImageUsage::Linear);
+
+            int32_t irtIdx = resolveTextureIndex(data, mat.iridescence.iridescence_thickness_texture.texture);
+            out.iridescenceThicknessTextureIndex = irtIdx;
+            tagImageUsage(images, irtIdx, GLTFImageUsage::Linear);
+        }
+
+        if (mat.has_dispersion) {
+            out.dispersion = mat.dispersion.dispersion;
+        }
     }
 
     if (outMaterials.empty()) {
@@ -257,23 +306,36 @@ static void loadMaterials(cgltf_data* data, std::vector<Material>& outMaterials,
         memset(&def, 0, sizeof(def));
         def.colorValue = simd_make_float3(0.8f, 0.8f, 0.8f);
         def.colorTextureIndex = -1;
-        def.roughnessValue = 0.5f;
         def.roughnessTextureIndex = -1;
-        def.metallicValue = 0.0f;
         def.metallicTextureIndex = -1;
         def.emissionTextureIndex = -1;
         def.emissiveStrength = 1.0f;
         def.ior = 1.5f;
         def.alphaCutoff = 0.5f;
+        def.specularFactor = 1.0f;
+        def.specularColor = simd_make_float3(1, 1, 1);
+        def.specularTextureIndex = -1;
+        def.specularColorTextureIndex = -1;
         def.transmissionTextureIndex = -1;
+        def.thicknessTextureIndex = -1;
         def.attenuationColor = simd_make_float3(1, 1, 1);
         def.attenuationDistance = INFINITY;
+        def.diffuseTransmissionTextureIndex = -1;
+        def.diffuseTransmissionColor = simd_make_float3(1, 1, 1);
+        def.diffuseTransmissionColorTextureIndex = -1;
         def.normalTextureIndex = -1;
         def.normalScale = 1.0f;
         def.clearcoatTextureIndex = -1;
         def.clearcoatRoughnessTextureIndex = -1;
         def.clearcoatNormalTextureIndex = -1;
         def.anisotropyTextureIndex = -1;
+        def.sheenColorTextureIndex = -1;
+        def.sheenRoughnessTextureIndex = -1;
+        def.iridescenceTextureIndex = -1;
+        def.iridescenceThicknessTextureIndex = -1;
+        def.iridescenceIor = 1.3f;
+        def.iridescenceThicknessMin = 100.0f;
+        def.iridescenceThicknessMax = 400.0f;
         outMaterials.push_back(def);
     }
 }

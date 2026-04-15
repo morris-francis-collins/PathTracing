@@ -11,13 +11,7 @@
 #include "Utility.h"
 #include "Interactions.h"
 
-#define MAX_LIGHTS 16
 #define SCENE_RADIUS 8.0f
-
-#define ENVIRONMENT_MAP_HEIGHT 2048
-#define ENVIRONMENT_MAP_WIDTH 4096
-#define ENVIRONMENT_MAP_SCALE 2
-
 #define DELTA_LIGHT (1 << 7)
 
 enum LightType : uint8_t {

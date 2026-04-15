@@ -349,7 +349,7 @@ class Renderer: NSObject, MTKViewDelegate {
         return (threadsPerThreadGroup, threadGroups)
     }
     
-    func finalizeAccumulation(commandBuffer: MTLCommandBuffer, threadgroups: MTLSize, threadsPerThreadgroup: MTLSize) {
+    func finalizeAccumulation(commandBuffer: MTLCommandBuffer) {
         guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return
         }
@@ -360,6 +360,7 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
         commandEncoder.setTexture(finalImage, index: 0)
         
+        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
         commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         commandEncoder.endEncoding()
     }

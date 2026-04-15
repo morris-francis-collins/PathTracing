@@ -22,7 +22,8 @@ enum class GLTFImageUsage : unsigned int {
     Occlusion,
     Transmission,
     Clearcoat,
-    Unknown
+    Unknown,
+    Linear
 };
 
 struct GLTFImage {

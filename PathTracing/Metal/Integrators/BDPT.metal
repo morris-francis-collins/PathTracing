@@ -545,3 +545,22 @@ kernel void bidirectionalPathTracingKernel(device float3* accmulationBuffer,
     
     accmulationBuffer[tid.y * uniforms.width + tid.x] += contribution;
 }
+
+kernel void finalizeAccumulationBDPT(uint2 tid [[thread_position_in_grid]],
+                                    device float3* accumulation,
+                                    device atomic_float* splatAccmulation,
+                                    constant Uniforms& uniforms,
+                                    texture2d<float, access::read_write> finalImage)
+{
+    if (tid.x >= uniforms.width || tid.y >= uniforms.height)
+        return;
+    
+    uint pixelIndex = tid.y * uniforms.width + tid.x;
+    float3 contribution = accumulation[pixelIndex];
+    float3 splatContribution = float3(atomic_load_explicit(&splatAccmulation[3 * pixelIndex + 0], memory_order_relaxed),
+                                      atomic_load_explicit(&splatAccmulation[3 * pixelIndex + 1], memory_order_relaxed),
+                                      atomic_load_explicit(&splatAccmulation[3 * pixelIndex + 2], memory_order_relaxed));
+    
+    float3 color = (contribution + splatContribution) / (uniforms.frameIndex + 1);
+    finalImage.write(float4(color, 1.0f), tid);
+}
