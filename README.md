@@ -20,6 +20,5 @@ A physically-based renderer written in Metal and Swift. The renderer leverages M
 <img src="https://github.com/user-attachments/assets/f5ee930d-79bd-454e-93cb-f40e30e87df1" width="1000">
 <img src="https://github.com/user-attachments/assets/babe7799-2c19-42f3-a8b0-6aee2b81aa26" width="1000">
 <img src="https://github.com/user-attachments/assets/e85a327f-d8a0-405a-9f87-e89e9cf13eb0" width="1000">
-
-<img src="https://github.com/user-attachments/assets/550d16ac-9cd9-40b9-9de9-d058e334eac3" width="500">
-<img src="https://github.com/user-attachments/assets/e8e3438e-7544-4b8a-bff7-c10fd90632a8" width="500">
+<img src="https://github.com/user-attachments/assets/550d16ac-9cd9-40b9-9de9-d058e334eac3" width="1000">
+<img src="https://github.com/user-attachments/assets/e8e3438e-7544-4b8a-bff7-c10fd90632a8" width="1000">
