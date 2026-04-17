@@ -11,9 +11,10 @@
 #include "Interactions.h"
 #include "Materials.h"
 #include "Samplers.h"
+#include "PathTracing.h"
 
 #define HASH_TABLE_SIZE 3999971u
-#define PHOTON_COUNT (4 * 65536u)
+#define PHOTON_COUNT (16 * 65536u)
 #define ALPHA 0.55f
 
 #ifdef __METAL_VERSION__

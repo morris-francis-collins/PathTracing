@@ -12,7 +12,7 @@ import simd
 class GLTFGeometry: Geometry {
     private var modelName: String
 
-    init(device: MTLDevice, modelPath: String, emissionAmplifier: Float = 1.0) {
+    init(device: MTLDevice, modelPath: String, defaultMaterial: Material? = nil, emissionAmplifier: Float = 1.0) {
         modelName = URL(fileURLWithPath: modelPath).lastPathComponent
         super.init(device: device)
 
@@ -31,7 +31,7 @@ class GLTFGeometry: Geometry {
         for p in 0..<Int(scene.primitiveCount) {
             let prim = scene.primitives[p]
             let matIdx = min(Int(prim.materialIndex), gpuMaterials.count - 1)
-            let material = gpuMaterials[matIdx]
+            let material = defaultMaterial == nil ? gpuMaterials[matIdx] : defaultMaterial!
 
             let emissionMag = length_squared(material.emissionValue * material.emissiveStrength)
             let isEmissive = emissionMag > 1e-4 || material.emissionTextureIndex != -1

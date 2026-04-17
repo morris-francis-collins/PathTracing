@@ -113,62 +113,33 @@ kernel void generateHitPointsSPPM(device float* accumulation,
             break;
         }
         
-        if (!material.isPerfectSpecular()) {
-            uint hashedLocation = hashLocation(si.position, hashGridSize);
-
-            hitPointBSDFs[pixelIndex] = throughput;
-            hitPointLocations[pixelIndex] = si.position;
-            hitPointIncomingDirections[pixelIndex] = -ray.direction;
-            hitPointNormals[pixelIndex] = si.normal;
-            hitPointHashes[pixelIndex] = hashedLocation;
-
-            atomic_fetch_add_explicit(&hashTableCounts[hashedLocation], 1u, memory_order_relaxed);
-            return;
+        if (material.isPerfectSpecular()) {
+            BSDFSample bs = sampleBXDF(-ray.direction, si.normal, material, Radiance, sampler.r3());
+            throughput *= bs.BSDF * abs(dot(bs.wo, si.normal)) / bs.PDF;
+            
+            if (isBlack(throughput))
+                break;
+            
+            ray.origin = si.position + bs.wo * 1e-4f;
+            ray.direction = bs.wo;
+            continue;
         }
         
-        BSDFSample bs = sampleBXDF(-ray.direction, si.normal, material, Radiance, float3(prng(rng_state), prng(rng_state), prng(rng_state)));
-        
-        if (!bs.delta) {
-            float selectionPDF;
-            constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
-            LightSample lightSample = sampleLight(si.position, light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
-            
-            float3 wi = -ray.direction, wo = lightSample.wo;
-            float3 pos1 = si.position, pos2 = lightSample.position;
-            float distance = lightSample.distance;
-            
-            float cosCamera = dot(wo, si.normal);
-            float cosLight = light.type == AREA_LIGHT ? dot(-wo, si.normal) : 1.0f;
-        
-            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, si.normal, pos2, lightSample.normal, instances, accelerationStructure)) {
-                float3 BSDF = getBXDF(wi, wo, si.normal, material, Radiance);
+        float3 NEEContribution = sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, si, material, uniforms, instances, accelerationStructure);
 
-                float G = cosCamera * cosLight / (distance * distance);
-                float lightPDF = selectionPDF * lightSample.PDF;
-                
-                float3 contribution;
-
-                if (light.isDelta()) {
-                    contribution = throughput * BSDF * lightSample.emission * G / lightPDF;
-                } else {
-                    float bsdfPDF = getPDF(wi, wo, si.normal, material);
-                    float weight = powerHeuristic(lightPDF, bsdfPDF);
-                    contribution = throughput * BSDF * lightSample.emission * G * weight / lightPDF;
-                }
-                
-                accumulation[3 * pixelIndex + 0] += contribution.r;
-                accumulation[3 * pixelIndex + 1] += contribution.g;
-                accumulation[3 * pixelIndex + 2] += contribution.b;
-            }
-        }
-                        
-        throughput *= bs.BSDF * abs(dot(bs.wo, si.normal)) / bs.PDF;
+        accumulation[3 * pixelIndex + 0] += NEEContribution.r;
+        accumulation[3 * pixelIndex + 1] += NEEContribution.g;
+        accumulation[3 * pixelIndex + 2] += NEEContribution.b;
         
-        if (isBlack(throughput))
-            break;
-                
-        ray.origin = si.position + bs.wo * 1e-4f;
-        ray.direction = bs.wo;
+        uint hashedLocation = hashLocation(si.position, hashGridSize);
+        hitPointBSDFs[pixelIndex] = throughput;
+        hitPointLocations[pixelIndex] = si.position;
+        hitPointIncomingDirections[pixelIndex] = -ray.direction;
+        hitPointNormals[pixelIndex] = si.normal;
+        hitPointHashes[pixelIndex] = hashedLocation;
+        atomic_fetch_add_explicit(&hashTableCounts[hashedLocation], 1u, memory_order_relaxed);
+        
+        return;
     }
     
     hitPointBSDFs[pixelIndex] = float3(0.0f); // when we cant find a diffuse surface or escape
@@ -291,7 +262,7 @@ kernel void tracePhotonsSPPM(device atomic_float* accumulation,
         SurfaceInteraction si = getSurfaceInteraction(ray, ir, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = si.material;
 
-        if (!material.isPerfectSpecular()) {
+        if (bounce > 0 and !material.isPerfectSpecular()) {
             float3 photonPosition = si.position;
             int3 cell = int3(floor(photonPosition / hashGridSize));
             

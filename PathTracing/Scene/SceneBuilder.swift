@@ -1078,4 +1078,63 @@ extension GameScene {
         // single point light high up — clean directional illumination for sharp caustics
         addPointLight(position: SIMD3<Float>(0.0, 4.5, 0.0), color: 50 * .one)
     }
+    
+    func createEnvironmentMapCausticScene() {
+        cameraLocations = [
+            (SIMD3<Float>(2.4255426, 1.7886385, -3.879791), SIMD3<Float>(0.28805757, -0.15328133, 0.45178628))
+        ]
+
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
+        let glassBallGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: GLASS)
+
+        let roughBlueMetal = createStaticMaterial(color: SIMD3<Float>(0.35, 0.7, 0.9), ior: 1.5, roughness: 0.5, metallic: 1.0)
+        let roseGoldMirror = createStaticMaterial(color: SIMD3<Float>(0.818, 0.431, 0.475), ior: 1.5, roughness: 0.0, metallic: 1.0)
+
+        let dragonGeometry = addAssimpGeometry(fileName: "stanford_dragon", fileExtension: "obj", defaultMaterial: roughBlueMetal)
+        let ringGeometry = addAssimpGeometry(fileName: "ring", fileExtension: "obj", defaultMaterial: roseGoldMirror)
+
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(8, 0.1, 8))
+
+        addInstance(with: glassBallGeometry,
+                    translation: SIMD3<Float>(-0.5, 1, 0.0),
+                    scale: SIMD3<Float>(2.0, 2.0, 2.0))
+
+        addInstance(with: dragonGeometry,
+                    translation: SIMD3<Float>(-0.6, 0.0, 0.0),
+                    rotation: SIMD3<Float>(0, .pi, 0),
+                    scale: 0.08 * .one)
+
+        addInstance(with: ringGeometry,
+                    translation: SIMD3<Float>(1.8307674, 0.2, -1.5601866),
+                    scale: SIMD3<Float>(2.0, 0.4, 2.0),
+        )
+
+        addEnvironmentMap(textureURL: skyURL, emissionAmplifier: 3)
+    }
+    
+    func createTextCausticScene() {
+        cameraLocations = [
+            (SIMD3<Float>(2.4255426, 1.7886385, -3.879791), SIMD3<Float>(0.28805757, -0.15328133, 0.45178628))
+        ]
+
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let roughColoredMetal = createStaticMaterial(color: SIMD3<Float>(0.3176, 0.4039, 0.9882), ior: 1.5, roughness: 0.5, metallic: 1.0)
+
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj")
+        let textGeometry = addAssimpGeometry(fileName: "loggeometry", fileExtension: "obj", defaultMaterial: roughColoredMetal)
+
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(8, 0.1, 8))
+
+        addInstance(with: textGeometry,
+                    translation: SIMD3<Float>(0, 1, 0),
+                    rotation: SIMD3<Float>(0, -2 *  .pi/4, 0),
+                    scale: 0.3 * .one)
+
+        addEnvironmentMap(textureURL: skyURL, emissionAmplifier: 3)
+    }
 }

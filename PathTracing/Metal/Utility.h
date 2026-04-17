@@ -10,7 +10,7 @@
 
 #define DEBUG(...) os_log_default.log_info(__VA_ARGS__)
 
-#define MAX_PATH_LENGTH 20
+#define MAX_PATH_LENGTH 40
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 

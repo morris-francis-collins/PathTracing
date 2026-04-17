@@ -53,7 +53,7 @@ class GameScene: ObservableObject {
         self.device = device
         TextureRegistry.shared.reset()
         MaterialRegistry.shared.reset()
-        createSPPMCausticTestScene()
+        createTextCausticScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -348,7 +348,7 @@ class GameScene: ObservableObject {
         return geometry
     }
     
-    func addGLTFGeometry(fileName: String, fileExtension: String, emissionAmplifier: Float = 1.0) -> GLTFGeometry {
+    func addGLTFGeometry(fileName: String, fileExtension: String, defaultMaterial: Material? = nil, emissionAmplifier: Float = 1.0) -> GLTFGeometry {
         guard let modelPath = Bundle.main.path(forResource: fileName, ofType: fileExtension) else {
             fatalError("[GameScene] Failed to find resource \(fileName).\(fileExtension)")
         }

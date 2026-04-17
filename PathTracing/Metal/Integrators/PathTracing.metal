@@ -12,6 +12,50 @@
 using namespace metal;
 using namespace raytracing;
 
+float3 sampleNEE(float3 throughput,
+                 ray ray,
+                        
+                 constant Light* lights,
+                 constant LightTriangle* lightTriangles,
+                 thread Sampler& sampler,
+                 constant Textures* textures,
+                 constant AliasEntry* lightAliasEntries,
+                 constant AliasEntry* lightTriangleAliasEntries,
+                 texture2d<float> environmentMapTexture,
+                 constant AliasEntry* environmentMapAliasEntries,
+                        
+                 SurfaceInteraction si,
+                 SampledMaterial material,
+                        
+                 constant Uniforms& uniforms,
+                 device MTLAccelerationStructureInstanceDescriptor* instances,
+                 instance_acceleration_structure accelerationStructure)
+{
+    float selectionPDF;
+    constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
+    LightSample ls = sampleLight(si.position, light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
+
+    float3 wi = -ray.direction, wo = ls.wo;
+    float cosCamera = dot(wo, si.normal);
+    float cosLight = light.type == AREA_LIGHT ? dot(-wo, ls.normal) : 1.0f;
+
+    if (cosCamera > 0.0f && cosLight > 0.0f && isVisible(si.position, si.normal, ls.position, ls.normal, instances, accelerationStructure)) {
+        float3 BSDF = getBXDF(wi, wo, si.normal, material, Radiance);
+        float G = cosCamera * cosLight / (ls.distance * ls.distance);
+        float lightPDF = selectionPDF * ls.PDF;
+
+        if (light.isDelta()) {
+            return throughput * BSDF * ls.emission * G / lightPDF;
+        } else {
+            float bsdfPDF = getPDF(wi, wo, si.normal, material);
+            float weight = powerHeuristic(lightPDF, bsdfPDF);
+            return throughput * BSDF * ls.emission * G * weight / lightPDF;
+        }
+    }
+    
+    return float3(0.0f);
+}
+
 float3 pathIntegrator(float2 pixel,
                       constant Uniforms& uniforms,
                       device MTLAccelerationStructureInstanceDescriptor *instances,
@@ -100,41 +144,9 @@ float3 pathIntegrator(float2 pixel,
         inMedium ^= bsdfSample.transmitted;
         float epsilon = calculateEpsilon(surfaceInteraction.position);
         prevSpecular = bsdfSample.delta;
-        
-//        if (inMedium) {
-//            attenuationDistance += length(surfaceInteraction.position - ray.origin);
-//        } else if (bsdfSample.transmitted) {
-//            float3 absorption = log(1 - material.color);
-//            throughput *= exp(absorption * attenuationDistance);
-//            attenuationDistance = 0.0f;
-//        }
 
         if (!bsdfSample.delta) {
-            float selectionPDF;
-            constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());
-            LightSample lightSample = sampleLight(surfaceInteraction.position, light, lightTriangles, textures, environmentMapTexture, lightTriangleAliasEntries, environmentMapAliasEntries, sampler);
-            
-            float3 wi = -ray.direction, wo = lightSample.wo;
-            float3 pos1 = surfaceInteraction.position, pos2 = lightSample.position;
-            float distance = lightSample.distance;
-            
-            float cosCamera = dot(wo, n);
-            float cosLight = light.type == AREA_LIGHT ? dot(-wo, lightSample.normal) : 1.0f;
-        
-            if (cosCamera > 0.0f and cosLight > 0.0f and isVisible(pos1, surfaceInteraction.normal, pos2, lightSample.normal, instances, accelerationStructure)) {
-                float3 BSDF = getBXDF(wi, wo, n, material, Radiance);
-
-                float G = cosCamera * cosLight / (distance * distance);
-                float lightPDF = selectionPDF * lightSample.PDF;
-
-                if (light.isDelta()) {
-                    contribution += throughput * BSDF * lightSample.emission * G / lightPDF;
-                } else {
-                    float bsdfPDF = getPDF(wi, wo, n, material);
-                    float weight = powerHeuristic(lightPDF, bsdfPDF);
-                    contribution += throughput * BSDF * lightSample.emission * G * weight / lightPDF;
-                }
-            }
+            contribution += sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, surfaceInteraction, material, uniforms, instances, accelerationStructure);
         }
                 
         throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
@@ -184,7 +196,10 @@ kernel void pathTracingKernel(device float3* accmulationBuffer,
     pixel += sampler.r2() - 0.5f;
     
     float3 contribution = pathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, sampler, textures, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
-        
+    
+    if (uniforms.frameIndex == 0u) {
+        accmulationBuffer[tid.y * uniforms.width + tid.x] = float3(0.0f);
+    }
     accmulationBuffer[tid.y * uniforms.width + tid.x] += contribution;
 }
 
