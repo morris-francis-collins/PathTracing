@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 import ImageIO
 
 struct ContentView: View {
-    @State private var rendererType: RendererType = .sppm
+    @State private var rendererType: RendererType = .pathTracing
     @State private var debugType: DebugType = Color
     @State private var widthText: String = ""
     @State private var heightText: String = ""

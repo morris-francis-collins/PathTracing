@@ -40,6 +40,8 @@ class GameScene: ObservableObject {
     var lightTriangleAliasEntriesBuffer: MTLBuffer?
     var environmentMapAliasEntriesBuffer: MTLBuffer?
     
+    var sobolData: Sobol!
+    
     var cameraPosition: SIMD3<Float> = SIMD3<Float>(0, 0, -1)
     var cameraTarget: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
     var cameraUp: SIMD3<Float> = SIMD3<Float>(0, 1, 0)
@@ -53,7 +55,7 @@ class GameScene: ObservableObject {
         self.device = device
         TextureRegistry.shared.reset()
         MaterialRegistry.shared.reset()
-        createTextCausticScene()
+        createEnvironmentMapCausticScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -75,6 +77,8 @@ class GameScene: ObservableObject {
         
         createLightAliasTable()
         createLightTriangleAliasTable()
+        
+        sobolData = Sobol(device: device, dimensions: 256)
         
         let options = getManagedBufferStorageMode()
                 

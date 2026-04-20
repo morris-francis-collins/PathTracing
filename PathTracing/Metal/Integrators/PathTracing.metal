@@ -177,6 +177,8 @@ kernel void pathTracingKernel(device float3* accmulationBuffer,
                               constant Material* materials,
                               constant Textures* textures,
                               
+                              constant uint* sobolValues,
+                              
                               texture2d<unsigned int> randomTex,
                               texture2d<float> environmentMapTexture,
                               
@@ -190,7 +192,7 @@ kernel void pathTracingKernel(device float3* accmulationBuffer,
         return;
 
     unsigned int offset = randomTex.read(tid).x;
-    Sampler sampler(offset, uniforms.frameIndex);
+    Sampler sampler(offset, uniforms.frameIndex, sobolValues);
     
     float2 pixel = (float2) tid;
     pixel += sampler.r2() - 0.5f;

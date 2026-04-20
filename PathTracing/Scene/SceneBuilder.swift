@@ -1137,4 +1137,25 @@ extension GameScene {
 
         addEnvironmentMap(textureURL: skyURL, emissionAmplifier: 3)
     }
+    
+    func createCausticGlass() {
+        cameraLocations = [
+            (SIMD3<Float>(3.8443356, 2.1953845, 0.8233167), SIMD3<Float>(-0.7502346, -0.21905541, 0.4197518))
+        ]
+
+        (cameraPosition, cameraTarget) = cameraLocations[0]
+        cameraUp = SIMD3<Float>(0.0, 1.0, 0.0)
+        
+        let whiteCubeGeometry = addAssimpGeometry(fileName: "cube", fileExtension: "obj", defaultMaterial: ROUGH_OPAQUE_DIELECTRIC)
+        let causticGlassGeometry = addAssimpGeometry(fileName: "caustic_glass", fileExtension: "obj", defaultMaterial: GLASS)
+        
+        addInstance(with: whiteCubeGeometry, scale: SIMD3<Float>(8, 0.1, 8))
+        
+        addInstance(with: causticGlassGeometry,
+                    translation: SIMD3<Float>(-2, 0, -2),
+                    scale: .one)
+
+        addPointLight(position: SIMD3<Float>(-6, 2.5, -6), color: 150 * .one)
+//        addDirectionalLight(direction: normalize(SIMD3<Float>(1.568244, 0.28695798, 1.3539786) - SIMD3<Float>(-2.359778, 1.4115877, -1.8722084)), color: 10 * .one)
+    }
 }

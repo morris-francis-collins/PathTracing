@@ -14,29 +14,28 @@ using namespace raytracing;
 
 kernel void createCameraRaysSPPM(device float3* rayOrigins,
                                  device float3* rayDirections,
-                                 device uint* rngStates,
+                                 
+                                 constant uint* sobolValues,
                                  
                                  constant Uniforms& uniforms,
-                             
+                                                              
                                  uint2 tid [[thread_position_in_grid]])
 {
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
         return;
 
     uint pixelIndex = tid.y * uniforms.width + tid.x;
-    uint rng_state = init_prng(pixelIndex, uniforms.frameIndex);
-    float2 pixel = static_cast<float2>(tid) + float2(prng(rng_state), prng(rng_state)) - 0.5f;
+    Sampler sampler(pixelIndex, uniforms.frameIndex, sobolValues);
+    float2 pixel = static_cast<float2>(tid) + float2(sampler.r2()) - 0.5f;
     
     rayOrigins[pixelIndex] = uniforms.camera.position;
     rayDirections[pixelIndex] = generateRayDirection(pixel, uniforms);
-    rngStates[pixelIndex] = rng_state;
 }
 
 kernel void generateHitPointsSPPM(device float* accumulation,
                                   
                                   device float3* rayOrigins,
                                   device float3* rayDirections,
-                                  device uint* rngStates,
                                   
                                   constant Light* lights,
                                   constant LightTriangle* lightTriangles,
@@ -58,6 +57,8 @@ kernel void generateHitPointsSPPM(device float* accumulation,
                                   device atomic_uint* hashTableCounts,
                                   constant float& hashGridSize,
                                   
+                                  constant uint* sobolValues,
+                                  
                                   constant Uniforms& uniforms,
                                   device MTLAccelerationStructureInstanceDescriptor* instances,
                                   instance_acceleration_structure accelerationStructure,
@@ -68,8 +69,7 @@ kernel void generateHitPointsSPPM(device float* accumulation,
         return;
 
     uint pixelIndex = tid.y * uniforms.width + tid.x;
-    device uint& rng_state = rngStates[pixelIndex];
-    Sampler sampler(pixelIndex, uniforms.frameIndex);
+    Sampler sampler(pixelIndex, uniforms.frameIndex, sobolValues); sampler.dimension = 3u;
 
     ray ray;
     ray.origin = rayOrigins[pixelIndex];
@@ -225,6 +225,8 @@ kernel void tracePhotonsSPPM(device atomic_float* accumulation,
                              
                              device atomic_uint* currentPhotonCounts,
                              device float* gatheringRadii,
+                             
+                             constant uint* sobolValues,
 
                              constant Uniforms& uniforms,
                              device MTLAccelerationStructureInstanceDescriptor* instances,
@@ -235,7 +237,7 @@ kernel void tracePhotonsSPPM(device atomic_float* accumulation,
     if (tid >= PHOTON_COUNT)
         return;
 
-    Sampler sampler(tid, uniforms.frameIndex);
+    Sampler sampler(tid, uniforms.frameIndex, sobolValues); sampler.dimension = 90u;
 
     float selectionPDF;
     constant Light& light = selectLight(lights, lightAliasEntries, uniforms, selectionPDF, sampler.r2());

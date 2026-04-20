@@ -61,6 +61,7 @@ func colorMaterial(material: Material, color: SIMD3<Float>) -> Material {
 let GLASS = createStaticMaterial(color: .one, ior: 1.5, roughness: 0.0, metallic: 0.0, transmission: 1.0)
 let PLASTIC = createStaticMaterial(color: 0.7 * .one, ior: 1.0, roughness: 0.9, metallic: 0.0)
 let SMOOTH_OPAQUE_DIELECTRIC = createStaticMaterial(color: 0.7 * .one, ior: 1.5, roughness: 0.0, metallic: 0.0)
+let ROUGH_OPAQUE_DIELECTRIC = createStaticMaterial(color: 0.7 * .one, ior: 1.5, roughness: 0.5, metallic: 0.0)
 let MIRROR = createStaticMaterial(color: .one, ior: 1.5, roughness: 0.0, metallic: 1.0)
 let WATER = createStaticMaterial(color: .one, ior: 1.33, roughness: 0.0, metallic: 0.0, transmission: 1.0)
 let EMISSIVE = createStaticMaterial(color: .one, emission: .one)

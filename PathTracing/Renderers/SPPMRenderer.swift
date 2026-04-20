@@ -8,7 +8,7 @@
 import MetalKit
 
 class SPPMRenderer: Renderer {
-    private let initialRadius: Float = 0.002 // TODO: adapt with scene size
+    private let initialRadius: Float = 0.001 // TODO: adapt with scene size
     
     private var createCameraRaysPipeline: MTLComputePipelineState!
     private var generateHitPointsPipeline: MTLComputePipelineState!
@@ -17,7 +17,6 @@ class SPPMRenderer: Renderer {
         
     private var rayOriginBuffer: MTLBuffer!
     private var rayDirectionBuffer: MTLBuffer!
-    private var rngStateBuffer: MTLBuffer!
     
     private var hitPointBSDFBuffer: MTLBuffer!
     private var hitPointLocationBuffer: MTLBuffer!
@@ -63,7 +62,6 @@ class SPPMRenderer: Renderer {
     private func createSPPMBuffers(maxRays: Int) {
         rayOriginBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModeShared)
         rayDirectionBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModeShared)
-        rngStateBuffer = device.makeBuffer(length: maxRays * MemoryLayout<UInt32>.stride, options: .storageModeShared)
         
         hitPointBSDFBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModeShared)
         hitPointLocationBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModeShared)
@@ -102,7 +100,8 @@ class SPPMRenderer: Renderer {
         let buffers = [
             rayOriginBuffer,
             rayDirectionBuffer,
-            rngStateBuffer,
+            
+            scene.sobolData.buffer
         ]
         
         for (i, buffer) in buffers.enumerated() {
@@ -126,7 +125,6 @@ class SPPMRenderer: Renderer {
             
             rayOriginBuffer,
             rayDirectionBuffer,
-            rngStateBuffer,
             
             scene.lightBuffer,
             scene.lightTriangleBuffer,
@@ -145,7 +143,9 @@ class SPPMRenderer: Renderer {
             hitPointHashBuffer,
             
             hashTableCountBuffer,
-            hashGridSizeBuffer
+            hashGridSizeBuffer,
+            
+            scene.sobolData.buffer
         ]
         
         let textures = [
@@ -240,7 +240,9 @@ class SPPMRenderer: Renderer {
             hashGridSizeBuffer,
             
             currentPhotonCountBuffer,
-            gatheringRadiusBuffer
+            gatheringRadiusBuffer,
+            
+            scene.sobolData.buffer
         ]
         
         let textures = [

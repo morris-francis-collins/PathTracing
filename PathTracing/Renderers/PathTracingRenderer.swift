@@ -62,6 +62,8 @@ class PathTracingRenderer: Renderer {
             
             MaterialRegistry.shared.getBuffer(),
             textureArgumentBuffer,
+        
+            scene.sobolData.buffer
         ]
         
         let textures = [

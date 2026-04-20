@@ -95,6 +95,8 @@ class BDPTRenderer: Renderer {
             
             MaterialRegistry.shared.getBuffer(),
             textureArgumentBuffer,
+            
+            scene.sobolData.buffer
         ]
         
         let textures = [

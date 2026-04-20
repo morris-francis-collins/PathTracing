@@ -525,6 +525,8 @@ kernel void bidirectionalPathTracingKernel(device float3* accmulationBuffer,
                              
                                            texture2d<unsigned int> randomTex,
                                            texture2d<float> environmentMapTexture,
+                                           
+                                           constant uint* sobolValues,
                              
                                            constant Uniforms& uniforms,
                                            device MTLAccelerationStructureInstanceDescriptor* instances,
@@ -536,7 +538,7 @@ kernel void bidirectionalPathTracingKernel(device float3* accmulationBuffer,
         return;
     
     unsigned int offset = randomTex.read(tid).x;
-    Sampler sampler(offset, uniforms.frameIndex);
+    Sampler sampler(offset, uniforms.frameIndex, sobolValues);
     
     float2 pixel = (float2) tid;
     pixel += sampler.r2() - 0.5f;
