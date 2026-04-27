@@ -8,7 +8,7 @@
 import MetalKit
 
 class SPPMRenderer: Renderer {
-    private let initialRadius: Float = 0.001 // TODO: adapt with scene size
+    private let initialRadius: Float = 0.01 // TODO: adapt with scene size
     
     private var createCameraRaysPipeline: MTLComputePipelineState!
     private var generateHitPointsPipeline: MTLComputePipelineState!

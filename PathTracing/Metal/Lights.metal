@@ -149,7 +149,7 @@ struct EnvironmentMapSample {
 
 static EnvironmentMapSample sampleEnvironmentMapAliasTable(constant Light& environmentMap, constant AliasEntry* environmentMapAliasEntries, float2 r2) {
     unsigned int pixels = environmentMap.environment.width * environmentMap.environment.height;
-    unsigned int index = floor(pixels * r2.x);
+    unsigned int index = clamp(uint(pixels * r2.x), 0u, pixels - 1u);
     
     if (environmentMapAliasEntries[index].acceptanceProbability > r2.y) {
         return {index, environmentMapAliasEntries[index].PMF};

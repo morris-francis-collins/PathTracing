@@ -14,7 +14,7 @@
 #include "PathTracing.h"
 
 #define HASH_TABLE_SIZE 3999971u
-#define PHOTON_COUNT (256 * 65536u)
+#define PHOTON_COUNT (2u * 65536u)
 #define ALPHA 0.65f
 
 #ifdef __METAL_VERSION__

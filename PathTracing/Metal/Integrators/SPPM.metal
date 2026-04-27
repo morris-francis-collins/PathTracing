@@ -124,13 +124,7 @@ kernel void generateHitPointsSPPM(device float* accumulation,
             ray.direction = bs.wo;
             continue;
         }
-        
-        float3 NEEContribution = sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, si, material, uniforms, instances, accelerationStructure);
-
-        accumulation[3 * pixelIndex + 0] += NEEContribution.r;
-        accumulation[3 * pixelIndex + 1] += NEEContribution.g;
-        accumulation[3 * pixelIndex + 2] += NEEContribution.b;
-        
+                
         uint hashedLocation = hashLocation(si.position, hashGridSize);
         hitPointBSDFs[pixelIndex] = throughput;
         hitPointLocations[pixelIndex] = si.position;
@@ -264,7 +258,7 @@ kernel void tracePhotonsSPPM(device atomic_float* accumulation,
         SurfaceInteraction si = getSurfaceInteraction(ray, ir, instances, accelerationStructure, instanceLightIndices, textures, materials);
         SampledMaterial material = si.material;
 
-        if (bounce > 0 and !material.isPerfectSpecular()) {
+        if (!material.isPerfectSpecular()) {
             float3 photonPosition = si.position;
             int3 cell = int3(floor(photonPosition / hashGridSize));
             
