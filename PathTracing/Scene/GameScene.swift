@@ -55,7 +55,7 @@ class GameScene: ObservableObject {
         self.device = device
         TextureRegistry.shared.reset()
         MaterialRegistry.shared.reset()
-        createEnvironmentMapCausticScene()
+        createTheWhiteRoomScene()
     }
         
     func addGeometry(_ mesh: Geometry) {
@@ -78,7 +78,7 @@ class GameScene: ObservableObject {
         createLightAliasTable()
         createLightTriangleAliasTable()
         
-        sobolData = Sobol(device: device, dimensions: 256)
+        sobolData = Sobol(device: device, dimensions: 1024)
         
         let options = getManagedBufferStorageMode()
                 

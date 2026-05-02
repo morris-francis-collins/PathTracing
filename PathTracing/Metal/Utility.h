@@ -10,7 +10,7 @@
 
 #define DEBUG(...) os_log_default.log_info(__VA_ARGS__)
 
-#define MAX_PATH_LENGTH 40
+#define MAX_PATH_LENGTH 10
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
 
@@ -83,6 +83,42 @@ inline bool isBlack(float3 w) {
 
 inline float3 reinhardTonemap(float3 x) {
     return x / (1.0f + x);
+}
+
+inline void addContribution(float3 contribution, uint pixelIndex, device atomic_float* accumulation) {
+    atomic_fetch_add_explicit(&accumulation[3 * pixelIndex + 0], contribution.r, memory_order_relaxed);
+    atomic_fetch_add_explicit(&accumulation[3 * pixelIndex + 1], contribution.g, memory_order_relaxed);
+    atomic_fetch_add_explicit(&accumulation[3 * pixelIndex + 2], contribution.b, memory_order_relaxed);
+}
+
+inline void addContribution(float3 contribution, uint pixelIndex, device float* accumulation) {
+    accumulation[3 * pixelIndex + 0] += contribution.r;
+    accumulation[3 * pixelIndex + 1] += contribution.g;
+    accumulation[3 * pixelIndex + 2] += contribution.b;
+}
+
+inline void setContribution(float3 contribution, uint pixelIndex, device atomic_float* accumulation) {
+    atomic_store_explicit(&accumulation[3 * pixelIndex + 0], contribution.r, memory_order_relaxed);
+    atomic_store_explicit(&accumulation[3 * pixelIndex + 1], contribution.g, memory_order_relaxed);
+    atomic_store_explicit(&accumulation[3 * pixelIndex + 2], contribution.b, memory_order_relaxed);
+}
+
+inline void setContribution(float3 contribution, uint pixelIndex, device float* accumulation) {
+    accumulation[3 * pixelIndex + 0] = contribution.r;
+    accumulation[3 * pixelIndex + 1] = contribution.g;
+    accumulation[3 * pixelIndex + 2] = contribution.b;
+}
+
+inline float3 getFloat3FromAccumulation(uint pixelIndex, device atomic_float* accumulation) {
+    return float3(atomic_load_explicit(&accumulation[3 * pixelIndex + 0], memory_order_relaxed),
+                  atomic_load_explicit(&accumulation[3 * pixelIndex + 1], memory_order_relaxed),
+                  atomic_load_explicit(&accumulation[3 * pixelIndex + 2], memory_order_relaxed));
+}
+
+inline float3 getFloat3FromAccumulation(uint pixelIndex, device float* accumulation) {
+    return float3(accumulation[3 * pixelIndex + 0],
+                  accumulation[3 * pixelIndex + 1],
+                  accumulation[3 * pixelIndex + 2]);
 }
 
 void cameraRayPDF(constant Uniforms& uniforms, float3 w, thread float& positionPDF, thread float& directionPDF);

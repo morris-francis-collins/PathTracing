@@ -18,7 +18,6 @@ class BDPTRenderer: Renderer {
     
     override init(device: any MTLDevice, scene: GameScene) {
         super.init(device: device, scene: scene)
-        
         createBDPTPipelines()
     }
     

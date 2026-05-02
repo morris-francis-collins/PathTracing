@@ -78,9 +78,6 @@ float3 pathIntegrator(float2 pixel,
     float PDF = 0.0f;
     bool prevSpecular = true;
     
-    bool inMedium = false;
-    float attenuationDistance = 0.0f;
-    
     for (int bounce = 0; bounce < MAX_PATH_LENGTH; bounce++) {
         IntersectionResult intersection = intersect<false>(ray, accelerationStructure);
         
@@ -128,7 +125,7 @@ float3 pathIntegrator(float2 pixel,
             constant Light& light = lights[surfaceInteraction.lightIndex];
             float3 color = surfaceInteraction.emission;
 
-            if (prevSpecular) {
+            if (true or prevSpecular) {
                 contribution += throughput * color;
             } else {
                 float lightPDF = getLightSelectionPDF(light, lightAliasEntries) * getLightSamplePDF(light);
@@ -141,11 +138,10 @@ float3 pathIntegrator(float2 pixel,
         
         PDF = bsdfSample.PDF;
         float3 wo = bsdfSample.wo;
-        inMedium ^= bsdfSample.transmitted;
         float epsilon = calculateEpsilon(surfaceInteraction.position);
         prevSpecular = bsdfSample.delta;
 
-        if (!bsdfSample.delta) {
+        if (false and !bsdfSample.delta) {
             contribution += sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, surfaceInteraction, material, uniforms, instances, accelerationStructure);
         }
                 
@@ -167,7 +163,8 @@ float3 pathIntegrator(float2 pixel,
     return contribution;
 }
  
-kernel void pathTracingKernel(device float3* accmulationBuffer,
+kernel void pathTracingKernel(device float* accumulation,
+                              
                               constant Light* lights,
                               constant LightTriangle* lightTriangles,
                               constant int* instanceLightIndices,
@@ -199,22 +196,24 @@ kernel void pathTracingKernel(device float3* accmulationBuffer,
     
     float3 contribution = pathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, sampler, textures, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
     
-    if (uniforms.frameIndex == 0u) {
-        accmulationBuffer[tid.y * uniforms.width + tid.x] = float3(0.0f);
-    }
-    accmulationBuffer[tid.y * uniforms.width + tid.x] += contribution;
+    uint pixelIndex = tid.y * uniforms.width + tid.x;
+    
+    if (uniforms.frameIndex == 0u)
+        setContribution(float3(0.0f), pixelIndex, accumulation);
+    addContribution(contribution, pixelIndex, accumulation);
 }
 
-kernel void finalizeAccumulation(uint2 tid [[thread_position_in_grid]],
-                                device float3* accumulation,
-                                constant Uniforms& uniforms,
-                                texture2d<float, access::read_write> finalImage)
+kernel void finalizeAccumulation(device float* accumulation,
+                                 constant Uniforms& uniforms,
+                                 texture2d<float, access::read_write> finalImage,
+                                 
+                                 uint2 tid [[thread_position_in_grid]])
 {
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
         return;
     
     uint pixelIndex = tid.y * uniforms.width + tid.x;
-    float3 contribution = accumulation[pixelIndex];
+    float3 contribution = getFloat3FromAccumulation(pixelIndex, accumulation);
     
     float3 color = contribution / (uniforms.frameIndex + 1.0f);
     finalImage.write(float4(color, 1.0f), tid);

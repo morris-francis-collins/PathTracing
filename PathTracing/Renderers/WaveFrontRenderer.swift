@@ -32,23 +32,14 @@ class WaveFrontRenderer: Renderer {
         
     override init(device: any MTLDevice, scene: GameScene) {
         super.init(device: device, scene: scene)
-        
         createWaveFrontPipelines()
     }
     
-    
     private func createWaveFrontPipelines() {
-        let createCameraRaysFunction = library.makeFunction(name: "createCameraRays")!
-        createCameraRaysPipeline = newComputePipelineState(function: createCameraRaysFunction)
-        
-        let calculateIntersectionsFunction = library.makeFunction(name: "calculateIntersections")!
-        calculateIntersectionsPipeline = newComputePipelineState(function: calculateIntersectionsFunction)
-        
-        let calculateIntersectionsWithCompactionFunction = library.makeFunction(name: "calculateIntersectionsWithCompaction")!
-        calculateIntersectionsWithCompactionPipeline = newComputePipelineState(function: calculateIntersectionsWithCompactionFunction)
-        
-        let sampleBXDFsFunction = library.makeFunction(name: "sampleBXDFs")!
-        sampleBXDFsPipeline = newComputePipelineState(function: sampleBXDFsFunction)
+        createCameraRaysPipeline = newComputePipelineState(function: library.makeFunction(name: "createCameraRays")!)
+        calculateIntersectionsPipeline = newComputePipelineState(function: library.makeFunction(name: "calculateIntersections")!)
+        calculateIntersectionsWithCompactionPipeline = newComputePipelineState(function: library.makeFunction(name: "calculateIntersectionsWithCompaction")!)
+        sampleBXDFsPipeline = newComputePipelineState(function: library.makeFunction(name: "sampleBXDFs")!)
     }
     
     private func createWaveFrontBuffers(maxRays: Int) {
@@ -90,6 +81,8 @@ class WaveFrontRenderer: Renderer {
         commandEncoder.setComputePipelineState(createCameraRaysPipeline)
         
         let buffers = [
+            accumulationBuffer,
+
             rayBuffers[currentBuffer].origins,
             rayBuffers[currentBuffer].directions,
             rayBuffers[currentBuffer].throughputs,
@@ -98,7 +91,6 @@ class WaveFrontRenderer: Renderer {
             rayBuffers[currentBuffer].rayAlive,
             
             rayCountBuffer,
-            accumulationBuffer
         ]
         
         for (i, buffer) in buffers.enumerated() {
@@ -258,6 +250,8 @@ class WaveFrontRenderer: Renderer {
         commandEncoder.setComputePipelineState(sampleBXDFsPipeline)
         
         let buffers: [MTLBuffer?] = [
+            accumulationBuffer,
+
             rayBuffers[currentBuffer].origins,
             rayBuffers[currentBuffer].directions,
             rayBuffers[currentBuffer].throughputs,
@@ -273,7 +267,6 @@ class WaveFrontRenderer: Renderer {
             rayCountBuffer,
             nextRayCountBuffer,
             rayBuffers[currentBuffer].rayAlive,
-            accumulationBuffer,
             
             intersectionPositionsBuffer,
             intersectionNormalsBuffer,
@@ -303,10 +296,8 @@ class WaveFrontRenderer: Renderer {
         
         let requiredPixels = Int(size.width) * Int(size.height)
 
-        if requiredPixels > bufferPixels || requiredPixels < bufferPixels / 2 {
-            createWaveFrontBuffers(maxRays: requiredPixels)
-            bufferPixels = requiredPixels
-        }
+        createWaveFrontBuffers(maxRays: requiredPixels)
+        bufferPixels = requiredPixels
     }
     
     override func draw(in view: MTKView) {

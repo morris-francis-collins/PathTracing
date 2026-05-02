@@ -266,7 +266,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         let requiredPixels = Int(size.width) * Int(size.height)
         if requiredPixels > bufferPixels || requiredPixels < bufferPixels / 2 {
-            let bufferSize = requiredPixels * MemoryLayout<SIMD3<Float>>.stride
+            let bufferSize = 3 * requiredPixels * MemoryLayout<Float>.stride
             accumulationBuffer = device.makeBuffer(length: bufferSize, options: .storageModeShared)
             bufferPixels = requiredPixels
         }

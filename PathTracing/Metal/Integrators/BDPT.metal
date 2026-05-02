@@ -512,8 +512,9 @@ float3 bidirectionalPathIntegrator(float2 pixel,
     return totalContribution;
 }
 
-kernel void bidirectionalPathTracingKernel(device float3* accmulationBuffer,
+kernel void bidirectionalPathTracingKernel(device float* accumulation,
                                            device atomic_float* splatBuffer,
+                                           
                                            constant Light* lights,
                                            constant LightTriangle* lightTriangles,
                                            constant int* instanceLightIndices,
@@ -545,24 +546,23 @@ kernel void bidirectionalPathTracingKernel(device float3* accmulationBuffer,
     
     float3 contribution = bidirectionalPathIntegrator(pixel, uniforms, instances, accelerationStructure, lights, lightTriangles, instanceLightIndices, textures, sampler, splatBuffer, materials, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries);
     
-    accmulationBuffer[tid.y * uniforms.width + tid.x] += contribution;
+    addContribution(contribution, tid.y * uniforms.width + tid.x, accumulation);
 }
 
-kernel void finalizeAccumulationBDPT(uint2 tid [[thread_position_in_grid]],
-                                    device float3* accumulation,
-                                    device atomic_float* splatAccmulation,
-                                    constant Uniforms& uniforms,
-                                    texture2d<float, access::read_write> finalImage)
+kernel void finalizeAccumulationBDPT(device float* accumulation,
+                                     device float* splatAccmulation,
+                                     constant Uniforms& uniforms,
+                                     texture2d<float, access::read_write> finalImage,
+                                     
+                                     uint2 tid [[thread_position_in_grid]])
 {
     if (tid.x >= uniforms.width || tid.y >= uniforms.height)
         return;
     
     uint pixelIndex = tid.y * uniforms.width + tid.x;
-    float3 contribution = accumulation[pixelIndex];
-    float3 splatContribution = float3(atomic_load_explicit(&splatAccmulation[3 * pixelIndex + 0], memory_order_relaxed),
-                                      atomic_load_explicit(&splatAccmulation[3 * pixelIndex + 1], memory_order_relaxed),
-                                      atomic_load_explicit(&splatAccmulation[3 * pixelIndex + 2], memory_order_relaxed));
+    float3 contribution = getFloat3FromAccumulation(pixelIndex, accumulation);
+    float3 splatContribution = getFloat3FromAccumulation(pixelIndex, splatAccmulation);
     
-    float3 color = (contribution + splatContribution) / (uniforms.frameIndex + 1);
+    float3 color = (contribution + splatContribution) / (uniforms.frameIndex + 1u);
     finalImage.write(float4(color, 1.0f), tid);
 }

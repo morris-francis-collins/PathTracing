@@ -12,17 +12,9 @@
 using namespace metal;
 using namespace raytracing;
 
-void addContribution(float3 contribution, texture2d<float, access::read_write> texture, constant Uniforms& uniforms, uint2 pixel) {
-    if (uniforms.frameIndex > 0) {
-        float3 prev_color = texture.read(pixel).xyz * uniforms.frameIndex;
-        contribution += prev_color;
-        contribution /= (uniforms.frameIndex + 1);
-    }
-    
-    texture.write(float4(contribution, 1.0f), pixel);
-}
-
-kernel void createCameraRays(device float3* rayOrigins,
+kernel void createCameraRays(device atomic_float* accumulation,
+                             
+                             device float3* rayOrigins,
                              device float3* rayDirections,
                              device float3* rayThroughput,
                              device uint* pixelIndices,
@@ -30,7 +22,6 @@ kernel void createCameraRays(device float3* rayOrigins,
                              device bool* rayAlive,
 
                              device atomic_uint* rayCount,
-                             device float3* accumulation,
                              
                              constant Uniforms& uniforms,
                              
@@ -50,7 +41,6 @@ kernel void createCameraRays(device float3* rayOrigins,
     rngStates[pixelIndex] = rng_state;
     
     rayAlive[pixelIndex] = true;
-    accumulation[pixelIndex] = float3(0.0f);
 }
 
 kernel void calculateIntersections(device float3* rayOrigins,
@@ -181,7 +171,9 @@ kernel void calculateIntersectionsWithCompaction(device float3* rayOrigins,
     intersectionEmission[intersectionIndex] = si.emission;
 }
 
-kernel void sampleBXDFs(device float3* rayOrigins,
+kernel void sampleBXDFs(device atomic_float* accumulation,
+                        
+                        device float3* rayOrigins,
                         device float3* rayDirections,
                         device float3* rayThroughput,
                         device uint* pixelIndices,
@@ -196,7 +188,6 @@ kernel void sampleBXDFs(device float3* rayOrigins,
                         device atomic_uint* rayCount,
                         device atomic_uint* nextRayCount,
                         device bool* rayAlive,
-                        device float3* accumulation,
                         
                         device float3* intersectionPositions,
                         device float3* intersectionNormals,
@@ -232,9 +223,9 @@ kernel void sampleBXDFs(device float3* rayOrigins,
     float3 emission = intersectionEmission[rayIndex];
         
     if (lightIndex != -1) {
-        accumulation[pixelIndex] += throughput * emission;
+        addContribution(throughput * emission, pixelIndex, accumulation);
     }
-    
+
     SampledMaterial material = intersectionSampledMaterials[rayIndex];
     BSDFSample bsdfSample = sampleBXDF(wi, normal, material, Radiance, float3(prng(rng_state), prng(rng_state), prng(rng_state)));
     
@@ -242,7 +233,7 @@ kernel void sampleBXDFs(device float3* rayOrigins,
         rayAlive[rayIndex] = false;
         return;
     }
-    
+
     float3 wo = bsdfSample.wo;
     float cosTheta = abs(dot(wo, normal));
     float3 newThroughput = throughput * bsdfSample.BSDF * cosTheta / bsdfSample.PDF;
