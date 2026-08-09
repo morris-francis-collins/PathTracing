@@ -12,16 +12,15 @@
 using namespace metal;
 using namespace raytracing;
 
-kernel void createCameraRays(device atomic_float* accumulation,
+kernel void createCameraRays(device float* accumulation,
                              
                              device float3* rayOrigins,
                              device float3* rayDirections,
                              device float3* rayThroughput,
                              device uint* pixelIndices,
-                             device uint* rngStates,
-                             device bool* rayAlive,
-
-                             device atomic_uint* rayCount,
+                             device uint* rngDimension,
+                             
+                             constant uint* sobolValues,
                              
                              constant Uniforms& uniforms,
                              
@@ -31,145 +30,101 @@ kernel void createCameraRays(device atomic_float* accumulation,
         return;
 
     uint pixelIndex = tid.y * uniforms.width + tid.x;
-    uint rng_state = init_prng(pixelIndex, uniforms.frameIndex);
-    float2 pixel = static_cast<float2>(tid) + float2(prng(rng_state), prng(rng_state)) - 0.5f;
+    rngDimension[pixelIndex] = 0u;
+    
+    Sampler sampler(pixelIndex, uniforms.frameIndex, sobolValues);
+    float2 pixel = static_cast<float2>(tid) + sampler.r2() - 0.5f;
+
+    if (uniforms.frameIndex == 0u)
+        setContribution(float3(0.0f), pixelIndex, accumulation);
     
     rayOrigins[pixelIndex] = uniforms.camera.position;
     rayDirections[pixelIndex] = generateRayDirection(pixel, uniforms);
     rayThroughput[pixelIndex] = float3(1.0f);
     pixelIndices[pixelIndex] = pixelIndex;
-    rngStates[pixelIndex] = rng_state;
-    
-    rayAlive[pixelIndex] = true;
+    rngDimension[pixelIndex] = sampler.dimension;
 }
 
 kernel void calculateIntersections(device float3* rayOrigins,
                                    device float3* rayDirections,
                                    device float3* rayThroughput,
-                                   device uint* pixelIndices,
-                                   device uint* rngStates,
-                                   device bool* rayAlive,
                                    
-                                   device atomic_uint* rayCount,
+                                   device IntersectionResult* intersectionResults,
                                    
-                                   device atomic_uint* intersectionCount,
-                                   device float3* intersectionPositions,
-                                   device float3* intersectionNormals,
-                                   device SampledMaterial* intersectionSampledMaterials,
-                                   device int* intersectionLightIndices,
-                                   device float3* intersectionEmission,
+                                   device uint* escapedQueue,
+                                   device uint* intersectedQueue,
+                                   
+                                   constant uint& rayCount,
+                                   device atomic_uint& escapedRayCount,
+                                   device atomic_uint& intersectedRayCount,
                                    
                                    constant Textures* textures,
                                    constant Material* materials,
                                    constant int* instanceLightIndices,
                                    
-                                   device MTLAccelerationStructureInstanceDescriptor* instances,
                                    constant Uniforms& uniforms,
+                                   device MTLAccelerationStructureInstanceDescriptor* instances,
                                    instance_acceleration_structure accelerationStructure,
-                                   
+
                                    uint tid [[thread_position_in_grid]])
 {
-    uint currentRayCount = atomic_load_explicit(rayCount, memory_order_relaxed);
-
-    if (tid >= currentRayCount) {
+    if (tid >= rayCount) {
         return;
     }
     
-    uint rayIndex = tid;
-
     ray r;
-    r.origin = rayOrigins[rayIndex];
-    r.direction = rayDirections[rayIndex];
-    r.min_distance = 0.001f;
+    r.origin = rayOrigins[tid];
+    r.direction = rayDirections[tid];
+    r.min_distance = 1e-4f;
     r.max_distance = INFINITY;
         
-    IntersectionResult intres = intersect<false>(r, accelerationStructure);
+    IntersectionResult ir = intersect<false>(r, accelerationStructure);
             
-    if (intres.type == intersection_type::none) {
-        rayAlive[rayIndex] = false;
-        return;
+    if (ir.type == intersection_type::none) {
+        uint index = atomic_fetch_add_explicit(&escapedRayCount, 1u, memory_order_relaxed);
+        escapedQueue[index] = tid;
+    } else {
+        uint index = atomic_fetch_add_explicit(&intersectedRayCount, 1u, memory_order_relaxed);
+        intersectedQueue[index] = tid;
+        intersectionResults[index] = ir;
     }
-    
-    rayAlive[rayIndex] = true;
-    
-    SurfaceInteraction si = getSurfaceInteraction(r, intres, instances, accelerationStructure, instanceLightIndices, textures, materials);
-    intersectionPositions[rayIndex] = si.position;
-    intersectionNormals[rayIndex] = si.normal;
-    intersectionSampledMaterials[rayIndex] = si.material;
-    intersectionLightIndices[rayIndex] = si.lightIndex;
-    intersectionEmission[rayIndex] = si.emission;
 }
 
-kernel void calculateIntersectionsWithCompaction(device float3* rayOrigins,
-                                                 device float3* rayDirections,
-                                                 device float3* rayThroughput,
-                                                 device uint* pixelIndices,
-                                                 device uint* rngStates,
-                                                 device bool* rayAlive,
-                                   
-                                                 device float3* nextRayOrigins,
-                                                 device float3* nextRayDirections,
-                                                 device float3* nextRayThroughput,
-                                                 device uint* nextPixelIndices,
-                                                 device uint* nextRngStates,
-                                                 device bool* nextRayAlive,
+kernel void handleEscapedRays(device atomic_float* accumulation,
+                              
+                              device float3* rayDirections,
+                              device float3* rayThroughput,
+                              device uint* pixelIndices,
+                              
+                              device uint* escapedQueue,
+                              
+                              texture2d<float> environmentMapTexture,
+                                                            
+                              device uint& escapedRayCount,
+                              
+                              constant Uniforms& uniforms,
 
-                                                 device atomic_uint* rayCount,
-                                   
-                                                 device atomic_uint* intersectionCount,
-                                                 device float3* intersectionPositions,
-                                                 device float3* intersectionNormals,
-                                                 device SampledMaterial* intersectionSampledMaterials,
-                                                 device int* intersectionLightIndices,
-                                                 device float3* intersectionEmission,
-                                   
-                                                 constant Textures* textures,
-                                                 constant Material* materials,
-                                                 constant int* instanceLightIndices,
-                                   
-                                                 device MTLAccelerationStructureInstanceDescriptor* instances,
-                                                 constant Uniforms& uniforms,
-                                                 instance_acceleration_structure accelerationStructure,
-                                                 
-                                                 uint tid [[thread_position_in_grid]])
+                              uint tid [[thread_position_in_grid]])
 {
-    uint currentRayCount = atomic_load_explicit(rayCount, memory_order_relaxed);
-
-    if (tid >= currentRayCount) {
+    if (tid >= escapedRayCount) {
         return;
     }
     
-    uint rayIndex = tid;
+    uint rayIndex = escapedQueue[tid];
+    int environmentMapLightIndex = uniforms.environmentMapLightIndex;
 
-    ray r;
-    r.origin = rayOrigins[rayIndex];
-    r.direction = rayDirections[rayIndex];
-    r.min_distance = 0.001f;
-    r.max_distance = INFINITY;
+    if (environmentMapLightIndex == -1)
+        return;
+    
+    float2 uv = getEnvironmentMapUV(rayDirections[rayIndex]);
+    float3 emission = environmentMapEmission(environmentMapTexture, uv);
+    float3 throughput = rayThroughput[rayIndex];
+    uint pixelIndex = pixelIndices[rayIndex];
         
-    IntersectionResult intres = intersect<false>(r, accelerationStructure);
-            
-    if (intres.type == intersection_type::none) {
-        return;
-    }
-    
-    uint intersectionIndex = atomic_fetch_add_explicit(intersectionCount, 1, memory_order_relaxed);
-    
-    nextRayOrigins[intersectionIndex] = rayOrigins[rayIndex];
-    nextRayDirections[intersectionIndex] = rayDirections[rayIndex];
-    nextRayThroughput[intersectionIndex] = rayThroughput[rayIndex];
-    nextPixelIndices[intersectionIndex] = pixelIndices[rayIndex];
-    nextRngStates[intersectionIndex] = rngStates[rayIndex];
-    nextRayAlive[intersectionIndex] = true;
-    
-    SurfaceInteraction si = getSurfaceInteraction(r, intres, instances, accelerationStructure, instanceLightIndices, textures, materials);
-    // TODO: add alpha interactions and normal flipping for thin surfaces
-    intersectionPositions[intersectionIndex] = si.position;
-    intersectionNormals[intersectionIndex] = si.normal;
-    intersectionSampledMaterials[intersectionIndex] = si.material;
-    intersectionLightIndices[intersectionIndex] = si.lightIndex;
-    intersectionEmission[intersectionIndex] = si.emission;
+    float3 contribution = throughput * emission;
+    addContribution(contribution, pixelIndex, accumulation);
 }
+
 
 kernel void sampleBXDFs(device atomic_float* accumulation,
                         
@@ -177,83 +132,86 @@ kernel void sampleBXDFs(device atomic_float* accumulation,
                         device float3* rayDirections,
                         device float3* rayThroughput,
                         device uint* pixelIndices,
-                        device uint* rngStates,
+                        device uint* rngDimensions,
                         
                         device float3* nextRayOrigins,
                         device float3* nextRayDirections,
                         device float3* nextRayThroughput,
                         device uint* nextPixelIndices,
-                        device uint* nextRngStates,
+                        device uint* nextRngDimensions,
                         
-                        device atomic_uint* rayCount,
-                        device atomic_uint* nextRayCount,
-                        device bool* rayAlive,
+                        device IntersectionResult* intersectionResults,
                         
-                        device float3* intersectionPositions,
-                        device float3* intersectionNormals,
-                        device SampledMaterial* intersectionSampledMaterials,
-                        device int* intersectionLightIndices,
-                        device float3* intersectionEmission,
+                        device uint* intersectedQueue,
+                        
+                        device uint& intersectedCount,
+                        device atomic_uint& survivedCount,
+                        
+                        constant uint* sobolValues,
+                        constant Textures* textures,
+                        constant Material* materials,
+                        constant int* instanceLightIndices,
                         
                         constant Uniforms& uniforms,
+                        device MTLAccelerationStructureInstanceDescriptor* instances,
+                        instance_acceleration_structure accelerationStructure,
                         constant uint& bounceIndex,
-                        
+
                         uint tid [[thread_position_in_grid]])
 {
-    uint currentRayCount = atomic_load_explicit(rayCount, memory_order_relaxed);
-
-    if (tid >= currentRayCount) {
+    if (tid >= intersectedCount) {
         return;
     }
 
-    uint rayIndex = tid;
+    uint rayIndex = intersectedQueue[tid];
     uint pixelIndex = pixelIndices[rayIndex];
+    IntersectionResult ir = intersectionResults[tid];
+    Sampler sampler(tid, uniforms.frameIndex, sobolValues); sampler.dimension = rngDimensions[rayIndex];
     
-    if (!rayAlive[rayIndex]) {
-        return;
-    }
+    ray r;
+    r.origin = rayOrigins[rayIndex];
+    r.direction = rayDirections[rayIndex];
+    r.min_distance = 1e-4f;
+    r.max_distance = INFINITY;
     
-    device uint& rng_state = rngStates[rayIndex];
+    auto si = getSurfaceInteraction(r, ir, instances, accelerationStructure, instanceLightIndices, textures, materials);
     
     float3 throughput = rayThroughput[rayIndex];
-    float3 normal = intersectionNormals[rayIndex];
-    float3 position = intersectionPositions[rayIndex];
+    float3 normal = si.normal;
+    float3 position = si.position;
     float3 wi = -rayDirections[rayIndex];
-    int lightIndex = intersectionLightIndices[rayIndex];
-    float3 emission = intersectionEmission[rayIndex];
+    int lightIndex = si.lightIndex;
+    float3 emission = si.emission;
         
     if (lightIndex != -1) {
         addContribution(throughput * emission, pixelIndex, accumulation);
     }
 
-    SampledMaterial material = intersectionSampledMaterials[rayIndex];
-    BSDFSample bsdfSample = sampleBXDF(wi, normal, material, Radiance, float3(prng(rng_state), prng(rng_state), prng(rng_state)));
-    
-    if (bsdfSample.PDF <= 0.0f || isBlack(bsdfSample.BSDF)) {
-        rayAlive[rayIndex] = false;
-        return;
-    }
+    SampledMaterial material = si.material;
+    BSDFSample bsdfSample = sampleBXDF(wi, normal, material, Radiance, sampler.r3());
 
     float3 wo = bsdfSample.wo;
     float cosTheta = abs(dot(wo, normal));
-    float3 newThroughput = throughput * bsdfSample.BSDF * cosTheta / bsdfSample.PDF;
+    throughput *= bsdfSample.BSDF * cosTheta / bsdfSample.PDF;
+    
+    if (isBlack(throughput))
+        return;
     
     if (bounceIndex > 4) {
-        float q = clamp(calculateLuminance(newThroughput), 0.01f, 1.0f);
-        if (prng(rng_state) > q) {
-            rayAlive[rayIndex] = false;
+        float q = clamp(calculateLuminance(throughput), 0.05f, 1.0f);
+        if (sampler.r() > q) {
             return;
         }
-        newThroughput /= q;
+        throughput /= q;
     }
         
-    uint nextRayIndex = atomic_fetch_add_explicit(nextRayCount, 1, memory_order_relaxed);
+    uint nextRayIndex = atomic_fetch_add_explicit(&survivedCount, 1u, memory_order_relaxed);
     
     float3 offsetOrigin = position + normal * 0.001f * sign(dot(wo, normal));
     
     nextRayOrigins[nextRayIndex] = offsetOrigin;
     nextRayDirections[nextRayIndex] = wo;
-    nextRayThroughput[nextRayIndex] = newThroughput;
+    nextRayThroughput[nextRayIndex] = throughput;
     nextPixelIndices[nextRayIndex] = pixelIndex;
-    nextRngStates[nextRayIndex] = rng_state;
+    nextRngDimensions[nextRayIndex] = sampler.dimension;
 }

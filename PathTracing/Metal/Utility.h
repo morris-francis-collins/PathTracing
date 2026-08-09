@@ -10,9 +10,12 @@
 
 #define DEBUG(...) os_log_default.log_info(__VA_ARGS__)
 
-#define MAX_PATH_LENGTH 10
+#define MAX_PATH_LENGTH 30
 #define MAX_CAMERA_PATH_LENGTH (MAX_PATH_LENGTH + 2)
 #define MAX_LIGHT_PATH_LENGTH (MAX_PATH_LENGTH + 1)
+
+#define RR_MIN_BOUNCE 4
+#define RR_MIN_SURVIVAL 0.05f
 
 #define CAMERA_FOV_ANGLE 60.0f
 #define MAX_TEXTURES 512
@@ -79,6 +82,12 @@ inline float powerHeuristic(float main, float other) {
 
 inline bool isBlack(float3 w) {
     return all(w < 1e-20f);
+}
+
+inline float russianRoulette(float3 throughput, uint bounce) {
+    if (bounce < RR_MIN_BOUNCE)
+        return 1.0f;
+    return clamp(calculateLuminance(throughput), RR_MIN_SURVIVAL, 1.0f);
 }
 
 inline float3 reinhardTonemap(float3 x) {

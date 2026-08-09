@@ -49,7 +49,7 @@ class BDPTRenderer: Renderer {
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 2)
         commandEncoder.setTexture(finalImage, index: 0)
         
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
         commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         commandEncoder.endEncoding()
     }
@@ -76,7 +76,7 @@ class BDPTRenderer: Renderer {
         processCameraInput()
         updateUniforms()
                 
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: BDPTPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: BDPTPipeline)
                 
         guard let computeEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return

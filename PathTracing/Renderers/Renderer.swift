@@ -341,12 +341,10 @@ class Renderer: NSObject, MTKViewDelegate {
         let threadWidth = pipeline.threadExecutionWidth
         let threadHeight = pipeline.maxTotalThreadsPerThreadgroup / threadWidth
         
+        let threadgroups = MTLSize(width: (Int(drawableSize.width) + threadWidth - 1) / threadWidth, height: (Int(drawableSize.height) + threadHeight - 1) / threadHeight, depth: 1)
         let threadsPerThreadGroup = MTLSize(width: threadWidth, height: threadHeight, depth: 1)
-        let threadGroups = MTLSize(width: (Int(drawableSize.width) + threadWidth - 1) / threadWidth,
-                                   height: (Int(drawableSize.height) + threadHeight - 1) / threadHeight,
-                                   depth: 1)
 
-        return (threadsPerThreadGroup, threadGroups)
+        return (threadgroups, threadsPerThreadGroup)
     }
     
     func finalizeAccumulation(commandBuffer: MTLCommandBuffer) {
@@ -360,13 +358,11 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
         commandEncoder.setTexture(finalImage, index: 0)
         
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
         commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         commandEncoder.endEncoding()
     }
 }
-
-
 
 func getManagedBufferStorageMode() -> MTLResourceOptions {
 #if os(iOS)

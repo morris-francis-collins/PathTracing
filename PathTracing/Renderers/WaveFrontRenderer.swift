@@ -14,22 +14,24 @@ import SwiftUI
 class WaveFrontRenderer: Renderer {
     private var createCameraRaysPipeline: MTLComputePipelineState!
     private var calculateIntersectionsPipeline: MTLComputePipelineState!
-    private var calculateIntersectionsWithCompactionPipeline: MTLComputePipelineState!
+    private var handleEscapedRaysPipeline: MTLComputePipelineState!
     private var sampleBXDFsPipeline: MTLComputePipelineState!
     
     private var rayBuffers: [RayBuffers] = []
     private var currentBuffer: Int = 0
+        
+    private var escapedQueueBuffer: MTLBuffer!
+    private var intersectedQueueBuffer: MTLBuffer!
+    
+    private var intersectionResultBuffer: MTLBuffer!
     
     private var rayCountBuffer: MTLBuffer!
-    private var nextRayCountBuffer: MTLBuffer!
-    private var intersectionCountBuffer: MTLBuffer!
+    private var rayCount: UInt32 { rayCountBuffer.contents().load(as: UInt32.self) }
     
-    private var intersectionPositionsBuffer: MTLBuffer!
-    private var intersectionNormalsBuffer: MTLBuffer!
-    private var intersectionSampledMaterialsBuffer: MTLBuffer!
-    private var intersectionLightIndicesBuffer: MTLBuffer!
-    private var intersectionEmissionBuffer: MTLBuffer!
-        
+    private var escapedRayCountBuffer: MTLBuffer!
+    private var intersectedRayCountBuffer: MTLBuffer!
+    private var survivedRayCountBuffer: MTLBuffer!
+    
     override init(device: any MTLDevice, scene: GameScene) {
         super.init(device: device, scene: scene)
         createWaveFrontPipelines()
@@ -38,7 +40,7 @@ class WaveFrontRenderer: Renderer {
     private func createWaveFrontPipelines() {
         createCameraRaysPipeline = newComputePipelineState(function: library.makeFunction(name: "createCameraRays")!)
         calculateIntersectionsPipeline = newComputePipelineState(function: library.makeFunction(name: "calculateIntersections")!)
-        calculateIntersectionsWithCompactionPipeline = newComputePipelineState(function: library.makeFunction(name: "calculateIntersectionsWithCompaction")!)
+        handleEscapedRaysPipeline = newComputePipelineState(function: library.makeFunction(name: "handleEscapedRays")!)
         sampleBXDFsPipeline = newComputePipelineState(function: library.makeFunction(name: "sampleBXDFs")!)
     }
     
@@ -49,48 +51,37 @@ class WaveFrontRenderer: Renderer {
                                          directions: device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModePrivate)!,
                                          throughputs: device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModePrivate)!,
                                          pixelIndices: device.makeBuffer(length: maxRays * MemoryLayout<UInt32>.stride, options: .storageModePrivate)!,
-                                         rngStates: device.makeBuffer(length: maxRays * MemoryLayout<UInt32>.stride, options: .storageModePrivate)!,
-                                         rayAlive: device.makeBuffer(length: maxRays * MemoryLayout<Bool>.stride, options: .storageModePrivate)!)
+                                         rngDimensions: device.makeBuffer(length: maxRays * MemoryLayout<UInt32>.stride, options: .storageModePrivate)!)
             )
         }
         
-        rayCountBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
-        nextRayCountBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
-        intersectionCountBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
-        
         accumulationBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModePrivate)
+                
+        escapedQueueBuffer = device.makeBuffer(length: maxRays * MemoryLayout<UInt32>.stride, options: .storageModePrivate)
+        intersectedQueueBuffer = device.makeBuffer(length: maxRays * MemoryLayout<UInt32>.stride, options: .storageModePrivate)
         
-        intersectionPositionsBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModePrivate)
-        intersectionNormalsBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModePrivate)
-        intersectionSampledMaterialsBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SampledMaterial>.stride, options: .storageModePrivate)
-        intersectionLightIndicesBuffer = device.makeBuffer(length: maxRays * MemoryLayout<Int32>.stride, options: .storageModePrivate)
-        intersectionEmissionBuffer = device.makeBuffer(length: maxRays * MemoryLayout<SIMD3<Float>>.stride, options: .storageModePrivate)
+        intersectionResultBuffer = device.makeBuffer(length: maxRays * Int(INTERSECTION_RESULT_STRIDE), options: .storageModePrivate)
+        
+        var initialRays = maxRays
+        rayCountBuffer = device.makeBuffer(bytes: &initialRays, length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
+        escapedRayCountBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
+        intersectedRayCountBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
+        survivedRayCountBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
     }
     
-    private func createCameraRays(commandBuffer: MTLCommandBuffer, threadgroups: MTLSize, threadsPerThreadgroup: MTLSize) {
-        let blitEncoder = commandBuffer.makeBlitCommandEncoder()!
-        let initialCount = UInt32(drawableSize.width) * UInt32(drawableSize.height)
-        rayCountBuffer.contents().storeBytes(of: initialCount, as: UInt32.self)
-        blitEncoder.fill(buffer: nextRayCountBuffer, range: 0..<MemoryLayout<UInt32>.stride, value: 0)
-        blitEncoder.endEncoding()
-        
-        guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else {
-            return
-        }
-        
+    private func createCameraRays(_ commandEncoder: MTLComputeCommandEncoder) {
         commandEncoder.setComputePipelineState(createCameraRaysPipeline)
         
         let buffers = [
             accumulationBuffer,
-
+            
             rayBuffers[currentBuffer].origins,
             rayBuffers[currentBuffer].directions,
             rayBuffers[currentBuffer].throughputs,
             rayBuffers[currentBuffer].pixelIndices,
-            rayBuffers[currentBuffer].rngStates,
-            rayBuffers[currentBuffer].rayAlive,
+            rayBuffers[currentBuffer].rngDimensions,
             
-            rayCountBuffer,
+            scene.sobolData.buffer,
         ]
         
         for (i, buffer) in buffers.enumerated() {
@@ -99,151 +90,94 @@ class WaveFrontRenderer: Renderer {
         
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
         
+        // dispatch
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: createCameraRaysPipeline)
         commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
-        commandEncoder.endEncoding()
     }
     
-    private func calculateIntersections(commandBuffer: MTLCommandBuffer, rayCount: Int) {
-        guard rayCount > 0 else { return }
-        
-        let blitEncoder = commandBuffer.makeBlitCommandEncoder()!
-        blitEncoder.fill(buffer: intersectionCountBuffer, range: 0..<MemoryLayout<UInt32>.stride, value: 0)
-        blitEncoder.fill(buffer: rayBuffers[1 - currentBuffer].rayAlive, range: 0..<rayBuffers[1 - currentBuffer].rayAlive.length, value: 0)
-        blitEncoder.endEncoding()
-        
-        guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else { return }
-        
+    private func calculateIntersections(_ commandEncoder: MTLComputeCommandEncoder) {
         commandEncoder.setComputePipelineState(calculateIntersectionsPipeline)
         
-        let nextBuffer = 1 - currentBuffer
-        
-        let buffers: [MTLBuffer?] = [
+        let buffers = [
             rayBuffers[currentBuffer].origins,
             rayBuffers[currentBuffer].directions,
             rayBuffers[currentBuffer].throughputs,
-            rayBuffers[currentBuffer].pixelIndices,
-            rayBuffers[currentBuffer].rngStates,
-            rayBuffers[currentBuffer].rayAlive,
+            
+            intersectionResultBuffer,
+            
+            escapedQueueBuffer,
+            intersectedQueueBuffer,
             
             rayCountBuffer,
-            
-            intersectionCountBuffer,
-            intersectionPositionsBuffer,
-            intersectionNormalsBuffer,
-            intersectionSampledMaterialsBuffer,
-            intersectionLightIndicesBuffer,
-            intersectionEmissionBuffer,
+            escapedRayCountBuffer,
+            intersectedRayCountBuffer,
             
             textureArgumentBuffer,
             MaterialRegistry.shared.getBuffer(),
             scene.instanceLightIndicesBuffer,
+        ]
+        
+        for (i, buffer) in buffers.enumerated() {
+            commandEncoder.setBuffer(buffer, offset: 0, index: i)
+        }
+
+        commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
+        commandEncoder.setBuffer(instanceBuffer, offset: 0, index: buffers.count + 1)
+        commandEncoder.setAccelerationStructure(instanceAccelerationStructure, bufferIndex: buffers.count + 2)
+        
+        // bind resources
+        commandEncoder.useResources(TextureRegistry.shared.getTextures(), usage: .read)
+        for primitiveAccel in primitiveAccelerationStructures { commandEncoder.useResource(primitiveAccel, usage: .read) }
+        
+        // dispatch
+        let threadsPerGroup = calculateIntersectionsPipeline.threadExecutionWidth
+        let threadgroups = (Int(rayCount) + threadsPerGroup - 1) / threadsPerGroup
+        
+        commandEncoder.dispatchThreadgroups(MTLSize(width: threadgroups, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1))
+    }
+    
+    private func handleEscapedRays(_ commandEncoder: MTLComputeCommandEncoder) {
+        commandEncoder.setComputePipelineState(handleEscapedRaysPipeline)
+        
+        let buffers = [
+            accumulationBuffer,
             
-            instanceBuffer,
+            rayBuffers[currentBuffer].directions,
+            rayBuffers[currentBuffer].throughputs,
+            rayBuffers[currentBuffer].pixelIndices,
+            
+            escapedQueueBuffer,
+            
+            escapedRayCountBuffer,
+        ]
+        
+        let textures = [
+            scene.environmentMapTexture
         ]
         
         for (i, buffer) in buffers.enumerated() {
             commandEncoder.setBuffer(buffer, offset: 0, index: i)
         }
         
-        commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
-        commandEncoder.setAccelerationStructure(instanceAccelerationStructure, bufferIndex: buffers.count + 1)
-        
-        let textures = TextureRegistry.shared.getTextures()
-        commandEncoder.useResources(textures, usage: .read)
-        for primitiveAccel in primitiveAccelerationStructures {
-            commandEncoder.useResource(primitiveAccel, usage: .read)
-        }
-        
-        let threadsPerGroup = calculateIntersectionsPipeline.threadExecutionWidth
-        assert(rayCount > 0)
-        let threadgroups = (rayCount + threadsPerGroup - 1) / threadsPerGroup
-        commandEncoder.dispatchThreadgroups(
-            MTLSize(width: threadgroups, height: 1, depth: 1),
-            threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1)
-        )
-        commandEncoder.endEncoding()
-    }
-    
-    private func calculateIntersectionsWithCompaction(commandBuffer: MTLCommandBuffer, rayCount: Int) {
-        guard rayCount > 0 else { return }
-        let nextBuffer = 1 - currentBuffer
-        
-        let blitEncoder = commandBuffer.makeBlitCommandEncoder()!
-        blitEncoder.fill(buffer: intersectionCountBuffer, range: 0..<MemoryLayout<UInt32>.stride, value: 0)
-        blitEncoder.fill(buffer: rayBuffers[nextBuffer].rayAlive, range: 0..<rayBuffers[nextBuffer].rayAlive.length, value: 0)
-        blitEncoder.endEncoding()
-        
-        guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else { return }
-        
-        commandEncoder.setComputePipelineState(calculateIntersectionsWithCompactionPipeline)
-        
-        let buffers: [MTLBuffer?] = [
-            rayBuffers[currentBuffer].origins,
-            rayBuffers[currentBuffer].directions,
-            rayBuffers[currentBuffer].throughputs,
-            rayBuffers[currentBuffer].pixelIndices,
-            rayBuffers[currentBuffer].rngStates,
-            rayBuffers[currentBuffer].rayAlive,
-            
-            rayBuffers[nextBuffer].origins,
-            rayBuffers[nextBuffer].directions,
-            rayBuffers[nextBuffer].throughputs,
-            rayBuffers[nextBuffer].pixelIndices,
-            rayBuffers[nextBuffer].rngStates,
-            rayBuffers[nextBuffer].rayAlive,
-            
-            rayCountBuffer,
-            
-            intersectionCountBuffer,
-            intersectionPositionsBuffer,
-            intersectionNormalsBuffer,
-            intersectionSampledMaterialsBuffer,
-            intersectionLightIndicesBuffer,
-            intersectionEmissionBuffer,
-            
-            textureArgumentBuffer,
-            MaterialRegistry.shared.getBuffer(),
-            scene.instanceLightIndicesBuffer,
-            
-            instanceBuffer,
-        ]
-        
-        for (i, buffer) in buffers.enumerated() {
-            commandEncoder.setBuffer(buffer, offset: 0, index: i)
+        for (i, texture) in textures.enumerated() {
+            commandEncoder.setTexture(texture, index: i)
         }
         
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
-        commandEncoder.setAccelerationStructure(instanceAccelerationStructure, bufferIndex: buffers.count + 1)
         
-        let textures = TextureRegistry.shared.getTextures()
-        commandEncoder.useResources(textures, usage: .read)
-        for primitiveAccel in primitiveAccelerationStructures {
-            commandEncoder.useResource(primitiveAccel, usage: .read)
-        }
+        // bind resources
+        commandEncoder.useResources(TextureRegistry.shared.getTextures(), usage: .read) // TODO: need ts?
+        for primitiveAccel in primitiveAccelerationStructures { commandEncoder.useResource(primitiveAccel, usage: .read) }
         
-        let threadsPerGroup = calculateIntersectionsPipeline.threadExecutionWidth
-        assert(rayCount > 0)
-        let threadgroups = (rayCount + threadsPerGroup - 1) / threadsPerGroup
-        commandEncoder.dispatchThreadgroups(
-            MTLSize(width: threadgroups, height: 1, depth: 1),
-            threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1)
-        )
-        commandEncoder.endEncoding()
+        // dispatch
+        let threadsPerGroup = handleEscapedRaysPipeline.threadExecutionWidth
+        let threadgroups = (Int(rayCount) + threadsPerGroup - 1) / threadsPerGroup
         
-        currentBuffer = 1 - currentBuffer
+        commandEncoder.dispatchThreadgroups(MTLSize(width: threadgroups, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1))
     }
     
-    private func sampleBXDFs(commandBuffer: MTLCommandBuffer, rayCount: Int, bounceIndex: UInt32) {
-        guard rayCount > 0 else { return }
-        
-        let blitEncoder = commandBuffer.makeBlitCommandEncoder()!
-        blitEncoder.fill(buffer: nextRayCountBuffer, range: 0..<MemoryLayout<UInt32>.stride, value: 0)
-        blitEncoder.endEncoding()
-        
-        guard let commandEncoder = commandBuffer.makeComputeCommandEncoder() else {
-            return
-        }
-        
+    
+    private func sampleBXDFs(_ commandEncoder: MTLComputeCommandEncoder, bounceIndex: UInt32) {
         var bounces = bounceIndex
         let nextBuffer = 1 - currentBuffer
         
@@ -251,123 +185,135 @@ class WaveFrontRenderer: Renderer {
         
         let buffers: [MTLBuffer?] = [
             accumulationBuffer,
-
+            
             rayBuffers[currentBuffer].origins,
             rayBuffers[currentBuffer].directions,
             rayBuffers[currentBuffer].throughputs,
             rayBuffers[currentBuffer].pixelIndices,
-            rayBuffers[currentBuffer].rngStates,
+            rayBuffers[currentBuffer].rngDimensions,
             
             rayBuffers[nextBuffer].origins,
             rayBuffers[nextBuffer].directions,
             rayBuffers[nextBuffer].throughputs,
             rayBuffers[nextBuffer].pixelIndices,
-            rayBuffers[nextBuffer].rngStates,
+            rayBuffers[nextBuffer].rngDimensions,
             
-            rayCountBuffer,
-            nextRayCountBuffer,
-            rayBuffers[currentBuffer].rayAlive,
+            intersectionResultBuffer,
             
-            intersectionPositionsBuffer,
-            intersectionNormalsBuffer,
-            intersectionSampledMaterialsBuffer,
-            intersectionLightIndicesBuffer,
-            intersectionEmissionBuffer,
+            intersectedQueueBuffer,
+            
+            intersectedRayCountBuffer,
+            survivedRayCountBuffer,
+
+            scene.sobolData.buffer,
+            textureArgumentBuffer,
+            MaterialRegistry.shared.getBuffer(),
+            scene.instanceLightIndicesBuffer
         ]
         
         for (i, buffer) in buffers.enumerated() {
             commandEncoder.setBuffer(buffer, offset: 0, index: i)
         }
         
+        commandEncoder.setBytes(&bounces, length: MemoryLayout<UInt32>.stride, index: buffers.count)
+        
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
-        commandEncoder.setBytes(&bounces, length: MemoryLayout<UInt32>.stride, index: buffers.count + 1)
+        commandEncoder.setBuffer(instanceBuffer, offset: 0, index: buffers.count + 1)
+        commandEncoder.setAccelerationStructure(instanceAccelerationStructure, bufferIndex: buffers.count + 2)
+        commandEncoder.setBytes(&bounces, length: MemoryLayout<UInt32>.stride, index: buffers.count + 3)
+
+        // bind resources
+        commandEncoder.useResources(TextureRegistry.shared.getTextures(), usage: .read) // TODO: need ts?
+        for primitiveAccel in primitiveAccelerationStructures { commandEncoder.useResource(primitiveAccel, usage: .read) }
         
+        // dispatch
         let threadsPerGroup = sampleBXDFsPipeline.threadExecutionWidth
-        let threadgroups = (rayCount + threadsPerGroup - 1) / threadsPerGroup
-        commandEncoder.dispatchThreadgroups(
-            MTLSize(width: threadgroups, height: 1, depth: 1),
-            threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1)
-        )
-        commandEncoder.endEncoding()
+        let threadgroups = (Int(rayCount) + threadsPerGroup - 1) / threadsPerGroup
+        commandEncoder.dispatchThreadgroups(MTLSize(width: threadgroups, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1))
     }
-        
+    
     override func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         super.mtkView(view, drawableSizeWillChange: size)
         
         let requiredPixels = Int(size.width) * Int(size.height)
-
+        
         createWaveFrontBuffers(maxRays: requiredPixels)
         bufferPixels = requiredPixels
     }
     
     override func draw(in view: MTKView) {
         _ = semaphore.wait(timeout: .distantFuture)
-        
-        guard let commandBuffer = queue.makeCommandBuffer() else {
-            return
-        }
-        
-        commandBuffer.addCompletedHandler { _ in
-            self.semaphore.signal()
-        }
-        
+                
         processCameraInput()
         updateUniforms()
         
-        var rayCount: Int = Int(drawableSize.width) * Int(drawableSize.height)
+        // ============ Camera rays ============
+        guard let setupCmdBuffer = queue.makeCommandBuffer() else {
+            semaphore.signal()
+            return
+        }
+                
+        setUInt32BufferValue(rayCountBuffer, value: Int(drawableSize.width) * Int(drawableSize.height))
         
-        let width = Int(drawableSize.width)
-        let height = Int(drawableSize.height)
+        let setupEncoder = setupCmdBuffer.makeComputeCommandEncoder()!
+        createCameraRays(setupEncoder)
+        setupEncoder.endEncoding()
         
-        let threadWidth = createCameraRaysPipeline.threadExecutionWidth
-        let threadHeight = createCameraRaysPipeline.maxTotalThreadsPerThreadgroup / threadWidth
-        
-        let threadsPerThreadgroup = MTLSize(width: threadWidth, height: threadHeight, depth: 1)
-        let threadgroups = MTLSize(width: (width + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
-                                   height: (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
-                                   depth: 1)
-        
-        createCameraRays(commandBuffer: commandBuffer, threadgroups: threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        
-        for bounce in 0..<11 {
+        setupCmdBuffer.commit()
+        setupCmdBuffer.waitUntilCompleted()
+                
+        for bounce in 0..<MAX_PATH_LENGTH {
             if rayCount == 0 { break }
             
-            guard let bounceCommandBuffer = queue.makeCommandBuffer() else { return }
+            setUInt32BufferValue(escapedRayCountBuffer, value: 0)
+            setUInt32BufferValue(intersectedRayCountBuffer, value: 0)
+            setUInt32BufferValue(survivedRayCountBuffer, value: 0)
+
+            guard let bounceCmdBuffer = queue.makeCommandBuffer() else { break }
+            let encoder = bounceCmdBuffer.makeComputeCommandEncoder()!
             
-            if false {
-                calculateIntersectionsWithCompaction(commandBuffer: bounceCommandBuffer, rayCount: rayCount)
-            } else {
-                calculateIntersections(commandBuffer: bounceCommandBuffer, rayCount: rayCount)
-            }
+            calculateIntersections(encoder)
+            encoder.memoryBarrier(scope: .buffers)
             
-            sampleBXDFs(commandBuffer: bounceCommandBuffer, rayCount: rayCount, bounceIndex: UInt32(bounce))
+            handleEscapedRays(encoder)
+            encoder.memoryBarrier(scope: .buffers)
             
-            bounceCommandBuffer.commit()
-            bounceCommandBuffer.waitUntilCompleted()
+            sampleBXDFs(encoder, bounceIndex: UInt32(bounce))
             
+            encoder.endEncoding()
+            bounceCmdBuffer.commit()
+            bounceCmdBuffer.waitUntilCompleted()
+            
+            // Swap for next bounce
             currentBuffer = 1 - currentBuffer
-            swap(&rayCountBuffer, &nextRayCountBuffer)
-            rayCount = Int(rayCountBuffer.contents().load(as: UInt32.self))
-            
-//            print("bounce \(bounce): \(rayCount) rays")
+            swap(&rayCountBuffer, &survivedRayCountBuffer)
+            print("bounce \(bounce): \(rayCount) rays")
         }
         
-        guard let finalCommandBuffer = queue.makeCommandBuffer() else { return }
-        finalCommandBuffer.addCompletedHandler { _ in self.semaphore.signal() }
-        finalizeAccumulation(commandBuffer: finalCommandBuffer)
+        // ============ Finalize + present ============
+        guard let finalCmdBuffer = queue.makeCommandBuffer() else {
+            semaphore.signal()
+            return
+        }
+        finalCmdBuffer.addCompletedHandler { _ in self.semaphore.signal() }
         
-        presentDrawable(view: view, commandBuffer: finalCommandBuffer)
-        finalCommandBuffer.commit()
+        finalizeAccumulation(commandBuffer: finalCmdBuffer)
+        presentDrawable(view: view, commandBuffer: finalCmdBuffer)
+        
+        finalCmdBuffer.commit()
+        
+        print("------")
     }
 }
 
+func setUInt32BufferValue(_ buffer: MTLBuffer, value: Int) {
+    buffer.contents().storeBytes(of: UInt32(value), as: UInt32.self)
+}
+    
 struct RayBuffers {
     var origins: MTLBuffer
     var directions: MTLBuffer
     var throughputs: MTLBuffer
     var pixelIndices: MTLBuffer
-    var rngStates: MTLBuffer
-    var rayAlive: MTLBuffer
+    var rngDimensions: MTLBuffer
 }

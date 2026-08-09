@@ -111,7 +111,7 @@ class SPPMRenderer: Renderer {
         computeEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
 
         // dispatch
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: createCameraRaysPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: createCameraRaysPipeline)
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
     }
@@ -169,7 +169,7 @@ class SPPMRenderer: Renderer {
         for primitiveAccel in primitiveAccelerationStructures { computeEncoder.useResource(primitiveAccel, usage: .read) }
 
         // dispatch
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: generateHitPointsPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: generateHitPointsPipeline)
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
     }
@@ -207,7 +207,7 @@ class SPPMRenderer: Renderer {
         computeEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: buffers.count)
                 
         // dispatch
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: createHashGridPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: createHashGridPipeline)
         computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
     }
@@ -283,7 +283,7 @@ class SPPMRenderer: Renderer {
         commandEncoder.setBuffer(uniformBuffer, offset: uniformBufferOffset, index: 1)
         commandEncoder.setTexture(finalImage, index: 0)
         
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: finalizeAccumulationPipeline)
         commandEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
         commandEncoder.endEncoding()
     }

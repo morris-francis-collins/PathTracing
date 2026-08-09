@@ -45,7 +45,7 @@ class PathTracingRenderer: Renderer {
         processCameraInput()
         updateUniforms()
                 
-        let (threadsPerThreadgroup, threadgroups) = getDispatchSize2D(pipeline: pathTracingPipeline)
+        let (threadgroups, threadsPerThreadgroup) = getDispatchSize2D(pipeline: pathTracingPipeline)
                 
         guard let computeEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return

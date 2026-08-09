@@ -104,6 +104,7 @@ struct SampledMaterial {
     vector_float3 emission;
  
     int BXDFs;
+    
 #ifdef __METAL_VERSION__
     bool isPerfectSpecular() {
         return roughness < 0.01f and (transmission > 0.01f or metallic > 0.5f);

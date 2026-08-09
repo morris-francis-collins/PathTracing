@@ -11,11 +11,27 @@
 #include "Utility.h"
 #include "Materials.h"
 
+#define INTERSECTION_RESULT_STRIDE 64
+
 struct PrimitiveData {
     vector_float3 n0, n1, n2;
     vector_float2 uv0, uv1, uv2;
     int materialIndex;
     int primitiveLightIndex;
+};
+
+struct SurfaceInteraction {
+    SampledMaterial material;
+    vector_float3 position;
+    vector_float3 normal;
+    vector_float3 emission;
+    int lightIndex;
+
+#ifdef __METAL_VERSION__
+    bool hitLight() {
+        return lightIndex != -1;
+    }
+#endif
 };
 
 #ifdef __METAL_VERSION__
@@ -25,30 +41,6 @@ using namespace raytracing;
 
 struct Textures {
     array<texture2d<float>, MAX_TEXTURES> textures;
-};
-
-struct SurfaceInteraction {
-    float3 position;
-    float3 normal;
-    SampledMaterial material;
-    int lightIndex;
-    float3 emission;
-    
-    SurfaceInteraction() {
-        
-    }
-    
-    SurfaceInteraction(float3 _position, float3 _normal, SampledMaterial _material, int _lightIndex, float3 _emission) {
-        position = _position;
-        normal = _normal;
-        material = _material;
-        lightIndex = _lightIndex;
-        emission = _emission;
-    }
-    
-    bool hitLight() {
-        return lightIndex != -1;
-    }
 };
 
 struct IntersectionResult {

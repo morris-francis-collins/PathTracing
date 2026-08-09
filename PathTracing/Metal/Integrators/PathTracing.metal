@@ -125,7 +125,7 @@ float3 pathIntegrator(float2 pixel,
             constant Light& light = lights[surfaceInteraction.lightIndex];
             float3 color = surfaceInteraction.emission;
 
-            if (true or prevSpecular) {
+            if (prevSpecular) {
                 contribution += throughput * color;
             } else {
                 float lightPDF = getLightSelectionPDF(light, lightAliasEntries) * getLightSamplePDF(light);
@@ -141,7 +141,7 @@ float3 pathIntegrator(float2 pixel,
         float epsilon = calculateEpsilon(surfaceInteraction.position);
         prevSpecular = bsdfSample.delta;
 
-        if (false and !bsdfSample.delta) {
+        if (!bsdfSample.delta) {
             contribution += sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, surfaceInteraction, material, uniforms, instances, accelerationStructure);
         }
                 
