@@ -130,9 +130,9 @@ struct BSDFSample {
     bool transmitted;
 };
 
-BSDFSample sampleBXDF(float3 wi, float3 n, SampledMaterial material, TransportMode transportMode, float3 r3);
-float3 getBXDF(float3 wi, float3 wo, float3 n, SampledMaterial material, TransportMode transportMode);
-float getPDF(float3 wi, float3 wo, float3 n, SampledMaterial material);
+BSDFSample sampleBXDF(float3 wi, float3 n, thread SampledMaterial& material, TransportMode transportMode, float3 r3);
+float3 getBXDF(float3 wi, float3 wo, float3 n, thread SampledMaterial& material, TransportMode transportMode);
+float getPDF(float3 wi, float3 wo, float3 n, thread SampledMaterial& material);
 
 inline float3 sampleCosineWeightedHemisphere(float2 u) {
     float phi = 2.0f * M_PI_F * u.x;

@@ -28,9 +28,8 @@ float3 sampleNEE(float3 throughput,
                  texture2d<float> environmentMapTexture,
                  constant AliasEntry* environmentMapAliasEntries,
                         
-                 SurfaceInteraction si,
-                 SampledMaterial material,
-                        
+                 thread SurfaceInteraction& si,
+
                  constant Uniforms& uniforms,
                  device MTLAccelerationStructureInstanceDescriptor* instances,
                  instance_acceleration_structure accelerationStructure);

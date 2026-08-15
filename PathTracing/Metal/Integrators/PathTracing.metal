@@ -24,9 +24,8 @@ float3 sampleNEE(float3 throughput,
                  texture2d<float> environmentMapTexture,
                  constant AliasEntry* environmentMapAliasEntries,
                         
-                 SurfaceInteraction si,
-                 SampledMaterial material,
-                        
+                 thread SurfaceInteraction& si,
+
                  constant Uniforms& uniforms,
                  device MTLAccelerationStructureInstanceDescriptor* instances,
                  instance_acceleration_structure accelerationStructure)
@@ -40,14 +39,14 @@ float3 sampleNEE(float3 throughput,
     float cosLight = light.type == AREA_LIGHT ? dot(-wo, ls.normal) : 1.0f;
 
     if (cosCamera > 0.0f && cosLight > 0.0f && isVisible(si.position, si.normal, ls.position, ls.normal, instances, accelerationStructure)) {
-        float3 BSDF = getBXDF(wi, wo, si.normal, material, Radiance);
+        float3 BSDF = getBXDF(wi, wo, si.normal, si.material, Radiance);
         float G = cosCamera * cosLight / (ls.distance * ls.distance);
         float lightPDF = selectionPDF * ls.PDF;
 
         if (light.isDelta()) {
             return throughput * BSDF * ls.emission * G / lightPDF;
         } else {
-            float bsdfPDF = getPDF(wi, wo, si.normal, material);
+            float bsdfPDF = getPDF(wi, wo, si.normal, si.material);
             float weight = powerHeuristic(lightPDF, bsdfPDF);
             return throughput * BSDF * ls.emission * G * weight / lightPDF;
         }
@@ -102,19 +101,18 @@ float3 pathIntegrator(float2 pixel,
         }
         
         SurfaceInteraction surfaceInteraction = getSurfaceInteraction(ray, intersection, instances, accelerationStructure, instanceLightIndices, textures, materials);
-        SampledMaterial material = surfaceInteraction.material;
-        
-        if (material.BXDFs == DIFFUSE || material.BXDFs == CONDUCTOR || material.BXDFs == DIELECTRIC_REFLECTION) { // TODO: move to surface interaction
+
+        if (surfaceInteraction.material.BXDFs == DIFFUSE || surfaceInteraction.material.BXDFs == CONDUCTOR || surfaceInteraction.material.BXDFs == DIELECTRIC_REFLECTION) { // TODO: move to surface interaction
             if (dot(-ray.direction, surfaceInteraction.normal) < 0.0f)
                 surfaceInteraction.normal = -surfaceInteraction.normal;
         }
-        
-        if (material.alphaMode == ALPHA_MASK && material.alpha < material.alphaCutoff) {
+
+        if (surfaceInteraction.material.alphaMode == ALPHA_MASK && surfaceInteraction.material.alpha < surfaceInteraction.material.alphaCutoff) {
             ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
             continue;
         }
-        
-        if (material.alphaMode == ALPHA_BLEND && sampler.r() > material.alpha) {
+
+        if (surfaceInteraction.material.alphaMode == ALPHA_BLEND && sampler.r() > surfaceInteraction.material.alpha) {
             ray.origin = surfaceInteraction.position + ray.direction * 1e-4f;
             continue;
         }
@@ -134,7 +132,7 @@ float3 pathIntegrator(float2 pixel,
             }
         }
         
-        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, material, Radiance, sampler.r3());
+        BSDFSample bsdfSample = sampleBXDF(-ray.direction, n, surfaceInteraction.material, Radiance, sampler.r3());
         
         PDF = bsdfSample.PDF;
         float3 wo = bsdfSample.wo;
@@ -142,7 +140,7 @@ float3 pathIntegrator(float2 pixel,
         prevSpecular = bsdfSample.delta;
 
         if (!bsdfSample.delta) {
-            contribution += sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, surfaceInteraction, material, uniforms, instances, accelerationStructure);
+            contribution += sampleNEE(throughput, ray, lights, lightTriangles, sampler, textures, lightAliasEntries, lightTriangleAliasEntries, environmentMapTexture, environmentMapAliasEntries, surfaceInteraction, uniforms, instances, accelerationStructure);
         }
                 
         throughput *= bsdfSample.BSDF * abs(dot(wo, n)) / bsdfSample.PDF;
